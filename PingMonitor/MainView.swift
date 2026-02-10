@@ -1,0 +1,1644 @@
+import SwiftUI
+import UniformTypeIdentifiers
+
+struct MainView: View {
+    @ObservedObject var viewModel: PingMonitorViewModel
+    @State private var selectedTab = 0
+
+    var body: some View {
+        VStack(spacing: 0) {
+            headerView
+
+            Picker("", selection: $selectedTab) {
+                Text("监控").tag(0)
+                Text("统计").tag(1)
+                Text("主机管理").tag(2)
+                Text("日志").tag(3)
+                Text("设置").tag(4)
+            }
+            .pickerStyle(.segmented)
+            .padding()
+
+            Group {
+                switch selectedTab {
+                case 0:
+                    MonitorTab(viewModel: viewModel)
+                case 1:
+                    StatisticsTab(viewModel: viewModel)
+                case 2:
+                    HostManagementTab(viewModel: viewModel)
+                case 3:
+                    LogsTab()
+                case 4:
+                    SettingsTab(viewModel: viewModel)
+                default:
+                    MonitorTab(viewModel: viewModel)
+                }
+            }
+
+            versionView
+        }
+        .frame(minWidth: 900, minHeight: 650)
+    }
+
+    private var headerView: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "network")
+                .font(.title2)
+                .foregroundStyle(.tint)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Ping Monitor")
+                    .font(.headline)
+                Text(viewModel.isRunning ? "运行中" : "已停止")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            Button(action: { viewModel.toggle() }) {
+                Label(viewModel.isRunning ? "停止" : "开始", systemImage: viewModel.isRunning ? "stop.fill" : "play.fill")
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(viewModel.isRunning ? .red : .green)
+            .controlSize(.small)
+        }
+        .padding()
+        .background(.ultraThinMaterial)
+    }
+
+    private var versionView: some View {
+        Group {
+            if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String {
+                Text("Version \(version)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .padding(.bottom, 8)
+            }
+        }
+    }
+}
+
+// MARK: - 统计 Tab
+struct StatisticsTab: View {
+    @ObservedObject var viewModel: PingMonitorViewModel
+    @State private var selectedHost: HostConfig?
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // 主机选择器
+            if viewModel.hosts.count > 1 {
+                Picker("选择主机", selection: $selectedHost) {
+                    Text("全部主机").tag(nil as HostConfig?)
+                    ForEach(viewModel.hosts) { host in
+                        Text(host.name).tag(host as HostConfig?)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .padding()
+            }
+            
+            if let host = selectedHost ?? viewModel.hosts.first {
+                StatisticsContentView(viewModel: viewModel, host: host)
+            } else {
+                ContentUnavailableView("没有主机", systemImage: "network", description: Text("添加主机查看统计"))
+            }
+        }
+    }
+}
+
+struct StatisticsContentView: View {
+    @ObservedObject var viewModel: PingMonitorViewModel
+    let host: HostConfig?
+    
+    // 聚合所有主机的统计数据
+    var aggregatedStats: AggregatedStats {
+        if let singleHost = host {
+            // 单个主机模式
+            let stats = viewModel.hostStats[singleHost.id]
+            return AggregatedStats(
+                totalPings: stats?.totalPings ?? 0,
+                successfulPings: stats?.successfulPings ?? 0,
+                failedPings: stats?.failedPings ?? 0,
+                totalBytesSent: stats?.totalBytesSent ?? 0,
+                totalBytesReceived: stats?.totalBytesReceived ?? 0,
+                minLatency: stats?.minLatency,
+                maxLatency: stats?.maxLatency,
+                avgLatency: stats?.avgLatency ?? 0,
+                latencyHistory: stats?.latencyHistory ?? [],
+                startTime: stats?.startTime ?? Date(),
+                isAggregated: false,
+                hostCount: 1
+            )
+        } else {
+            // 全部主机聚合模式
+            var totalPings = 0
+            var successfulPings = 0
+            var failedPings = 0
+            var totalBytesSent: Int64 = 0
+            var totalBytesReceived: Int64 = 0
+            var minLatency: Double?
+            var maxLatency: Double?
+            var totalAvgLatency: Double = 0
+            var allLatencyHistory: [LatencyPoint] = []
+            var earliestStartTime = Date()
+            var hostCount = 0
+            
+            for (hostId, stats) in viewModel.hostStats {
+                totalPings += stats.totalPings
+                successfulPings += stats.successfulPings
+                failedPings += stats.failedPings
+                totalBytesSent += stats.totalBytesSent
+                totalBytesReceived += stats.totalBytesReceived
+                
+                if let hostMinLatency = stats.minLatency {
+                    minLatency = minLatency == nil ? hostMinLatency : Swift.min(minLatency!, hostMinLatency)
+                }
+                if let hostMaxLatency = stats.maxLatency {
+                    maxLatency = maxLatency == nil ? hostMaxLatency : Swift.max(maxLatency!, hostMaxLatency)
+                }
+                
+                totalAvgLatency += stats.avgLatency
+                allLatencyHistory.append(contentsOf: stats.latencyHistory)
+                
+                if stats.startTime < earliestStartTime {
+                    earliestStartTime = stats.startTime
+                }
+                
+                hostCount += 1
+            }
+            
+            // 按时间排序历史记录
+            allLatencyHistory.sort { $0.timestamp < $1.timestamp }
+            // 限制总数
+            if allLatencyHistory.count > 100 {
+                allLatencyHistory = Array(allLatencyHistory.suffix(100))
+            }
+            
+            return AggregatedStats(
+                totalPings: totalPings,
+                successfulPings: successfulPings,
+                failedPings: failedPings,
+                totalBytesSent: totalBytesSent,
+                totalBytesReceived: totalBytesReceived,
+                minLatency: minLatency,
+                maxLatency: maxLatency,
+                avgLatency: hostCount > 0 ? totalAvgLatency / Double(hostCount) : 0,
+                latencyHistory: allLatencyHistory,
+                startTime: earliestStartTime,
+                isAggregated: true,
+                hostCount: hostCount
+            )
+        }
+    }
+    
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                // 概览卡片
+                OverviewCardsView(stats: aggregatedStats)
+                
+                // 延迟图表
+                if !aggregatedStats.latencyHistory.isEmpty {
+                    LatencyChartView(history: aggregatedStats.latencyHistory)
+                        .frame(height: 200)
+                }
+                
+                // 详细统计
+                DetailedStatsView(stats: aggregatedStats)
+                
+                // 操作按钮
+                HStack {
+                    if let singleHost = host {
+                        Button("重置当前主机统计") {
+                            viewModel.resetStats(for: singleHost.id)
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                    
+                    Button("重置所有统计") {
+                        viewModel.resetAllStats()
+                    }
+                    .buttonStyle(.bordered)
+                    .foregroundStyle(.red)
+                }
+                .padding(.top)
+            }
+            .padding()
+        }
+    }
+}
+
+// 聚合统计数据结构
+struct AggregatedStats {
+    var totalPings: Int
+    var successfulPings: Int
+    var failedPings: Int
+    var totalBytesSent: Int64
+    var totalBytesReceived: Int64
+    var minLatency: Double?
+    var maxLatency: Double?
+    var avgLatency: Double
+    var latencyHistory: [LatencyPoint]
+    var startTime: Date
+    var isAggregated: Bool
+    var hostCount: Int
+    
+    var packetLossRate: Double {
+        guard totalPings > 0 else { return 0 }
+        return Double(failedPings) / Double(totalPings) * 100
+    }
+    
+    var successRate: Double {
+        guard totalPings > 0 else { return 0 }
+        return Double(successfulPings) / Double(totalPings) * 100
+    }
+    
+    var totalTraffic: String {
+        let total = totalBytesSent + totalBytesReceived
+        return formatBytes(total)
+    }
+    
+    private func formatBytes(_ bytes: Int64) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.allowedUnits = [.useBytes, .useKB, .useMB, .useGB]
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: bytes)
+    }
+}
+
+struct OverviewCardsView: View {
+    let stats: AggregatedStats
+    
+    var body: some View {
+        LazyVGrid(columns: [
+            GridItem(.flexible()),
+            GridItem(.flexible()),
+            GridItem(.flexible()),
+            GridItem(.flexible())
+        ], spacing: 16) {
+            StatCard(
+                title: stats.isAggregated ? "总请求数" : "请求数",
+                value: "\(stats.totalPings)",
+                icon: "number.circle.fill",
+                color: .blue
+            )
+            
+            StatCard(
+                title: "成功率",
+                value: String(format: "%.1f%%", stats.successRate),
+                icon: "checkmark.circle.fill",
+                color: .green
+            )
+            
+            StatCard(
+                title: "丢包率",
+                value: String(format: "%.1f%%", stats.packetLossRate),
+                icon: "xmark.circle.fill",
+                color: stats.packetLossRate > 5 ? .red : .orange
+            )
+            
+            StatCard(
+                title: "总流量",
+                value: stats.totalTraffic,
+                icon: "arrow.up.arrow.down.circle.fill",
+                color: .purple
+            )
+        }
+    }
+}
+
+struct StatCard: View {
+    let title: String
+    let value: String
+    let icon: String
+    let color: Color
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.title2)
+                .foregroundStyle(color)
+            
+            Text(value)
+                .font(.system(.title2, design: .rounded, weight: .bold))
+                .foregroundStyle(.primary)
+            
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding()
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+struct LatencyChartView: View {
+    let history: [LatencyPoint]
+    @State private var hoveredPoint: LatencyPoint?
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("延迟趋势")
+                    .font(.system(size: 14, weight: .semibold))
+                
+                Spacer()
+                
+                if let point = hoveredPoint {
+                    Text("\(Int(point.latency))ms")
+                        .font(.system(size: 12, weight: .bold, design: .monospaced))
+                        .foregroundStyle(latencyColor(for: point.latency))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(latencyColor(for: point.latency).opacity(0.15))
+                        .clipShape(Capsule())
+                } else {
+                    Text("最近 \(history.count) 次")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            
+            GeometryReader { geometry in
+                chartContent(size: geometry.size)
+            }
+            .frame(height: 180)
+            
+            HStack {
+                latencyLegend("优秀", color: .green)
+                latencyLegend("良好", color: .orange)
+                latencyLegend("较差", color: .red)
+                Spacer()
+            }
+            .font(.system(size: 10))
+        }
+        .padding(16)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+    
+    private func chartContent(size: CGSize) -> some View {
+        let width = size.width - 60
+        let height = size.height
+        
+        return ZStack {
+            Path { path in
+                path.move(to: CGPoint(x: 60, y: height))
+                for (index, point) in history.enumerated() {
+                    let x = 60 + CGFloat(index) * (width / CGFloat(max(history.count - 1, 1)))
+                    let normalizedY = (point.latency - minLatency) / (maxLatency - minLatency)
+                    let y = height - CGFloat(normalizedY) * height
+                    path.addLine(to: CGPoint(x: x, y: y))
+                }
+                path.addLine(to: CGPoint(x: width + 60, y: height))
+                path.closeSubpath()
+            }
+            .fill(
+                LinearGradient(
+                    colors: [.blue.opacity(0.25), .blue.opacity(0.05)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+            
+            Canvas { context, size in
+                guard history.count > 1 else { return }
+                
+                let stepX = width / CGFloat(max(history.count - 1, 1))
+                
+                var path = Path()
+                for (index, point) in history.enumerated() {
+                    let x = 60 + CGFloat(index) * stepX
+                    let normalizedY = (point.latency - minLatency) / (maxLatency - minLatency)
+                    let y = height - CGFloat(normalizedY) * height
+                    if index == 0 {
+                        path.move(to: CGPoint(x: x, y: y))
+                    } else {
+                        path.addLine(to: CGPoint(x: x, y: y))
+                    }
+                }
+                context.stroke(path, with: .color(.blue), lineWidth: 2.5)
+                
+                for (index, point) in history.enumerated() {
+                    let x = 60 + CGFloat(index) * stepX
+                    let normalizedY = (point.latency - minLatency) / (maxLatency - minLatency)
+                    let y = height - CGFloat(normalizedY) * height
+                    let dotPath = Path(ellipseIn: CGRect(x: x - 3, y: y - 3, width: 6, height: 6))
+                    context.fill(dotPath, with: .color(latencyColor(for: point.latency)))
+                    context.stroke(dotPath, with: .color(.white), lineWidth: 1)
+                }
+            }
+        }
+    }
+    
+    private func latencyLegend(_ label: String, color: Color) -> some View {
+        HStack(spacing: 4) {
+            Circle()
+                .fill(color)
+                .frame(width: 6, height: 6)
+            Text(label)
+                .foregroundStyle(.secondary)
+        }
+    }
+    
+    private func latencyColor(for latency: Double) -> Color {
+        if latency < 50 { return .green }
+        if latency < 100 { return .orange }
+        return .red
+    }
+    
+    var minLatency: Double {
+        history.map { $0.latency }.min() ?? 0
+    }
+    
+    var maxLatency: Double {
+        max(history.map { $0.latency }.max() ?? 100, 1)
+    }
+}
+
+struct DetailedStatsView: View {
+    let stats: AggregatedStats
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(stats.isAggregated ? "详细统计 (\(stats.hostCount) 个主机)" : "详细统计")
+                .font(.headline)
+            
+            LazyVGrid(columns: [
+                GridItem(.flexible()),
+                GridItem(.flexible())
+            ], spacing: 12) {
+                StatRow(label: "成功请求", value: "\(stats.successfulPings)")
+                StatRow(label: "失败请求", value: "\(stats.failedPings)")
+                StatRow(label: "最小延迟", value: stats.minLatency != nil ? String(format: "%.2f ms", stats.minLatency!) : "N/A")
+                StatRow(label: "最大延迟", value: stats.maxLatency != nil ? String(format: "%.2f ms", stats.maxLatency!) : "N/A")
+                StatRow(label: "平均延迟", value: String(format: "%.2f ms", stats.avgLatency))
+                StatRow(label: "运行时间", value: formatDuration(stats.startTime))
+            }
+            
+            // 流量详情
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("发送流量")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(formatBytes(stats.totalBytesSent))
+                        .font(.system(.body, design: .monospaced))
+                }
+                
+                Spacer()
+                
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text("接收流量")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(formatBytes(stats.totalBytesReceived))
+                        .font(.system(.body, design: .monospaced))
+                }
+            }
+            .padding(.top, 8)
+        }
+        .padding()
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+    
+    private func formatBytes(_ bytes: Int64) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.allowedUnits = [.useBytes, .useKB, .useMB, .useGB]
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: bytes)
+    }
+    
+    private func formatDuration(_ startDate: Date) -> String {
+        let interval = Date().timeIntervalSince(startDate)
+        let hours = Int(interval) / 3600
+        let minutes = Int(interval) / 60 % 60
+        let seconds = Int(interval) % 60
+        
+        if hours > 0 {
+            return String(format: "%d小时%d分", hours, minutes)
+        } else if minutes > 0 {
+            return String(format: "%d分%d秒", minutes, seconds)
+        } else {
+            return String(format: "%d秒", seconds)
+        }
+    }
+}
+
+struct StatRow: View {
+    let label: String
+    let value: String
+    
+    var body: some View {
+        HStack {
+            Text(label)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Text(value)
+                .font(.system(.subheadline, design: .monospaced))
+                .foregroundStyle(.primary)
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+// MARK: - 监控 Tab
+struct MonitorTab: View {
+    @ObservedObject var viewModel: PingMonitorViewModel
+    @State private var editingHost: HostConfig?
+    @State private var newHostName = ""
+    @State private var newHostAddress = ""
+    @State private var newHostCommand = ""
+    @State private var newHostRules: [DisplayRule] = []
+    @State private var showingAddHost = false
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // 工具栏
+            HStack {
+                Text("监控中主机 (\(viewModel.hosts.count))")
+                    .font(.headline)
+                Spacer()
+                Button {
+                    showingAddHost = true
+                } label: {
+                    Label("添加", systemImage: "plus")
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+            }
+            .padding()
+            .background(.ultraThinMaterial)
+            
+            if viewModel.hosts.isEmpty {
+                ContentUnavailableView("没有主机", systemImage: "network", description: Text("点击右上角添加主机"))
+            } else {
+                ScrollView {
+                    LazyVGrid(columns: [
+                        GridItem(.adaptive(minimum: 280, maximum: .infinity), spacing: 12)
+                    ], spacing: 12) {
+                        ForEach(viewModel.hosts) { host in
+                            EditableHostCard(
+                                host: host,
+                                viewModel: viewModel,
+                                onEdit: {
+                                    editingHost = host
+                                    newHostName = host.name
+                                    newHostAddress = host.address
+                                    newHostCommand = host.command
+                                    newHostRules = host.displayRules
+                                },
+                                onDelete: {
+                                    if let index = viewModel.hosts.firstIndex(where: { $0.id == host.id }) {
+                                        viewModel.removeHost(at: index)
+                                    }
+                                }
+                            )
+                        }
+                    }
+                    .padding()
+                }
+            }
+        }
+        .sheet(isPresented: $showingAddHost) {
+            HostEditorSheet(
+                isPresented: $showingAddHost,
+                title: "添加主机",
+                name: $newHostName,
+                address: $newHostAddress,
+                command: $newHostCommand,
+                displayRules: $newHostRules,
+                onSave: {
+                    viewModel.addHost(name: newHostName, address: newHostAddress, command: newHostCommand, displayRules: newHostRules.isEmpty ? nil : newHostRules)
+                    resetForm()
+                }
+            )
+        }
+        .sheet(item: $editingHost) { host in
+            HostEditorSheet(
+                isPresented: Binding(
+                    get: { editingHost != nil },
+                    set: { if !$0 { editingHost = nil } }
+                ),
+                title: "编辑主机",
+                name: $newHostName,
+                address: $newHostAddress,
+                command: $newHostCommand,
+                displayRules: $newHostRules,
+                onSave: {
+                    if let index = viewModel.hosts.firstIndex(where: { $0.id == host.id }) {
+                        viewModel.updateHost(at: index, name: newHostName, address: newHostAddress, command: newHostCommand, displayRules: newHostRules)
+                    }
+                    editingHost = nil
+                }
+            )
+        }
+    }
+    
+    private func resetForm() {
+        newHostName = ""
+        newHostAddress = ""
+        newHostCommand = ""
+        newHostRules = []
+    }
+}
+
+struct EditableHostCard: View {
+    let host: HostConfig
+    let viewModel: PingMonitorViewModel
+    let onEdit: () -> Void
+    let onDelete: () -> Void
+    @State private var showingDeleteConfirm = false
+    @State private var isHovered = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .center) {
+                statusIndicator
+                
+                Text(host.name)
+                    .font(.system(size: 14, weight: .semibold))
+                    .lineLimit(1)
+                
+                Spacer()
+                
+                latencyDisplay
+            }
+            
+            Text(host.address)
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            
+            Spacer()
+            
+            rulesSection
+            activeRulesSection
+        }
+        .frame(height: 120)
+        .padding(12)
+        .background(cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(cardBorder, lineWidth: isHovered ? 2 : 1)
+        )
+        .shadow(color: .black.opacity(isHovered ? 0.15 : 0.08), radius: isHovered ? 8 : 4, y: isHovered ? 3 : 2)
+        .scaleEffect(isHovered ? 1.02 : 1.0)
+        .animation(.easeInOut(duration: 0.2), value: isHovered)
+        .onHover { hovering in
+            isHovered = hovering
+        }
+        .confirmationDialog("确认删除？", isPresented: $showingDeleteConfirm, titleVisibility: .visible) {
+            Button("删除主机", role: .destructive) {
+                onDelete()
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("删除后将无法恢复")
+        }
+    }
+    
+    private var statusIndicator: some View {
+        Circle()
+            .fill(statusColor)
+            .frame(width: 8, height: 8)
+            .shadow(color: statusColor, radius: 4)
+    }
+    
+    @ViewBuilder
+    private var latencyDisplay: some View {
+        if host.isChecking {
+            ProgressView()
+                .scaleEffect(0.7)
+                .frame(width: 50, height: 20)
+        } else if let latency = host.lastLatency {
+            HStack(spacing: 4) {
+                Image(systemName: statusIcon)
+                    .font(.system(size: 10))
+                Text("\(Int(latency))ms")
+                    .font(.system(size: 13, weight: .bold, design: .monospaced))
+            }
+            .foregroundStyle(statusColor)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(statusColor.opacity(0.12))
+            .clipShape(Capsule())
+        } else if viewModel.isRunning {
+            HStack(spacing: 2) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 10))
+                Text("超时")
+                    .font(.system(size: 11, weight: .medium))
+            }
+            .foregroundStyle(.red)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Color.red.opacity(0.12))
+            .clipShape(Capsule())
+        } else {
+            HStack(spacing: 2) {
+                Image(systemName: "pause.circle.fill")
+                    .font(.system(size: 10))
+                Text("未运行")
+                    .font(.system(size: 11))
+            }
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Color.gray.opacity(0.1))
+            .clipShape(Capsule())
+        }
+    }
+    
+    private var rulesSection: some View {
+        Group {
+            if !host.displayRules.filter({ $0.enabled }).isEmpty {
+                HStack(spacing: 4) {
+                    Image(systemName: "slider.horizontal.3")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.tertiary)
+                    
+                    ForEach(host.displayRules.filter { $0.enabled }.prefix(2)) { rule in
+                        Text("\(rule.condition == "less" ? "<" : ">")\(Int(rule.threshold))ms")
+                            .font(.system(size: 9, weight: .medium, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(Color.gray.opacity(0.1))
+                            .clipShape(RoundedRectangle(cornerRadius: 3))
+                    }
+                    
+                    if host.displayRules.filter({ $0.enabled }).count > 2 {
+                        Text("+\(host.displayRules.filter({ $0.enabled }).count - 2)")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+            }
+        }
+    }
+    
+    private var activeRulesSection: some View {
+        Group {
+            let activeRules = host.displayRules.filter { rule in
+                guard rule.enabled else { return false }
+                guard let latency = host.lastLatency else { return false }
+                if rule.condition == "less" {
+                    return latency < rule.threshold
+                } else {
+                    return latency > rule.threshold
+                }
+            }
+            
+            if !activeRules.isEmpty {
+                HStack(spacing: 4) {
+                    ForEach(activeRules.prefix(2)) { rule in
+                        Label(rule.label, systemImage: rule.condition == "less" ? "arrow.down.circle.fill" : "arrow.up.circle.fill")
+                            .font(.system(size: 10, weight: .medium))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 3)
+                            .background(rule.condition == "less" ? Color.green.opacity(0.15) : Color.orange.opacity(0.15))
+                            .foregroundStyle(rule.condition == "less" ? .green : .orange)
+                            .clipShape(Capsule())
+                    }
+                }
+            }
+        }
+    }
+    
+    private var cardBackground: some View {
+        Group {
+            if isHovered {
+                Rectangle()
+                    .fill(.ultraThinMaterial)
+            } else {
+                Rectangle()
+                    .fill(.regularMaterial)
+            }
+        }
+    }
+    
+    private var cardBorder: Color {
+        if isHovered {
+            return statusColor.opacity(0.5)
+        }
+        return statusColor.opacity(0.2)
+    }
+    
+    private var statusColor: Color {
+        guard !host.isChecking else { return .blue }
+        guard let latency = host.lastLatency else { return .gray }
+        if latency < 50 { return .green }
+        if latency < 100 { return .orange }
+        return .red
+    }
+    
+    private var statusIcon: String {
+        guard !host.isChecking else { return "checkmark" }
+        guard let latency = host.lastLatency else { return "circle" }
+        if latency < 50 { return "arrow.down" }
+        if latency < 100 { return "arrow.right" }
+        return "arrow.up"
+    }
+}
+
+// MARK: - 主机管理 Tab
+struct HostManagementTab: View {
+    @ObservedObject var viewModel: PingMonitorViewModel
+    @State private var selectedSection = 0
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            Picker("", selection: $selectedSection) {
+                Text("已保存主机 (\(viewModel.hosts.count))").tag(0)
+                Text("预设 (\(viewModel.presets.count))").tag(1)
+            }
+            .pickerStyle(.segmented)
+            .padding()
+            
+            if selectedSection == 0 {
+                HostsManagementView(viewModel: viewModel)
+            } else {
+                PresetsManagementView(viewModel: viewModel)
+            }
+        }
+    }
+}
+
+struct HostsManagementView: View {
+    @ObservedObject var viewModel: PingMonitorViewModel
+    @State private var showingAddHost = false
+    @State private var editingHost: HostConfig?
+    @State private var newHostName = ""
+    @State private var newHostAddress = ""
+    @State private var newHostCommand = ""
+    @State private var newHostRules: [DisplayRule] = []
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("管理监控主机")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button {
+                    showingAddHost = true
+                } label: {
+                    Label("添加主机", systemImage: "plus")
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 8)
+            
+            if viewModel.hosts.isEmpty {
+                ContentUnavailableView("没有主机", systemImage: "server.rack", description: Text("添加主机开始监控"))
+            } else {
+                List {
+                    ForEach(viewModel.hosts) { host in
+                        HostManagementRow(
+                            host: host,
+                            onEdit: {
+                                editingHost = host
+                                newHostName = host.name
+                                newHostAddress = host.address
+                                newHostCommand = host.command
+                                newHostRules = host.displayRules
+                            },
+                            onDelete: {
+                                if let index = viewModel.hosts.firstIndex(where: { $0.id == host.id }) {
+                                    viewModel.removeHost(at: index)
+                                }
+                            }
+                        )
+                    }
+                }
+                .listStyle(.plain)
+            }
+        }
+        .sheet(isPresented: $showingAddHost) {
+            HostEditorSheet(
+                isPresented: $showingAddHost,
+                title: "添加主机",
+                name: $newHostName,
+                address: $newHostAddress,
+                command: $newHostCommand,
+                displayRules: $newHostRules,
+                onSave: {
+                    viewModel.addHost(name: newHostName, address: newHostAddress, command: newHostCommand, displayRules: newHostRules.isEmpty ? nil : newHostRules)
+                    resetForm()
+                }
+            )
+        }
+        .sheet(item: $editingHost) { host in
+            HostEditorSheet(
+                isPresented: Binding(
+                    get: { editingHost != nil },
+                    set: { if !$0 { editingHost = nil } }
+                ),
+                title: "编辑主机",
+                name: $newHostName,
+                address: $newHostAddress,
+                command: $newHostCommand,
+                displayRules: $newHostRules,
+                onSave: {
+                    if let index = viewModel.hosts.firstIndex(where: { $0.id == host.id }) {
+                        viewModel.updateHost(at: index, name: newHostName, address: newHostAddress, command: newHostCommand, displayRules: newHostRules)
+                    }
+                    editingHost = nil
+                }
+            )
+        }
+    }
+    
+    private func resetForm() {
+        newHostName = ""
+        newHostAddress = ""
+        newHostCommand = ""
+        newHostRules = []
+    }
+}
+
+struct HostManagementRow: View {
+    let host: HostConfig
+    let onEdit: () -> Void
+    let onDelete: () -> Void
+    
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(host.name)
+                    .font(.body)
+                Text(host.address)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                
+                if !host.displayRules.filter({ $0.enabled }).isEmpty {
+                    HStack(spacing: 4) {
+                        ForEach(host.displayRules.filter { $0.enabled }.prefix(2)) { rule in
+                            Text("\(rule.condition == "less" ? "<" : ">")\(Int(rule.threshold))ms=\(rule.label)")
+                                .font(.caption2)
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 1)
+                                .background(rule.condition == "less" ? Color.green.opacity(0.2) : Color.orange.opacity(0.2))
+                                .foregroundStyle(rule.condition == "less" ? .green : .orange)
+                                .clipShape(RoundedRectangle(cornerRadius: 3))
+                        }
+                    }
+                }
+                
+                if !host.command.isEmpty {
+                    Text(host.command)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            
+            Spacer()
+            
+            HStack(spacing: 8) {
+                Button {
+                    onEdit()
+                } label: {
+                    Image(systemName: "slider.horizontal.3")
+                        .foregroundStyle(.purple)
+                }
+                .buttonStyle(.borderless)
+                .help("配置显示规则")
+                
+                Button {
+                    onEdit()
+                } label: {
+                    Image(systemName: "pencil")
+                        .foregroundStyle(.blue)
+                }
+                .buttonStyle(.borderless)
+                
+                Button {
+                    onDelete()
+                } label: {
+                    Image(systemName: "trash")
+                        .foregroundStyle(.red)
+                }
+                .buttonStyle(.borderless)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+// MARK: - Presets Management View
+struct PresetsManagementView: View {
+    @ObservedObject var viewModel: PingMonitorViewModel
+    @State private var showingAddPreset = false
+    @State private var editingPreset: HostPreset?
+    @State private var newPresetName = ""
+    @State private var newPresetAddress = ""
+    @State private var newPresetCommand = ""
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("预设快速添加")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button {
+                    showingAddPreset = true
+                } label: {
+                    Label("添加预设", systemImage: "plus")
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 8)
+            
+            if viewModel.presets.isEmpty {
+                ContentUnavailableView("没有预设", systemImage: "bookmark", description: Text("添加预设快速创建主机"))
+            } else {
+                List {
+                    ForEach(viewModel.presets) { preset in
+                        PresetManagementRow(
+                            preset: preset,
+                            viewModel: viewModel,
+                            onEdit: {
+                                editingPreset = preset
+                                newPresetName = preset.name
+                                newPresetAddress = preset.address
+                                newPresetCommand = preset.command
+                            },
+                            onDelete: {
+                                if let index = viewModel.presets.firstIndex(where: { $0.id == preset.id }) {
+                                    viewModel.removePreset(at: index)
+                                }
+                            }
+                        )
+                    }
+                }
+                .listStyle(.plain)
+            }
+        }
+        .sheet(isPresented: $showingAddPreset) {
+            PresetEditorSheet(
+                isPresented: $showingAddPreset,
+                title: "添加预设",
+                name: $newPresetName,
+                address: $newPresetAddress,
+                command: $newPresetCommand,
+                onSave: {
+                    viewModel.addPreset(name: newPresetName, address: newPresetAddress, command: newPresetCommand)
+                    resetForm()
+                }
+            )
+        }
+        .sheet(item: $editingPreset) { preset in
+            PresetEditorSheet(
+                isPresented: Binding(
+                    get: { editingPreset != nil },
+                    set: { if !$0 { editingPreset = nil } }
+                ),
+                title: "编辑预设",
+                name: $newPresetName,
+                address: $newPresetAddress,
+                command: $newPresetCommand,
+                onSave: {
+                    if let index = viewModel.presets.firstIndex(where: { $0.id == preset.id }) {
+                        viewModel.updatePreset(at: index, name: newPresetName, address: newPresetAddress, command: newPresetCommand)
+                    }
+                    editingPreset = nil
+                }
+            )
+        }
+    }
+    
+    private func resetForm() {
+        newPresetName = ""
+        newPresetAddress = ""
+        newPresetCommand = ""
+    }
+}
+
+struct PresetManagementRow: View {
+    let preset: HostPreset
+    let viewModel: PingMonitorViewModel
+    let onEdit: () -> Void
+    let onDelete: () -> Void
+
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(preset.name)
+                    .font(.body)
+                Text(preset.address)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if !preset.command.isEmpty {
+                    Text(preset.command)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer()
+            
+            HStack(spacing: 12) {
+                Button {
+                    viewModel.addHostFromPreset(preset)
+                } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .foregroundStyle(.green)
+                        .font(.title3)
+                }
+                .buttonStyle(.borderless)
+                .help("添加到监控")
+                
+                Button {
+                    onEdit()
+                } label: {
+                    Image(systemName: "pencil")
+                        .foregroundStyle(.blue)
+                }
+                .buttonStyle(.borderless)
+                
+                Button {
+                    onDelete()
+                } label: {
+                    Image(systemName: "trash")
+                        .foregroundStyle(.red)
+                }
+                .buttonStyle(.borderless)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+// MARK: - Editor Sheets
+struct HostEditorSheet: View {
+    @Binding var isPresented: Bool
+    let title: String
+    @Binding var name: String
+    @Binding var address: String
+    @Binding var command: String
+    @Binding var displayRules: [DisplayRule]
+    let onSave: () -> Void
+    @State private var showingAddRule = false
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text(title)
+                .font(.headline)
+
+            ScrollView {
+                Form {
+                    Section("基本信息") {
+                        TextField("名称", text: $name)
+                        TextField("地址", text: $address)
+                            .textContentType(.URL)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            TextField("命令 (可选)", text: $command)
+                            Text("留空使用默认: ping -c 1 -W 3 $address")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    
+                    Section("显示规则") {
+                        ForEach($displayRules) { $rule in
+                            RuleEditorRow(rule: $rule, onDelete: {
+                                if let index = displayRules.firstIndex(where: { $0.id == rule.id }) {
+                                    displayRules.remove(at: index)
+                                }
+                            })
+                        }
+                        
+                        Button {
+                            showingAddRule = true
+                        } label: {
+                            Label("添加规则", systemImage: "plus.circle")
+                        }
+                        .buttonStyle(.borderless)
+                    }
+                }
+                .formStyle(.grouped)
+            }
+
+            HStack {
+                Button("取消") {
+                    isPresented = false
+                }
+                .buttonStyle(.bordered)
+
+                Spacer()
+
+                Button("保存") {
+                    onSave()
+                    isPresented = false
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(name.isEmpty || address.isEmpty)
+            }
+        }
+        .padding()
+        .frame(width: 420, height: 500)
+        .sheet(isPresented: $showingAddRule) {
+            AddRuleSheet(isPresented: $showingAddRule, rules: $displayRules)
+        }
+    }
+}
+
+struct RuleEditorRow: View {
+    @Binding var rule: DisplayRule
+    let onDelete: () -> Void
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Toggle("启用", isOn: $rule.enabled)
+                Spacer()
+                Button(role: .destructive, action: onDelete) {
+                    Image(systemName: "trash")
+                        .font(.caption)
+                }
+                .buttonStyle(.borderless)
+            }
+            
+            HStack {
+                Picker("条件", selection: $rule.condition) {
+                    Text("< 小于").tag("less")
+                    Text("> 大于").tag("greater")
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 120)
+                
+                TextField("阈值(ms)", value: $rule.threshold, format: .number)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 80)
+                
+                TextField("显示文本", text: $rule.label)
+                    .textFieldStyle(.roundedBorder)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+struct AddRuleSheet: View {
+    @Binding var isPresented: Bool
+    @Binding var rules: [DisplayRule]
+    @State private var condition = "less"
+    @State private var threshold: Double = 100
+    @State private var label = ""
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            Text("添加显示规则")
+                .font(.headline)
+            
+            Form {
+                Picker("条件", selection: $condition) {
+                    Text("延迟小于").tag("less")
+                    Text("延迟大于").tag("greater")
+                }
+                .pickerStyle(.segmented)
+                
+                HStack {
+                    Text("阈值")
+                    Spacer()
+                    TextField("ms", value: $threshold, format: .number)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 100)
+                }
+                
+                TextField("显示文本 (如: P2P/转发)", text: $label)
+            }
+            .formStyle(.grouped)
+            
+            HStack {
+                Button("取消") {
+                    isPresented = false
+                }
+                .buttonStyle(.bordered)
+                
+                Spacer()
+                
+                Button("添加") {
+                    rules.append(DisplayRule(condition: condition, threshold: threshold, label: label, enabled: true))
+                    isPresented = false
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(label.isEmpty)
+            }
+        }
+        .padding()
+        .frame(width: 350)
+    }
+}
+
+struct PresetEditorSheet: View {
+    @Binding var isPresented: Bool
+    let title: String
+    @Binding var name: String
+    @Binding var address: String
+    @Binding var command: String
+    let onSave: () -> Void
+
+    var body: some View {
+        VStack(spacing: 20) {
+            Text(title)
+                .font(.headline)
+
+            Form {
+                TextField("名称", text: $name)
+                TextField("地址", text: $address)
+                    .textContentType(.URL)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    TextField("命令 (可选)", text: $command)
+                    Text("留空使用默认: ping -c 1 -W 3 $address")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .formStyle(.grouped)
+
+            HStack {
+                Button("取消") {
+                    isPresented = false
+                }
+                .buttonStyle(.bordered)
+
+                Spacer()
+
+                Button("保存") {
+                    onSave()
+                    isPresented = false
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(name.isEmpty || address.isEmpty)
+            }
+        }
+        .padding()
+        .frame(width: 380)
+    }
+}
+
+// MARK: - Logs Tab
+struct LogsTab: View {
+    @StateObject private var logManager = LogManager.shared
+    @State private var selectedLevel: LogManager.LogLevel?
+    @State private var showingExportSheet = false
+    @State private var exportURL: URL?
+    
+    var filteredLogs: [LogManager.LogEntry] {
+        if let level = selectedLevel {
+            return logManager.logs.filter { $0.level == level }
+        }
+        return logManager.logs
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Picker("日志级别", selection: $selectedLevel) {
+                    Text("全部").tag(nil as LogManager.LogLevel?)
+                    ForEach(LogManager.LogLevel.allCases, id: \.self) { level in
+                        Text(level.rawValue).tag(level as LogManager.LogLevel?)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 250)
+                
+                Spacer()
+                
+                Button(action: {
+                    logManager.clear()
+                }) {
+                    Label("清空", systemImage: "trash")
+                }
+                .buttonStyle(.borderless)
+                
+                Button(action: {
+                    if let url = logManager.exportToFile() {
+                        exportURL = url
+                        showingExportSheet = true
+                    }
+                }) {
+                    Label("导出", systemImage: "square.and.arrow.up")
+                }
+                .buttonStyle(.borderless)
+            }
+            .padding()
+            .background(.ultraThinMaterial)
+            
+            List(filteredLogs.reversed()) { entry in
+                LogRow(entry: entry)
+                    .listRowSeparator(.visible)
+            }
+            .listStyle(.plain)
+        }
+        .fileExporter(
+            isPresented: $showingExportSheet,
+            document: LogFileDocument(url: exportURL),
+            contentType: .plainText,
+            defaultFilename: "PingMonitor_Logs.txt"
+        ) { result in
+            if case .success = result {
+                print("Log exported successfully")
+            }
+        }
+    }
+}
+
+struct LogRow: View {
+    let entry: LogManager.LogEntry
+    
+    var levelColor: Color {
+        switch entry.level {
+        case .debug: return .gray
+        case .info: return .blue
+        case .warning: return .orange
+        case .error: return .red
+        }
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+                Text(entry.formattedTimestamp)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .monospaced()
+                
+                Text(entry.level.rawValue)
+                    .font(.caption2)
+                    .fontWeight(.bold)
+                    .foregroundStyle(levelColor)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 1)
+                    .background(levelColor.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                
+                if let host = entry.host {
+                    Text(host)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            
+            Text(entry.message)
+                .font(.caption)
+                .foregroundStyle(.primary)
+                .textSelection(.enabled)
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+struct LogFileDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.plainText] }
+    
+    var url: URL?
+    
+    init(url: URL?) {
+        self.url = url
+    }
+    
+    init(configuration: ReadConfiguration) throws {
+        self.url = nil
+    }
+    
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        guard let url = url,
+              let data = try? Data(contentsOf: url) else {
+            return FileWrapper(regularFileWithContents: Data())
+        }
+        return FileWrapper(regularFileWithContents: data)
+    }
+}
+
+// MARK: - Settings Tab
+struct SettingsTab: View {
+    @ObservedObject var viewModel: PingMonitorViewModel
+
+    var body: some View {
+        Form {
+            Section("状态栏显示") {
+                Picker("显示策略", selection: $viewModel.statusBarDisplayMode) {
+                    Text("平均延迟").tag(StatusBarDisplayMode.average)
+                    Text("最差主机").tag(StatusBarDisplayMode.worst)
+                    Text("最快主机").tag(StatusBarDisplayMode.best)
+                    Text("首个主机").tag(StatusBarDisplayMode.first)
+                }
+                .pickerStyle(.segmented)
+                .onChange(of: viewModel.statusBarDisplayMode) { _, _ in
+                    viewModel.saveSettings()
+                }
+                
+                Text(statusBarDescription)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                
+                Toggle("显示延迟数值", isOn: $viewModel.showLatencyInMenu)
+                    .onChange(of: viewModel.showLatencyInMenu) { _, _ in
+                        viewModel.saveSettings()
+                    }
+
+                Toggle("显示规则标签", isOn: $viewModel.showLabelsInMenu)
+                    .onChange(of: viewModel.showLabelsInMenu) { _, _ in
+                        viewModel.saveSettings()
+                    }
+            }
+
+            Section("监控") {
+                HStack {
+                    Text("监控间隔")
+                    Spacer()
+                    Picker("", selection: $viewModel.pingInterval) {
+                        Text("3秒").tag(3.0)
+                        Text("5秒").tag(5.0)
+                        Text("10秒").tag(10.0)
+                        Text("30秒").tag(30.0)
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 200)
+                }
+                .onChange(of: viewModel.pingInterval) { _, _ in
+                    viewModel.saveSettings()
+                    if viewModel.isRunning {
+                        viewModel.stopAll()
+                        viewModel.startAll()
+                    }
+                }
+                
+                Picker("日志级别", selection: $viewModel.logLevel) {
+                    ForEach(LogManager.LogLevel.allCases, id: \.self) { level in
+                        Text(level.rawValue).tag(level)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .onChange(of: viewModel.logLevel) { _, _ in
+                    viewModel.saveSettings()
+                }
+            }
+
+            Section("通知") {
+                Toggle("启用通知", isOn: $viewModel.notificationEnabled)
+                    .onChange(of: viewModel.notificationEnabled) { _, _ in
+                        viewModel.saveSettings()
+                    }
+
+                Picker("通知方式", selection: $viewModel.notificationType) {
+                    Text("系统通知").tag("system")
+                    Text("Bark推送").tag("bark")
+                }
+                .pickerStyle(.segmented)
+                .onChange(of: viewModel.notificationType) { _, _ in
+                        viewModel.saveSettings()
+                    }
+
+                if viewModel.notificationType == "bark" {
+                    TextField("Bark URL", text: $viewModel.barkURL)
+                        .onChange(of: viewModel.barkURL) { _, _ in
+                            viewModel.saveSettings()
+                        }
+                }
+            }
+
+            Section("系统") {
+                Toggle("开机自启动", isOn: $viewModel.autoStart)
+                    .onChange(of: viewModel.autoStart) { _, newValue in
+                        viewModel.toggleAutoStart(newValue)
+                    }
+            }
+        }
+        .formStyle(.grouped)
+        .padding()
+    }
+    
+    private var statusBarDescription: String {
+        switch viewModel.statusBarDisplayMode {
+        case .average:
+            return "显示所有主机的平均延迟"
+        case .worst:
+            return "显示延迟最高或不可达的主机"
+        case .best:
+            return "显示延迟最低的主机"
+        case .first:
+            return "显示列表中的第一个主机"
+        }
+    }
+}
