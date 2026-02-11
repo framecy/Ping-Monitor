@@ -414,19 +414,24 @@ class PingMonitorViewModel: ObservableObject {
         
         let hostName = host.name
         let address = host.address
-        let customCommand = host.command
+        let customCommand = host.command.trimmingCharacters(in: .whitespacesAndNewlines)
         let hostId = host.id
         
         let commandString: String
         if customCommand.isEmpty {
             commandString = "ping -i 1 \(address)"
-        } else if customCommand.contains("$") {
-            commandString = customCommand.replacingOccurrences(of: "$address", with: address)
-                                       .replacingOccurrences(of: "${address}", with: address)
-        } else if customCommand.hasPrefix("ping ") && !customCommand.contains(address) {
-            commandString = "\(customCommand) \(address)"
         } else {
-            commandString = customCommand
+            var result = customCommand.replacingOccurrences(of: "$address", with: address)
+                                      .replacingOccurrences(of: "${address}", with: address)
+            
+            // 如果用户明确使用了占位符，则信任其命令结构
+            // 如果未使用占位符，且命令中不包含地址，则自动追加
+            let usedPlaceholder = customCommand.contains("$address") || customCommand.contains("${address}")
+            
+            if !usedPlaceholder && !result.contains(address) {
+                result += " \(address)"
+            }
+            commandString = result
         }
         
         LogManager.shared.info("Starting continuous ping: \(commandString)", host: hostName)
@@ -936,8 +941,8 @@ class StatusBarController: ObservableObject {
                 return widthWithLatencyAndLabel
             }
         } else {
-            // 只显示标签
-            return widthWithLatencyAndLabel
+            // 只显示标签，使用自适应宽度避免空白或截断
+            return NSStatusItem.variableLength
         }
     }
 }

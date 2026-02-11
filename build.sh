@@ -64,7 +64,7 @@ fi
 
 # 创建 DMG (带 Applications 快捷入口)
 echo "💿 创建 DMG..."
-DMG_NAME="PingMonitor-v${NEW_VERSION}-r${NEW_BUILD}.dmg"
+DMG_NAME="PingMonitor-v${NEW_VERSION}.dmg"
 DMG_PATH="$HOME/Desktop/$DMG_NAME"
 
 # 创建临时文件夹结构

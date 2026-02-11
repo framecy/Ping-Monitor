@@ -1642,6 +1642,7 @@ struct PresetManagementCard: View {
             .opacity(isHovered ? 1 : 0.2)
         }
         .padding(14)
+        .frame(height: 110, alignment: .top)
         .background(
             RoundedRectangle(cornerRadius: 14)
                 .fill(.ultraThinMaterial)
