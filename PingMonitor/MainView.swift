@@ -201,10 +201,10 @@ struct StatisticsTab: View {
                 .padding()
             }
             
-            if let host = selectedHost ?? viewModel.hosts.first {
-                StatisticsContentView(viewModel: viewModel, host: host)
-            } else {
+            if viewModel.hosts.isEmpty {
                 ContentUnavailableView("没有主机", systemImage: "network", description: Text("添加主机查看统计"))
+            } else {
+                StatisticsContentView(viewModel: viewModel, host: selectedHost)
             }
         }
     }
@@ -304,7 +304,6 @@ struct StatisticsContentView: View {
                 // 延迟图表
                 if !aggregatedStats.latencyHistory.isEmpty {
                     LatencyChartView(history: aggregatedStats.latencyHistory)
-                        .frame(height: 200)
                 }
                 
                 // 详细统计
@@ -460,11 +459,11 @@ struct StatCard: View {
 
 struct LatencyChartView: View {
     let history: [LatencyPoint]
-    @State private var hoveredPoint: LatencyPoint?
     @State private var animateEndpoint = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            // Header
             HStack {
                 HStack(spacing: 6) {
                     Image(systemName: "chart.xyaxis.line")
@@ -476,15 +475,7 @@ struct LatencyChartView: View {
                 
                 Spacer()
                 
-                if let point = hoveredPoint {
-                    Text("\(Int(point.latency))ms")
-                        .font(.system(size: 12, weight: .bold, design: .monospaced))
-                        .foregroundStyle(latencyColor(for: point.latency))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(latencyColor(for: point.latency).opacity(0.12))
-                        .clipShape(Capsule())
-                } else if let last = history.last {
+                if let last = history.last {
                     HStack(spacing: 4) {
                         Circle()
                             .fill(latencyColor(for: last.latency))
@@ -496,11 +487,13 @@ struct LatencyChartView: View {
                 }
             }
             
+            // Chart
             GeometryReader { geometry in
                 chartContent(size: geometry.size)
             }
             .frame(height: 180)
             
+            // Legend
             HStack(spacing: 16) {
                 latencyLegend("<50ms 优秀", color: .green)
                 latencyLegend("<100ms 良好", color: .orange)
@@ -526,34 +519,44 @@ struct LatencyChartView: View {
     }
     
     private func chartContent(size: CGSize) -> some View {
-        let leftPad: CGFloat = 45
+        let leftPad: CGFloat = 40
         let rightPad: CGFloat = 10
         let topPad: CGFloat = 5
-        let bottomPad: CGFloat = 5
+        let bottomPad: CGFloat = 22 // space for X-axis labels
         let chartWidth = size.width - leftPad - rightPad
         let chartHeight = size.height - topPad - bottomPad
         
-        return ZStack {
+        return ZStack(alignment: .topLeading) {
             // Y-axis labels and grid lines
             ForEach(yAxisValues(), id: \.self) { value in
                 let normalizedY = (value - chartMinLatency) / (chartMaxLatency - chartMinLatency)
                 let y = topPad + chartHeight - CGFloat(normalizedY) * chartHeight
                 
-                // Grid line
                 Path { path in
                     path.move(to: CGPoint(x: leftPad, y: y))
                     path.addLine(to: CGPoint(x: size.width - rightPad, y: y))
                 }
                 .stroke(Color.gray.opacity(0.12), style: StrokeStyle(lineWidth: 0.5, dash: [4, 4]))
                 
-                // Label
                 Text("\(Int(value))")
                     .font(.system(size: 9, design: .monospaced))
                     .foregroundStyle(.tertiary)
-                    .position(x: 20, y: y)
+                    .position(x: 18, y: y)
             }
             
-            // Threshold reference lines (50ms, 100ms)
+            // X-axis time labels
+            ForEach(xAxisIndices(), id: \.self) { index in
+                let point = history[index]
+                let x = leftPad + chartWidth * CGFloat(index) / CGFloat(max(history.count - 1, 1))
+                let y = topPad + chartHeight + 12
+                
+                Text(formatTime(point.timestamp))
+                    .font(.system(size: 8, design: .monospaced))
+                    .foregroundStyle(.tertiary)
+                    .position(x: x, y: y)
+            }
+            
+            // Threshold reference lines
             ForEach([50.0, 100.0], id: \.self) { threshold in
                 if threshold >= chartMinLatency && threshold <= chartMaxLatency {
                     let normalizedY = (threshold - chartMinLatency) / (chartMaxLatency - chartMinLatency)
@@ -564,7 +567,7 @@ struct LatencyChartView: View {
                         path.addLine(to: CGPoint(x: size.width - rightPad, y: y))
                     }
                     .stroke(
-                        threshold == 50 ? Color.green.opacity(0.25) : Color.orange.opacity(0.25),
+                        threshold == 50 ? Color.green.opacity(0.2) : Color.orange.opacity(0.2),
                         style: StrokeStyle(lineWidth: 1, dash: [6, 3])
                     )
                 }
@@ -582,32 +585,32 @@ struct LatencyChartView: View {
             }
             .fill(
                 LinearGradient(
-                    colors: [.blue.opacity(0.2), .cyan.opacity(0.05), .clear],
+                    colors: [.blue.opacity(0.15), .cyan.opacity(0.05), .clear],
                     startPoint: .top,
                     endPoint: .bottom
                 )
             )
             
-            // Smooth Bézier curve line
+            // Gradient colored Bézier line segments
             Canvas { context, canvasSize in
                 guard history.count > 1 else { return }
                 let points = chartPoints(width: chartWidth, height: chartHeight, leftPad: leftPad, topPad: topPad)
                 
-                var path = Path()
-                path.move(to: points[0])
-                addSmoothCurve(to: &path, points: points)
+                // Draw line segments individually with per-point color
+                for i in 1..<points.count {
+                    let p0 = points[i - 1]
+                    let p1 = points[i]
+                    let midX = (p0.x + p1.x) / 2
+                    
+                    var seg = Path()
+                    seg.move(to: p0)
+                    seg.addCurve(to: p1, control1: CGPoint(x: midX, y: p0.y), control2: CGPoint(x: midX, y: p1.y))
+                    
+                    let avgLatency = (history[i-1].latency + history[i].latency) / 2
+                    context.stroke(seg, with: .color(latencyColor(for: avgLatency)), lineWidth: 2.5)
+                }
                 
-                context.stroke(
-                    path,
-                    with: .linearGradient(
-                        Gradient(colors: [.cyan, .blue, .blue]),
-                        startPoint: CGPoint(x: leftPad, y: 0),
-                        endPoint: CGPoint(x: canvasSize.width, y: 0)
-                    ),
-                    lineWidth: 2.5
-                )
-                
-                // Data points - only draw every Nth for clarity
+                // Data points — draw every Nth for clarity
                 let step = max(1, history.count / 20)
                 for (index, point) in history.enumerated() {
                     guard index % step == 0 || index == history.count - 1 else { continue }
@@ -636,6 +639,8 @@ struct LatencyChartView: View {
         }
     }
     
+    // MARK: - Helpers
+    
     private func chartPoints(width: CGFloat, height: CGFloat, leftPad: CGFloat, topPad: CGFloat) -> [CGPoint] {
         let stepX = width / CGFloat(max(history.count - 1, 1))
         return history.enumerated().map { index, point in
@@ -663,12 +668,23 @@ struct LatencyChartView: View {
         var values: [Double] = []
         var v = (chartMinLatency / step).rounded(.down) * step
         while v <= chartMaxLatency {
-            if v >= chartMinLatency {
-                values.append(v)
-            }
+            if v >= chartMinLatency { values.append(v) }
             v += step
         }
         return values
+    }
+    
+    private func xAxisIndices() -> [Int] {
+        guard history.count > 1 else { return history.isEmpty ? [] : [0] }
+        let count = min(5, history.count)
+        let step = Double(history.count - 1) / Double(count - 1)
+        return (0..<count).map { Int(Double($0) * step) }
+    }
+    
+    private func formatTime(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm:ss"
+        return f.string(from: date)
     }
     
     private func niceStep(for range: Double) -> Double {
@@ -683,11 +699,8 @@ struct LatencyChartView: View {
     
     private func latencyLegend(_ label: String, color: Color) -> some View {
         HStack(spacing: 4) {
-            Circle()
-                .fill(color)
-                .frame(width: 6, height: 6)
-            Text(label)
-                .foregroundStyle(.secondary)
+            Circle().fill(color).frame(width: 6, height: 6)
+            Text(label).foregroundStyle(.secondary)
         }
     }
     
@@ -714,47 +727,44 @@ struct DetailedStatsView: View {
     let stats: AggregatedStats
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(stats.isAggregated ? "详细统计 (\(stats.hostCount) 个主机)" : "详细统计")
-                .font(.headline)
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 6) {
+                Image(systemName: "list.bullet.rectangle.fill")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.indigo)
+                Text(stats.isAggregated ? "详细统计 (\(stats.hostCount) 个主机)" : "详细统计")
+                    .font(.system(size: 14, weight: .semibold))
+            }
             
             LazyVGrid(columns: [
                 GridItem(.flexible()),
+                GridItem(.flexible()),
                 GridItem(.flexible())
             ], spacing: 12) {
-                StatRow(label: "成功请求", value: "\(stats.successfulPings)")
-                StatRow(label: "失败请求", value: "\(stats.failedPings)")
-                StatRow(label: "最小延迟", value: stats.minLatency != nil ? String(format: "%.2f ms", stats.minLatency!) : "N/A")
-                StatRow(label: "最大延迟", value: stats.maxLatency != nil ? String(format: "%.2f ms", stats.maxLatency!) : "N/A")
-                StatRow(label: "平均延迟", value: String(format: "%.2f ms", stats.avgLatency))
-                StatRow(label: "运行时间", value: formatDuration(stats.startTime))
+                DetailStatCard(icon: "checkmark.circle", color: .green, label: "成功请求", value: "\(stats.successfulPings)")
+                DetailStatCard(icon: "xmark.circle", color: .red, label: "失败请求", value: "\(stats.failedPings)")
+                DetailStatCard(icon: "timer", color: .blue, label: "运行时间", value: formatDuration(stats.startTime))
+                DetailStatCard(icon: "arrow.down.to.line", color: .cyan, label: "最小延迟", value: stats.minLatency != nil ? String(format: "%.1fms", stats.minLatency!) : "N/A")
+                DetailStatCard(icon: "arrow.up.to.line", color: .orange, label: "最大延迟", value: stats.maxLatency != nil ? String(format: "%.1fms", stats.maxLatency!) : "N/A")
+                DetailStatCard(icon: "equal.circle", color: .purple, label: "平均延迟", value: String(format: "%.1fms", stats.avgLatency))
             }
             
-            // 流量详情
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("发送流量")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text(formatBytes(stats.totalBytesSent))
-                        .font(.system(.body, design: .monospaced))
-                }
-                
-                Spacer()
-                
-                VStack(alignment: .trailing, spacing: 4) {
-                    Text("接收流量")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text(formatBytes(stats.totalBytesReceived))
-                        .font(.system(.body, design: .monospaced))
-                }
+            // Traffic cards
+            HStack(spacing: 12) {
+                TrafficCard(icon: "arrow.up.circle.fill", color: .blue, label: "发送流量", value: formatBytes(stats.totalBytesSent))
+                TrafficCard(icon: "arrow.down.circle.fill", color: .green, label: "接收流量", value: formatBytes(stats.totalBytesReceived))
             }
-            .padding(.top, 8)
         }
-        .padding()
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(.ultraThinMaterial)
+                .shadow(color: .black.opacity(0.05), radius: 8, y: 3)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.indigo.opacity(0.08), lineWidth: 1)
+        )
     }
     
     private func formatBytes(_ bytes: Int64) -> String {
@@ -780,21 +790,72 @@ struct DetailedStatsView: View {
     }
 }
 
-struct StatRow: View {
+struct DetailStatCard: View {
+    let icon: String
+    let color: Color
     let label: String
     let value: String
     
     var body: some View {
-        HStack {
-            Text(label)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-            Spacer()
+        VStack(spacing: 8) {
+            HStack(spacing: 5) {
+                Image(systemName: icon)
+                    .font(.system(size: 10))
+                    .foregroundStyle(color)
+                Text(label)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+            }
             Text(value)
-                .font(.system(.subheadline, design: .monospaced))
+                .font(.system(size: 14, weight: .semibold, design: .monospaced))
                 .foregroundStyle(.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
         }
-        .padding(.vertical, 4)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+        .padding(.horizontal, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(color.opacity(0.06))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(color.opacity(0.1), lineWidth: 0.5)
+        )
+    }
+}
+
+struct TrafficCard: View {
+    let icon: String
+    let color: Color
+    let label: String
+    let value: String
+    
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 18))
+                .foregroundStyle(color)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                Text(value)
+                    .font(.system(size: 13, weight: .semibold, design: .monospaced))
+            }
+            Spacer()
+        }
+        .frame(maxWidth: .infinity)
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(color.opacity(0.06))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(color.opacity(0.1), lineWidth: 0.5)
+        )
     }
 }
 
@@ -1209,6 +1270,7 @@ struct HostsManagementView: View {
     @State private var newHostAddress = ""
     @State private var newHostCommand = ""
     @State private var newHostRules: [DisplayRule] = []
+    @State private var hoveredHostId: UUID?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -1226,31 +1288,43 @@ struct HostsManagementView: View {
                 .controlSize(.small)
             }
             .padding(.horizontal)
-            .padding(.bottom, 8)
+            .padding(.bottom, 12)
             
             if viewModel.hosts.isEmpty {
                 ContentUnavailableView("没有主机", systemImage: "server.rack", description: Text("添加主机开始监控"))
             } else {
-                List {
-                    ForEach(viewModel.hosts) { host in
-                        HostManagementRow(
-                            host: host,
-                            onEdit: {
-                                editingHost = host
-                                newHostName = host.name
-                                newHostAddress = host.address
-                                newHostCommand = host.command
-                                newHostRules = host.displayRules
-                            },
-                            onDelete: {
-                                if let index = viewModel.hosts.firstIndex(where: { $0.id == host.id }) {
-                                    viewModel.removeHost(at: index)
+                ScrollView {
+                    LazyVGrid(columns: [
+                        GridItem(.flexible(), spacing: 12),
+                        GridItem(.flexible(), spacing: 12)
+                    ], spacing: 12) {
+                        ForEach(viewModel.hosts) { host in
+                            HostManagementCard(
+                                host: host,
+                                isHovered: hoveredHostId == host.id,
+                                onEdit: {
+                                    editingHost = host
+                                    newHostName = host.name
+                                    newHostAddress = host.address
+                                    newHostCommand = host.command
+                                    newHostRules = host.displayRules
+                                },
+                                onDelete: {
+                                    if let index = viewModel.hosts.firstIndex(where: { $0.id == host.id }) {
+                                        viewModel.removeHost(at: index)
+                                    }
+                                }
+                            )
+                            .onHover { isHovered in
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    hoveredHostId = isHovered ? host.id : nil
                                 }
                             }
-                        )
+                        }
                     }
+                    .padding(.horizontal)
+                    .padding(.bottom)
                 }
-                .listStyle(.plain)
             }
         }
         .sheet(isPresented: $showingAddHost) {
@@ -1296,72 +1370,101 @@ struct HostsManagementView: View {
     }
 }
 
-struct HostManagementRow: View {
+struct HostManagementCard: View {
     let host: HostConfig
+    let isHovered: Bool
     let onEdit: () -> Void
     let onDelete: () -> Void
     
     var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 10) {
+            // Header: name + actions
+            HStack {
+                Image(systemName: "server.rack")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.blue)
                 Text(host.name)
-                    .font(.body)
-                Text(host.address)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 14, weight: .semibold))
+                    .lineLimit(1)
+                Spacer()
                 
-                if !host.displayRules.filter({ $0.enabled }).isEmpty {
-                    HStack(spacing: 4) {
-                        ForEach(host.displayRules.filter { $0.enabled }.prefix(2)) { rule in
-                            Text("\(rule.condition == "less" ? "<" : ">")\(Int(rule.threshold))ms=\(rule.label)")
-                                .font(.caption2)
-                                .padding(.horizontal, 4)
-                                .padding(.vertical, 1)
-                                .background(rule.condition == "less" ? Color.green.opacity(0.2) : Color.orange.opacity(0.2))
-                                .foregroundStyle(rule.condition == "less" ? .green : .orange)
-                                .clipShape(RoundedRectangle(cornerRadius: 3))
-                        }
+                HStack(spacing: 6) {
+                    Button { onEdit() } label: {
+                        Image(systemName: "pencil.circle.fill")
+                            .font(.system(size: 16))
+                            .foregroundStyle(.blue.opacity(0.7))
+                    }
+                    .buttonStyle(.plain)
+                    .help("编辑")
+                    
+                    Button { onDelete() } label: {
+                        Image(systemName: "trash.circle.fill")
+                            .font(.system(size: 16))
+                            .foregroundStyle(.red.opacity(0.6))
+                    }
+                    .buttonStyle(.plain)
+                    .help("删除")
+                }
+                .opacity(isHovered ? 1 : 0.3)
+            }
+            
+            // Address
+            HStack(spacing: 4) {
+                Image(systemName: "globe")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
+                Text(host.address)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            
+            // Display rules
+            if !host.displayRules.filter({ $0.enabled }).isEmpty {
+                HStack(spacing: 4) {
+                    ForEach(host.displayRules.filter { $0.enabled }.prefix(3)) { rule in
+                        Text("\(rule.condition == "less" ? "<" : ">")\(Int(rule.threshold))ms→\(rule.label)")
+                            .font(.system(size: 9, weight: .medium))
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(
+                                Capsule()
+                                    .fill(rule.condition == "less" ? Color.green.opacity(0.15) : Color.orange.opacity(0.15))
+                            )
+                            .foregroundStyle(rule.condition == "less" ? .green : .orange)
                     }
                 }
-                
-                if !host.command.isEmpty {
+            }
+            
+            // Custom command
+            if !host.command.isEmpty {
+                HStack(spacing: 4) {
+                    Image(systemName: "terminal")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.purple.opacity(0.7))
                     Text(host.command)
-                        .font(.caption2)
+                        .font(.system(size: 9, design: .monospaced))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
             }
-            
-            Spacer()
-            
-            HStack(spacing: 8) {
-                Button {
-                    onEdit()
-                } label: {
-                    Image(systemName: "slider.horizontal.3")
-                        .foregroundStyle(.purple)
-                }
-                .buttonStyle(.borderless)
-                .help("配置显示规则")
-                
-                Button {
-                    onEdit()
-                } label: {
-                    Image(systemName: "pencil")
-                        .foregroundStyle(.blue)
-                }
-                .buttonStyle(.borderless)
-                
-                Button {
-                    onDelete()
-                } label: {
-                    Image(systemName: "trash")
-                        .foregroundStyle(.red)
-                }
-                .buttonStyle(.borderless)
-            }
         }
-        .padding(.vertical, 4)
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(.ultraThinMaterial)
+                .shadow(color: .black.opacity(isHovered ? 0.08 : 0.03), radius: isHovered ? 8 : 4, y: 2)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(isHovered ? Color.blue.opacity(0.15) : Color.gray.opacity(0.08), lineWidth: 1)
+        )
+        .scaleEffect(isHovered ? 1.01 : 1.0)
+        .contextMenu {
+            Button { onEdit() } label: { Label("编辑", systemImage: "pencil") }
+            Divider()
+            Button(role: .destructive) { onDelete() } label: { Label("删除", systemImage: "trash") }
+        }
     }
 }
 
@@ -1373,6 +1476,7 @@ struct PresetsManagementView: View {
     @State private var newPresetName = ""
     @State private var newPresetAddress = ""
     @State private var newPresetCommand = ""
+    @State private var hoveredPresetId: UUID?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -1390,31 +1494,43 @@ struct PresetsManagementView: View {
                 .controlSize(.small)
             }
             .padding(.horizontal)
-            .padding(.bottom, 8)
+            .padding(.bottom, 12)
             
             if viewModel.presets.isEmpty {
                 ContentUnavailableView("没有预设", systemImage: "bookmark", description: Text("添加预设快速创建主机"))
             } else {
-                List {
-                    ForEach(viewModel.presets) { preset in
-                        PresetManagementRow(
-                            preset: preset,
-                            viewModel: viewModel,
-                            onEdit: {
-                                editingPreset = preset
-                                newPresetName = preset.name
-                                newPresetAddress = preset.address
-                                newPresetCommand = preset.command
-                            },
-                            onDelete: {
-                                if let index = viewModel.presets.firstIndex(where: { $0.id == preset.id }) {
-                                    viewModel.removePreset(at: index)
+                ScrollView {
+                    LazyVGrid(columns: [
+                        GridItem(.flexible(), spacing: 12),
+                        GridItem(.flexible(), spacing: 12)
+                    ], spacing: 12) {
+                        ForEach(viewModel.presets) { preset in
+                            PresetManagementCard(
+                                preset: preset,
+                                isHovered: hoveredPresetId == preset.id,
+                                onAdd: { viewModel.addHostFromPreset(preset) },
+                                onEdit: {
+                                    editingPreset = preset
+                                    newPresetName = preset.name
+                                    newPresetAddress = preset.address
+                                    newPresetCommand = preset.command
+                                },
+                                onDelete: {
+                                    if let index = viewModel.presets.firstIndex(where: { $0.id == preset.id }) {
+                                        viewModel.removePreset(at: index)
+                                    }
+                                }
+                            )
+                            .onHover { isHovered in
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    hoveredPresetId = isHovered ? preset.id : nil
                                 }
                             }
-                        )
+                        }
                     }
+                    .padding(.horizontal)
+                    .padding(.bottom)
                 }
-                .listStyle(.plain)
             }
         }
         .sheet(isPresented: $showingAddPreset) {
@@ -1457,59 +1573,91 @@ struct PresetsManagementView: View {
     }
 }
 
-struct PresetManagementRow: View {
+struct PresetManagementCard: View {
     let preset: HostPreset
-    let viewModel: PingMonitorViewModel
+    let isHovered: Bool
+    let onAdd: () -> Void
     let onEdit: () -> Void
     let onDelete: () -> Void
 
     var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Image(systemName: "bookmark.fill")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.orange)
                 Text(preset.name)
-                    .font(.body)
-                Text(preset.address)
-                    .font(.caption)
+                    .font(.system(size: 14, weight: .semibold))
+                    .lineLimit(1)
+                Spacer()
+                
+                Button { onAdd() } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 18))
+                        .foregroundStyle(.green)
+                }
+                .buttonStyle(.plain)
+                .help("添加到监控")
+            }
+            
+            HStack(spacing: 4) {
+                Image(systemName: "globe")
+                    .font(.system(size: 9))
                     .foregroundStyle(.secondary)
-                if !preset.command.isEmpty {
+                Text(preset.address)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            
+            if !preset.command.isEmpty {
+                HStack(spacing: 4) {
+                    Image(systemName: "terminal")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.purple.opacity(0.7))
                     Text(preset.command)
-                        .font(.caption2)
+                        .font(.system(size: 9, design: .monospaced))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
             }
-
-            Spacer()
             
-            HStack(spacing: 12) {
-                Button {
-                    viewModel.addHostFromPreset(preset)
-                } label: {
-                    Image(systemName: "plus.circle.fill")
-                        .foregroundStyle(.green)
-                        .font(.title3)
+            // Action buttons
+            HStack(spacing: 8) {
+                Spacer()
+                Button { onEdit() } label: {
+                    Image(systemName: "pencil.circle.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.blue.opacity(0.6))
                 }
-                .buttonStyle(.borderless)
-                .help("添加到监控")
+                .buttonStyle(.plain)
                 
-                Button {
-                    onEdit()
-                } label: {
-                    Image(systemName: "pencil")
-                        .foregroundStyle(.blue)
+                Button { onDelete() } label: {
+                    Image(systemName: "trash.circle.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.red.opacity(0.5))
                 }
-                .buttonStyle(.borderless)
-                
-                Button {
-                    onDelete()
-                } label: {
-                    Image(systemName: "trash")
-                        .foregroundStyle(.red)
-                }
-                .buttonStyle(.borderless)
+                .buttonStyle(.plain)
             }
+            .opacity(isHovered ? 1 : 0.2)
         }
-        .padding(.vertical, 4)
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(.ultraThinMaterial)
+                .shadow(color: .black.opacity(isHovered ? 0.08 : 0.03), radius: isHovered ? 8 : 4, y: 2)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(isHovered ? Color.orange.opacity(0.15) : Color.gray.opacity(0.08), lineWidth: 1)
+        )
+        .scaleEffect(isHovered ? 1.01 : 1.0)
+        .contextMenu {
+            Button { onAdd() } label: { Label("添加到监控", systemImage: "plus.circle") }
+            Button { onEdit() } label: { Label("编辑", systemImage: "pencil") }
+            Divider()
+            Button(role: .destructive) { onDelete() } label: { Label("删除", systemImage: "trash") }
+        }
     }
 }
 

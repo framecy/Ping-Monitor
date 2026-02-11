@@ -14,16 +14,7 @@ struct PingMonitorWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: Provider()) { entry in
             WidgetView(entry: entry)
-                .containerBackground(for: .widget) {
-                    LinearGradient(
-                        colors: [
-                            Color(.windowBackgroundColor).opacity(0.95),
-                            Color(.windowBackgroundColor)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                }
+                .containerBackground(.fill.tertiary, for: .widget)
         }
         .configurationDisplayName("Ping Monitor")
         .description("显示网络延迟状态")
@@ -100,13 +91,7 @@ struct SmallView: View {
         VStack(spacing: 10) {
             ZStack {
                 Circle()
-                    .fill(
-                        .linearGradient(
-                            colors: [statusColor.opacity(0.25), statusColor.opacity(0.08)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                    .fill(statusColor.opacity(0.15))
                     .frame(width: 48, height: 48)
                 
                 Image(systemName: entry.isRunning ? "network.badge.shield.half.filled" : "network")
@@ -141,17 +126,10 @@ struct MediumView: View {
 
     var body: some View {
         HStack(spacing: 20) {
-            // Left: status display
             VStack(spacing: 8) {
                 ZStack {
                     Circle()
-                        .fill(
-                            .linearGradient(
-                                colors: [statusColor.opacity(0.2), statusColor.opacity(0.05)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
+                        .fill(statusColor.opacity(0.15))
                         .frame(width: 52, height: 52)
                     
                     Image(systemName: "network.badge.shield.half.filled")
@@ -164,19 +142,11 @@ struct MediumView: View {
                     .foregroundStyle(statusColor)
             }
             
-            // Divider with gradient
-            RoundedRectangle(cornerRadius: 1)
-                .fill(
-                    .linearGradient(
-                        colors: [statusColor.opacity(0.3), .gray.opacity(0.1)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-                .frame(width: 2)
+            Rectangle()
+                .fill(Color.secondary.opacity(0.2))
+                .frame(width: 1)
                 .padding(.vertical, 8)
 
-            // Right: details
             VStack(alignment: .leading, spacing: 8) {
                 Text(entry.host)
                     .font(.system(size: 13, weight: .semibold))
@@ -184,7 +154,7 @@ struct MediumView: View {
                 
                 HStack(spacing: 4) {
                     Circle()
-                        .fill(entry.isRunning ? .green : .gray)
+                        .fill(entry.isRunning ? Color.green : Color.gray)
                         .frame(width: 6, height: 6)
                     Text(entry.isRunning ? "运行中" : "已停止")
                         .font(.system(size: 11))
@@ -217,7 +187,6 @@ struct LargeView: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            // Header
             HStack {
                 HStack(spacing: 6) {
                     Image(systemName: "network")
@@ -232,33 +201,19 @@ struct LargeView: View {
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
-                    .background(Color.gray.opacity(0.1))
+                    .background(Color.secondary.opacity(0.1))
                     .clipShape(Capsule())
             }
 
-            // Divider
             Rectangle()
-                .fill(
-                    .linearGradient(
-                        colors: [.blue.opacity(0.3), .clear],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
+                .fill(Color.blue.opacity(0.2))
                 .frame(height: 1)
 
-            // Main display
             HStack(spacing: 24) {
                 VStack(spacing: 10) {
                     ZStack {
                         Circle()
-                            .fill(
-                                .linearGradient(
-                                    colors: [statusColor.opacity(0.2), statusColor.opacity(0.05)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
+                            .fill(statusColor.opacity(0.15))
                             .frame(width: 60, height: 60)
                         
                         Image(systemName: "antenna.radiowaves.left.and.right")
@@ -274,7 +229,7 @@ struct LargeView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(spacing: 6) {
                         Circle()
-                            .fill(entry.isRunning ? .green : .gray)
+                            .fill(entry.isRunning ? Color.green : Color.gray)
                             .frame(width: 8, height: 8)
                         Text(entry.isRunning ? "运行中" : "已停止")
                             .font(.system(size: 12, weight: .medium))
