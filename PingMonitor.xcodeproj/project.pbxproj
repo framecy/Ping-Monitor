@@ -1,0 +1,464 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		136DB684B38ECE24B8F16B29 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = EC930EE8636979AACD15BBB7 /* Assets.xcassets */; };
+		3330EB9A488B83DBABE5AD53 /* PingMonitorApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E41F61BD4463C6191AD4EDE /* PingMonitorApp.swift */; };
+		8F84DCCB37A985B1311F07CD /* PingMonitorWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0474E749B23CD3D59A534A02 /* PingMonitorWidget.swift */; };
+		AE4DFB14EB5C0241FFF90C09 /* PingMonitorWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 019A9A5FF0AE2400BEA630D5 /* PingMonitorWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		CEB7B9C677A78A18AF0ED5DD /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E15E69887F7957EA47FA06D /* MainView.swift */; };
+		EA5962C4457A4AAC9D4C60CA /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C04ACB73A62AC186335F394B /* Assets.xcassets */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		FF5DF6B76FC92E2631DC005E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 32CE86AA2DFFAD64BEDB5149 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 50A649E1A9AAE589AA60398A;
+			remoteInfo = PingMonitorWidget;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		EAA2A681672DB6A413AECAC4 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				AE4DFB14EB5C0241FFF90C09 /* PingMonitorWidget.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		019A9A5FF0AE2400BEA630D5 /* PingMonitorWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PingMonitorWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		0474E749B23CD3D59A534A02 /* PingMonitorWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PingMonitorWidget.swift; sourceTree = "<group>"; };
+		3E15E69887F7957EA47FA06D /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
+		491A22FB66A984CCBB76CACC /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		608C42835018CF66383AF67E /* PingMonitorWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PingMonitorWidget.entitlements; sourceTree = "<group>"; };
+		7DFD8FDF48D0DAAE46E9D261 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		7E41F61BD4463C6191AD4EDE /* PingMonitorApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PingMonitorApp.swift; sourceTree = "<group>"; };
+		8256800946515CA010ECF247 /* PingMonitor.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PingMonitor.entitlements; sourceTree = "<group>"; };
+		C04ACB73A62AC186335F394B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		EC930EE8636979AACD15BBB7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		F2CC1A1E9C5BE46DCAB3B7C3 /* PingMonitor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PingMonitor.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		1FCA1BC4AC7A8240D5F29364 /* PingMonitor */ = {
+			isa = PBXGroup;
+			children = (
+				EC930EE8636979AACD15BBB7 /* Assets.xcassets */,
+				491A22FB66A984CCBB76CACC /* Info.plist */,
+				3E15E69887F7957EA47FA06D /* MainView.swift */,
+				8256800946515CA010ECF247 /* PingMonitor.entitlements */,
+				7E41F61BD4463C6191AD4EDE /* PingMonitorApp.swift */,
+			);
+			path = PingMonitor;
+			sourceTree = "<group>";
+		};
+		7AE4AF509B358A8D7A5C01FA = {
+			isa = PBXGroup;
+			children = (
+				1FCA1BC4AC7A8240D5F29364 /* PingMonitor */,
+				867901233B583733F807BB4F /* PingMonitorWidget */,
+				B4F5375F058C33028D422325 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		867901233B583733F807BB4F /* PingMonitorWidget */ = {
+			isa = PBXGroup;
+			children = (
+				C04ACB73A62AC186335F394B /* Assets.xcassets */,
+				7DFD8FDF48D0DAAE46E9D261 /* Info.plist */,
+				608C42835018CF66383AF67E /* PingMonitorWidget.entitlements */,
+				0474E749B23CD3D59A534A02 /* PingMonitorWidget.swift */,
+			);
+			path = PingMonitorWidget;
+			sourceTree = "<group>";
+		};
+		B4F5375F058C33028D422325 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				F2CC1A1E9C5BE46DCAB3B7C3 /* PingMonitor.app */,
+				019A9A5FF0AE2400BEA630D5 /* PingMonitorWidget.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		50A649E1A9AAE589AA60398A /* PingMonitorWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 19C0A5D03D21C695BDBA3C72 /* Build configuration list for PBXNativeTarget "PingMonitorWidget" */;
+			buildPhases = (
+				1902CB53DDA7FFA75A59F1A4 /* Sources */,
+				543ED2C2A45C2F9EADC54CEE /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = PingMonitorWidget;
+			packageProductDependencies = (
+			);
+			productName = PingMonitorWidget;
+			productReference = 019A9A5FF0AE2400BEA630D5 /* PingMonitorWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		7F28844C6A1B2187752C7C4E /* PingMonitor */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7A879DC5A6D7B01727A69AAE /* Build configuration list for PBXNativeTarget "PingMonitor" */;
+			buildPhases = (
+				368123FC12CB9669D489B297 /* Sources */,
+				2210C1E5C3C067BEB2BE0DD1 /* Resources */,
+				EAA2A681672DB6A413AECAC4 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				F56584DA5ABDC253AF6FD4AE /* PBXTargetDependency */,
+			);
+			name = PingMonitor;
+			packageProductDependencies = (
+			);
+			productName = PingMonitor;
+			productReference = F2CC1A1E9C5BE46DCAB3B7C3 /* PingMonitor.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		32CE86AA2DFFAD64BEDB5149 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1700;
+				TargetAttributes = {
+					50A649E1A9AAE589AA60398A = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+					7F28844C6A1B2187752C7C4E = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = F0D742B88309BA60F98FF056 /* Build configuration list for PBXProject "PingMonitor" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 7AE4AF509B358A8D7A5C01FA;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				7F28844C6A1B2187752C7C4E /* PingMonitor */,
+				50A649E1A9AAE589AA60398A /* PingMonitorWidget */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		2210C1E5C3C067BEB2BE0DD1 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				136DB684B38ECE24B8F16B29 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		543ED2C2A45C2F9EADC54CEE /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				EA5962C4457A4AAC9D4C60CA /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		1902CB53DDA7FFA75A59F1A4 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8F84DCCB37A985B1311F07CD /* PingMonitorWidget.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		368123FC12CB9669D489B297 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CEB7B9C677A78A18AF0ED5DD /* MainView.swift in Sources */,
+				3330EB9A488B83DBABE5AD53 /* PingMonitorApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		F56584DA5ABDC253AF6FD4AE /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 50A649E1A9AAE589AA60398A /* PingMonitorWidget */;
+			targetProxy = FF5DF6B76FC92E2631DC005E /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		0C1D56519C5AD44139A1F1E5 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = PingMonitorWidget/PingMonitorWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = PingMonitorWidget/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.pingmonitor.app.widget;
+				SDKROOT = macosx;
+				SKIP_INSTALL = NO;
+			};
+			name = Release;
+		};
+		385EAE02243EFF8B6CD08FF6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 26;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 2.0.25;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		388F92E17AAB81D2AF91C9AC /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = PingMonitor/PingMonitor.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = PingMonitor/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.pingmonitor.app;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		99D66429CC32700383E8B7C6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = PingMonitorWidget/PingMonitorWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = PingMonitorWidget/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.pingmonitor.app.widget;
+				SDKROOT = macosx;
+				SKIP_INSTALL = NO;
+			};
+			name = Debug;
+		};
+		A78A0400F302FE5D1100631D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 26;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 2.0.25;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		C0E51DFCE42CA1C80C92581F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = PingMonitor/PingMonitor.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = PingMonitor/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.pingmonitor.app;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		19C0A5D03D21C695BDBA3C72 /* Build configuration list for PBXNativeTarget "PingMonitorWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				99D66429CC32700383E8B7C6 /* Debug */,
+				0C1D56519C5AD44139A1F1E5 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		7A879DC5A6D7B01727A69AAE /* Build configuration list for PBXNativeTarget "PingMonitor" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				388F92E17AAB81D2AF91C9AC /* Debug */,
+				C0E51DFCE42CA1C80C92581F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		F0D742B88309BA60F98FF056 /* Build configuration list for PBXProject "PingMonitor" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				385EAE02243EFF8B6CD08FF6 /* Debug */,
+				A78A0400F302FE5D1100631D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 32CE86AA2DFFAD64BEDB5149 /* Project object */;
+}

@@ -1,82 +1,184 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+// MARK: - Sidebar Navigation Item
+enum SidebarItem: String, CaseIterable, Identifiable {
+    case monitor = "监控"
+    case statistics = "统计"
+    case hosts = "主机管理"
+    case logs = "日志"
+    case settings = "设置"
+    
+    var id: String { rawValue }
+    
+    var icon: String {
+        switch self {
+        case .monitor: return "waveform.path.ecg"
+        case .statistics: return "chart.bar.fill"
+        case .hosts: return "server.rack"
+        case .logs: return "doc.text.fill"
+        case .settings: return "gearshape.fill"
+        }
+    }
+    
+    var activeColor: Color {
+        switch self {
+        case .monitor: return .green
+        case .statistics: return .blue
+        case .hosts: return .purple
+        case .logs: return .orange
+        case .settings: return .gray
+        }
+    }
+}
+
 struct MainView: View {
     @ObservedObject var viewModel: PingMonitorViewModel
-    @State private var selectedTab = 0
+    @State private var selectedItem: SidebarItem = .monitor
 
     var body: some View {
-        VStack(spacing: 0) {
-            headerView
-
-            Picker("", selection: $selectedTab) {
-                Text("监控").tag(0)
-                Text("统计").tag(1)
-                Text("主机管理").tag(2)
-                Text("日志").tag(3)
-                Text("设置").tag(4)
+        NavigationSplitView {
+            sidebarView
+        } detail: {
+            VStack(spacing: 0) {
+                headerView
+                detailContent
             }
-            .pickerStyle(.segmented)
-            .padding()
-
-            Group {
-                switch selectedTab {
-                case 0:
-                    MonitorTab(viewModel: viewModel)
-                case 1:
-                    StatisticsTab(viewModel: viewModel)
-                case 2:
-                    HostManagementTab(viewModel: viewModel)
-                case 3:
-                    LogsTab()
-                case 4:
-                    SettingsTab(viewModel: viewModel)
-                default:
-                    MonitorTab(viewModel: viewModel)
-                }
-            }
-
-            versionView
         }
         .frame(minWidth: 900, minHeight: 650)
+        .navigationSplitViewColumnWidth(min: 170, ideal: 190, max: 220)
+    }
+    
+    // MARK: - Sidebar
+    private var sidebarView: some View {
+        VStack(spacing: 0) {
+            // App branding
+            HStack(spacing: 10) {
+                ZStack {
+                    Circle()
+                        .fill(.linearGradient(
+                            colors: [.blue.opacity(0.7), .cyan.opacity(0.5)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ))
+                        .frame(width: 32, height: 32)
+                    Image(systemName: "network")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white)
+                }
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Ping Monitor")
+                        .font(.system(size: 13, weight: .bold))
+                    if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String {
+                        Text("v\(version)")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            
+            Divider().padding(.horizontal, 12)
+            
+            // Navigation items
+            List(SidebarItem.allCases, selection: $selectedItem) { item in
+                sidebarRow(for: item)
+                    .tag(item)
+            }
+            .listStyle(.sidebar)
+        }
+        .background(.ultraThinMaterial)
+    }
+    
+    private func sidebarRow(for item: SidebarItem) -> some View {
+        Label {
+            Text(item.rawValue)
+                .font(.system(size: 13, weight: selectedItem == item ? .semibold : .regular))
+        } icon: {
+            Image(systemName: item.icon)
+                .font(.system(size: 12))
+                .foregroundStyle(selectedItem == item ? item.activeColor : .secondary)
+                .frame(width: 20)
+        }
+    }
+    
+    // MARK: - Detail Content
+    @ViewBuilder
+    private var detailContent: some View {
+        switch selectedItem {
+        case .monitor:
+            MonitorTab(viewModel: viewModel)
+        case .statistics:
+            StatisticsTab(viewModel: viewModel)
+        case .hosts:
+            HostManagementTab(viewModel: viewModel)
+        case .logs:
+            LogsTab()
+        case .settings:
+            SettingsTab(viewModel: viewModel)
+        }
     }
 
+    // MARK: - Header
     private var headerView: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "network")
-                .font(.title2)
-                .foregroundStyle(.tint)
+        HStack(spacing: 14) {
+            // Animated status indicator
+            ZStack {
+                if viewModel.isRunning {
+                    Circle()
+                        .fill(.green.opacity(0.25))
+                        .frame(width: 24, height: 24)
+                        .scaleEffect(viewModel.isRunning ? 1.6 : 1.0)
+                        .opacity(viewModel.isRunning ? 0 : 0.6)
+                        .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: false), value: viewModel.isRunning)
+                }
+                Circle()
+                    .fill(viewModel.isRunning ? .green : .gray.opacity(0.5))
+                    .frame(width: 10, height: 10)
+                    .shadow(color: viewModel.isRunning ? .green.opacity(0.5) : .clear, radius: 4)
+            }
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("Ping Monitor")
-                    .font(.headline)
-                Text(viewModel.isRunning ? "运行中" : "已停止")
-                    .font(.caption)
+                Text(selectedItem.rawValue)
+                    .font(.system(size: 16, weight: .bold))
+                Text(viewModel.isRunning ? "正在监控 \(viewModel.hosts.count) 个主机" : "已停止")
+                    .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
 
             Spacer()
 
             Button(action: { viewModel.toggle() }) {
-                Label(viewModel.isRunning ? "停止" : "开始", systemImage: viewModel.isRunning ? "stop.fill" : "play.fill")
+                HStack(spacing: 6) {
+                    Image(systemName: viewModel.isRunning ? "stop.fill" : "play.fill")
+                        .font(.system(size: 10))
+                    Text(viewModel.isRunning ? "停止" : "开始")
+                        .font(.system(size: 12, weight: .medium))
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 7)
+                .background(
+                    Capsule()
+                        .fill(viewModel.isRunning ? .red.opacity(0.15) : .green.opacity(0.15))
+                )
+                .foregroundStyle(viewModel.isRunning ? .red : .green)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(viewModel.isRunning ? .red : .green)
-            .controlSize(.small)
+            .buttonStyle(.plain)
         }
-        .padding()
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        .background(
+            LinearGradient(
+                colors: [
+                    viewModel.isRunning ? Color.green.opacity(0.04) : Color.gray.opacity(0.03),
+                    .clear
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        )
         .background(.ultraThinMaterial)
-    }
-
-    private var versionView: some View {
-        Group {
-            if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String {
-                Text("Version \(version)")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .padding(.bottom, 8)
-            }
-        }
     }
 }
 
@@ -316,35 +418,61 @@ struct StatCard: View {
     let color: Color
     
     var body: some View {
-        VStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.title2)
-                .foregroundStyle(color)
+        VStack(spacing: 10) {
+            ZStack {
+                Circle()
+                    .fill(
+                        .linearGradient(
+                            colors: [color.opacity(0.25), color.opacity(0.1)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 40, height: 40)
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(color)
+            }
             
             Text(value)
                 .font(.system(.title2, design: .rounded, weight: .bold))
                 .foregroundStyle(.primary)
+                .contentTransition(.numericText())
             
             Text(title)
-                .font(.caption)
+                .font(.system(size: 11))
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
-        .padding()
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .padding(.vertical, 14)
+        .padding(.horizontal, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(.ultraThinMaterial)
+                .shadow(color: color.opacity(0.08), radius: 8, y: 3)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(color.opacity(0.1), lineWidth: 1)
+        )
     }
 }
 
 struct LatencyChartView: View {
     let history: [LatencyPoint]
     @State private var hoveredPoint: LatencyPoint?
+    @State private var animateEndpoint = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("延迟趋势")
-                    .font(.system(size: 14, weight: .semibold))
+                HStack(spacing: 6) {
+                    Image(systemName: "chart.xyaxis.line")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.blue)
+                    Text("延迟趋势")
+                        .font(.system(size: 14, weight: .semibold))
+                }
                 
                 Spacer()
                 
@@ -354,12 +482,17 @@ struct LatencyChartView: View {
                         .foregroundStyle(latencyColor(for: point.latency))
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(latencyColor(for: point.latency).opacity(0.15))
+                        .background(latencyColor(for: point.latency).opacity(0.12))
                         .clipShape(Capsule())
-                } else {
-                    Text("最近 \(history.count) 次")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                } else if let last = history.last {
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(latencyColor(for: last.latency))
+                            .frame(width: 6, height: 6)
+                        Text("当前 \(Int(last.latency))ms")
+                            .font(.system(size: 11, weight: .medium, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
             
@@ -368,71 +501,184 @@ struct LatencyChartView: View {
             }
             .frame(height: 180)
             
-            HStack {
-                latencyLegend("优秀", color: .green)
-                latencyLegend("良好", color: .orange)
-                latencyLegend("较差", color: .red)
+            HStack(spacing: 16) {
+                latencyLegend("<50ms 优秀", color: .green)
+                latencyLegend("<100ms 良好", color: .orange)
+                latencyLegend(">100ms 较差", color: .red)
                 Spacer()
+                Text("共 \(history.count) 次")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
             }
             .font(.system(size: 10))
         }
         .padding(16)
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(.ultraThinMaterial)
+                .shadow(color: .black.opacity(0.05), radius: 8, y: 3)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.blue.opacity(0.08), lineWidth: 1)
+        )
+        .onAppear { animateEndpoint = true }
     }
     
     private func chartContent(size: CGSize) -> some View {
-        let width = size.width - 60
-        let height = size.height
+        let leftPad: CGFloat = 45
+        let rightPad: CGFloat = 10
+        let topPad: CGFloat = 5
+        let bottomPad: CGFloat = 5
+        let chartWidth = size.width - leftPad - rightPad
+        let chartHeight = size.height - topPad - bottomPad
         
         return ZStack {
-            Path { path in
-                path.move(to: CGPoint(x: 60, y: height))
-                for (index, point) in history.enumerated() {
-                    let x = 60 + CGFloat(index) * (width / CGFloat(max(history.count - 1, 1)))
-                    let normalizedY = (point.latency - minLatency) / (maxLatency - minLatency)
-                    let y = height - CGFloat(normalizedY) * height
-                    path.addLine(to: CGPoint(x: x, y: y))
+            // Y-axis labels and grid lines
+            ForEach(yAxisValues(), id: \.self) { value in
+                let normalizedY = (value - chartMinLatency) / (chartMaxLatency - chartMinLatency)
+                let y = topPad + chartHeight - CGFloat(normalizedY) * chartHeight
+                
+                // Grid line
+                Path { path in
+                    path.move(to: CGPoint(x: leftPad, y: y))
+                    path.addLine(to: CGPoint(x: size.width - rightPad, y: y))
                 }
-                path.addLine(to: CGPoint(x: width + 60, y: height))
+                .stroke(Color.gray.opacity(0.12), style: StrokeStyle(lineWidth: 0.5, dash: [4, 4]))
+                
+                // Label
+                Text("\(Int(value))")
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundStyle(.tertiary)
+                    .position(x: 20, y: y)
+            }
+            
+            // Threshold reference lines (50ms, 100ms)
+            ForEach([50.0, 100.0], id: \.self) { threshold in
+                if threshold >= chartMinLatency && threshold <= chartMaxLatency {
+                    let normalizedY = (threshold - chartMinLatency) / (chartMaxLatency - chartMinLatency)
+                    let y = topPad + chartHeight - CGFloat(normalizedY) * chartHeight
+                    
+                    Path { path in
+                        path.move(to: CGPoint(x: leftPad, y: y))
+                        path.addLine(to: CGPoint(x: size.width - rightPad, y: y))
+                    }
+                    .stroke(
+                        threshold == 50 ? Color.green.opacity(0.25) : Color.orange.opacity(0.25),
+                        style: StrokeStyle(lineWidth: 1, dash: [6, 3])
+                    )
+                }
+            }
+            
+            // Gradient fill under curve
+            Path { path in
+                guard history.count > 1 else { return }
+                let points = chartPoints(width: chartWidth, height: chartHeight, leftPad: leftPad, topPad: topPad)
+                path.move(to: CGPoint(x: points.first!.x, y: topPad + chartHeight))
+                path.addLine(to: points.first!)
+                addSmoothCurve(to: &path, points: points)
+                path.addLine(to: CGPoint(x: points.last!.x, y: topPad + chartHeight))
                 path.closeSubpath()
             }
             .fill(
                 LinearGradient(
-                    colors: [.blue.opacity(0.25), .blue.opacity(0.05)],
+                    colors: [.blue.opacity(0.2), .cyan.opacity(0.05), .clear],
                     startPoint: .top,
                     endPoint: .bottom
                 )
             )
             
-            Canvas { context, size in
+            // Smooth Bézier curve line
+            Canvas { context, canvasSize in
                 guard history.count > 1 else { return }
-                
-                let stepX = width / CGFloat(max(history.count - 1, 1))
+                let points = chartPoints(width: chartWidth, height: chartHeight, leftPad: leftPad, topPad: topPad)
                 
                 var path = Path()
-                for (index, point) in history.enumerated() {
-                    let x = 60 + CGFloat(index) * stepX
-                    let normalizedY = (point.latency - minLatency) / (maxLatency - minLatency)
-                    let y = height - CGFloat(normalizedY) * height
-                    if index == 0 {
-                        path.move(to: CGPoint(x: x, y: y))
-                    } else {
-                        path.addLine(to: CGPoint(x: x, y: y))
-                    }
-                }
-                context.stroke(path, with: .color(.blue), lineWidth: 2.5)
+                path.move(to: points[0])
+                addSmoothCurve(to: &path, points: points)
                 
+                context.stroke(
+                    path,
+                    with: .linearGradient(
+                        Gradient(colors: [.cyan, .blue, .blue]),
+                        startPoint: CGPoint(x: leftPad, y: 0),
+                        endPoint: CGPoint(x: canvasSize.width, y: 0)
+                    ),
+                    lineWidth: 2.5
+                )
+                
+                // Data points - only draw every Nth for clarity
+                let step = max(1, history.count / 20)
                 for (index, point) in history.enumerated() {
-                    let x = 60 + CGFloat(index) * stepX
-                    let normalizedY = (point.latency - minLatency) / (maxLatency - minLatency)
-                    let y = height - CGFloat(normalizedY) * height
-                    let dotPath = Path(ellipseIn: CGRect(x: x - 3, y: y - 3, width: 6, height: 6))
+                    guard index % step == 0 || index == history.count - 1 else { continue }
+                    let pt = points[index]
+                    let isLast = index == history.count - 1
+                    let dotSize: CGFloat = isLast ? 5 : 3
+                    let dotPath = Path(ellipseIn: CGRect(x: pt.x - dotSize, y: pt.y - dotSize, width: dotSize * 2, height: dotSize * 2))
                     context.fill(dotPath, with: .color(latencyColor(for: point.latency)))
-                    context.stroke(dotPath, with: .color(.white), lineWidth: 1)
+                    context.stroke(dotPath, with: .color(.white.opacity(0.8)), lineWidth: isLast ? 2 : 1)
+                }
+            }
+            
+            // Pulsing endpoint
+            if let last = history.last {
+                let points = chartPoints(width: chartWidth, height: chartHeight, leftPad: leftPad, topPad: topPad)
+                if let lastPt = points.last {
+                    Circle()
+                        .fill(latencyColor(for: last.latency).opacity(0.3))
+                        .frame(width: 16, height: 16)
+                        .scaleEffect(animateEndpoint ? 1.8 : 1.0)
+                        .opacity(animateEndpoint ? 0 : 0.5)
+                        .animation(.easeOut(duration: 1.5).repeatForever(autoreverses: false), value: animateEndpoint)
+                        .position(lastPt)
                 }
             }
         }
+    }
+    
+    private func chartPoints(width: CGFloat, height: CGFloat, leftPad: CGFloat, topPad: CGFloat) -> [CGPoint] {
+        let stepX = width / CGFloat(max(history.count - 1, 1))
+        return history.enumerated().map { index, point in
+            let x = leftPad + CGFloat(index) * stepX
+            let normalizedY = (point.latency - chartMinLatency) / (chartMaxLatency - chartMinLatency)
+            let y = topPad + height - CGFloat(normalizedY) * height
+            return CGPoint(x: x, y: y)
+        }
+    }
+    
+    private func addSmoothCurve(to path: inout Path, points: [CGPoint]) {
+        guard points.count > 1 else { return }
+        for i in 1..<points.count {
+            let p0 = points[i - 1]
+            let p1 = points[i]
+            let midX = (p0.x + p1.x) / 2
+            path.addCurve(to: p1, control1: CGPoint(x: midX, y: p0.y), control2: CGPoint(x: midX, y: p1.y))
+        }
+    }
+    
+    private func yAxisValues() -> [Double] {
+        let range = chartMaxLatency - chartMinLatency
+        guard range > 0 else { return [chartMinLatency] }
+        let step = niceStep(for: range)
+        var values: [Double] = []
+        var v = (chartMinLatency / step).rounded(.down) * step
+        while v <= chartMaxLatency {
+            if v >= chartMinLatency {
+                values.append(v)
+            }
+            v += step
+        }
+        return values
+    }
+    
+    private func niceStep(for range: Double) -> Double {
+        let rough = range / 4.0
+        let mag = pow(10, floor(log10(rough)))
+        let norm = rough / mag
+        if norm <= 1 { return 1 * mag }
+        if norm <= 2 { return 2 * mag }
+        if norm <= 5 { return 5 * mag }
+        return 10 * mag
     }
     
     private func latencyLegend(_ label: String, color: Color) -> some View {
@@ -451,12 +697,16 @@ struct LatencyChartView: View {
         return .red
     }
     
-    var minLatency: Double {
-        history.map { $0.latency }.min() ?? 0
+    var chartMinLatency: Double {
+        let minVal = history.map { $0.latency }.min() ?? 0
+        return max(0, minVal - (chartMaxLatency - minVal) * 0.1)
     }
     
-    var maxLatency: Double {
-        max(history.map { $0.latency }.max() ?? 100, 1)
+    var chartMaxLatency: Double {
+        let maxVal = max(history.map { $0.latency }.max() ?? 100, 1)
+        let minVal = history.map { $0.latency }.min() ?? 0
+        let padding = max((maxVal - minVal) * 0.15, 5)
+        return maxVal + padding
     }
 }
 
@@ -656,6 +906,7 @@ struct EditableHostCard: View {
     let onDelete: () -> Void
     @State private var showingDeleteConfirm = false
     @State private var isHovered = false
+    @State private var breathe = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -678,38 +929,77 @@ struct EditableHostCard: View {
             
             Spacer()
             
-            rulesSection
-            activeRulesSection
+            // Mini sparkline
+            if let stats = viewModel.hostStats[host.id],
+               stats.latencyHistory.count > 1 {
+                MiniSparkline(
+                    points: Array(stats.latencyHistory.suffix(15)),
+                    color: statusColor
+                )
+                .frame(height: 24)
+            }
+            
+            HStack(spacing: 0) {
+                rulesSection
+                Spacer()
+                activeRulesSection
+            }
         }
-        .frame(height: 120)
-        .padding(12)
-        .background(cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(cardBorder, lineWidth: isHovered ? 2 : 1)
+        .frame(height: 140)
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(
+                    .linearGradient(
+                        colors: [
+                            statusColor.opacity(isHovered ? 0.08 : 0.04),
+                            .clear
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
         )
-        .shadow(color: .black.opacity(isHovered ? 0.15 : 0.08), radius: isHovered ? 8 : 4, y: isHovered ? 3 : 2)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(isHovered ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(.regularMaterial))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(
+                    statusColor.opacity(isHovered ? 0.4 : 0.15),
+                    lineWidth: isHovered ? 1.5 : 1
+                )
+        )
+        .shadow(color: statusColor.opacity(isHovered ? 0.12 : 0.05), radius: isHovered ? 10 : 5, y: isHovered ? 4 : 2)
         .scaleEffect(isHovered ? 1.02 : 1.0)
-        .animation(.easeInOut(duration: 0.2), value: isHovered)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovered)
         .onHover { hovering in
             isHovered = hovering
         }
-        .confirmationDialog("确认删除？", isPresented: $showingDeleteConfirm, titleVisibility: .visible) {
-            Button("删除主机", role: .destructive) {
-                onDelete()
-            }
-            Button("取消", role: .cancel) {}
-        } message: {
-            Text("删除后将无法恢复")
+        .onAppear { breathe = true }
+        .contextMenu {
+            Button { onEdit() } label: { Label("编辑", systemImage: "pencil") }
+            Divider()
+            Button(role: .destructive) { onDelete() } label: { Label("删除", systemImage: "trash") }
         }
     }
     
     private var statusIndicator: some View {
-        Circle()
-            .fill(statusColor)
-            .frame(width: 8, height: 8)
-            .shadow(color: statusColor, radius: 4)
+        ZStack {
+            if viewModel.isRunning && host.isReachable {
+                Circle()
+                    .fill(statusColor.opacity(0.3))
+                    .frame(width: 14, height: 14)
+                    .scaleEffect(breathe ? 1.5 : 1.0)
+                    .opacity(breathe ? 0 : 0.6)
+                    .animation(.easeInOut(duration: 2.0).repeatForever(autoreverses: false), value: breathe)
+            }
+            Circle()
+                .fill(statusColor)
+                .frame(width: 8, height: 8)
+                .shadow(color: statusColor.opacity(0.5), radius: 3)
+        }
     }
     
     @ViewBuilder
@@ -813,25 +1103,6 @@ struct EditableHostCard: View {
         }
     }
     
-    private var cardBackground: some View {
-        Group {
-            if isHovered {
-                Rectangle()
-                    .fill(.ultraThinMaterial)
-            } else {
-                Rectangle()
-                    .fill(.regularMaterial)
-            }
-        }
-    }
-    
-    private var cardBorder: Color {
-        if isHovered {
-            return statusColor.opacity(0.5)
-        }
-        return statusColor.opacity(0.2)
-    }
-    
     private var statusColor: Color {
         guard !host.isChecking else { return .blue }
         guard let latency = host.lastLatency else { return .gray }
@@ -846,6 +1117,64 @@ struct EditableHostCard: View {
         if latency < 50 { return "arrow.down" }
         if latency < 100 { return "arrow.right" }
         return "arrow.up"
+    }
+}
+
+// MARK: - Mini Sparkline
+struct MiniSparkline: View {
+    let points: [LatencyPoint]
+    let color: Color
+    
+    var body: some View {
+        GeometryReader { geo in
+            let w = geo.size.width
+            let h = geo.size.height
+            let minV = points.map { $0.latency }.min() ?? 0
+            let maxV = max(points.map { $0.latency }.max() ?? 1, minV + 1)
+            
+            Path { path in
+                for (i, pt) in points.enumerated() {
+                    let x = w * CGFloat(i) / CGFloat(max(points.count - 1, 1))
+                    let y = h - (CGFloat(pt.latency - minV) / CGFloat(maxV - minV)) * h
+                    if i == 0 { path.move(to: CGPoint(x: x, y: y)) }
+                    else {
+                        let prev = points[i - 1]
+                        let px = w * CGFloat(i - 1) / CGFloat(max(points.count - 1, 1))
+                        let py = h - (CGFloat(prev.latency - minV) / CGFloat(maxV - minV)) * h
+                        let mx = (px + x) / 2
+                        path.addCurve(to: CGPoint(x: x, y: y), control1: CGPoint(x: mx, y: py), control2: CGPoint(x: mx, y: y))
+                    }
+                }
+            }
+            .stroke(color.opacity(0.5), lineWidth: 1.5)
+            
+            // Fill under
+            Path { path in
+                for (i, pt) in points.enumerated() {
+                    let x = w * CGFloat(i) / CGFloat(max(points.count - 1, 1))
+                    let y = h - (CGFloat(pt.latency - minV) / CGFloat(maxV - minV)) * h
+                    if i == 0 {
+                        path.move(to: CGPoint(x: 0, y: h))
+                        path.addLine(to: CGPoint(x: x, y: y))
+                    } else {
+                        let prev = points[i - 1]
+                        let px = w * CGFloat(i - 1) / CGFloat(max(points.count - 1, 1))
+                        let py = h - (CGFloat(prev.latency - minV) / CGFloat(maxV - minV)) * h
+                        let mx = (px + x) / 2
+                        path.addCurve(to: CGPoint(x: x, y: y), control1: CGPoint(x: mx, y: py), control2: CGPoint(x: mx, y: y))
+                    }
+                }
+                path.addLine(to: CGPoint(x: w, y: h))
+                path.closeSubpath()
+            }
+            .fill(
+                LinearGradient(
+                    colors: [color.opacity(0.15), color.opacity(0.02)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+        }
     }
 }
 
@@ -1475,36 +1804,36 @@ struct LogRow: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 8) {
-                Text(entry.formattedTimestamp)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .monospaced()
-                
-                Text(entry.level.rawValue)
-                    .font(.caption2)
-                    .fontWeight(.bold)
-                    .foregroundStyle(levelColor)
-                    .padding(.horizontal, 4)
-                    .padding(.vertical, 1)
-                    .background(levelColor.opacity(0.1))
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
-                
-                if let host = entry.host {
-                    Text(host)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-            }
+        HStack(spacing: 8) {
+            Circle()
+                .fill(levelColor)
+                .frame(width: 6, height: 6)
             
-            Text(entry.message)
-                .font(.caption)
-                .foregroundStyle(.primary)
-                .textSelection(.enabled)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text(entry.formattedTimestamp)
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(.tertiary)
+                    
+                    Text(entry.level.rawValue)
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(levelColor)
+                    
+                    if let host = entry.host {
+                        Text(host)
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+                
+                Text(entry.message)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.primary)
+                    .textSelection(.enabled)
+            }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 3)
     }
 }
 
@@ -1536,7 +1865,8 @@ struct SettingsTab: View {
 
     var body: some View {
         Form {
-            Section("状态栏显示") {
+            Section {
+
                 Picker("显示策略", selection: $viewModel.statusBarDisplayMode) {
                     Text("平均延迟").tag(StatusBarDisplayMode.average)
                     Text("最差主机").tag(StatusBarDisplayMode.worst)
@@ -1561,9 +1891,12 @@ struct SettingsTab: View {
                     .onChange(of: viewModel.showLabelsInMenu) { _, _ in
                         viewModel.saveSettings()
                     }
+            } header: {
+                Label("状态栏显示", systemImage: "menubar.rectangle")
             }
 
-            Section("监控") {
+            Section {
+
                 HStack {
                     Text("监控间隔")
                     Spacer()
@@ -1593,9 +1926,12 @@ struct SettingsTab: View {
                 .onChange(of: viewModel.logLevel) { _, _ in
                     viewModel.saveSettings()
                 }
+            } header: {
+                Label("监控", systemImage: "waveform.path.ecg")
             }
 
-            Section("通知") {
+            Section {
+
                 Toggle("启用通知", isOn: $viewModel.notificationEnabled)
                     .onChange(of: viewModel.notificationEnabled) { _, _ in
                         viewModel.saveSettings()
@@ -1616,13 +1952,18 @@ struct SettingsTab: View {
                             viewModel.saveSettings()
                         }
                 }
+            } header: {
+                Label("通知", systemImage: "bell.badge.fill")
             }
 
-            Section("系统") {
+            Section {
+
                 Toggle("开机自启动", isOn: $viewModel.autoStart)
                     .onChange(of: viewModel.autoStart) { _, newValue in
                         viewModel.toggleAutoStart(newValue)
                     }
+            } header: {
+                Label("系统", systemImage: "gear")
             }
         }
         .formStyle(.grouped)
