@@ -13,7 +13,7 @@
   <img src="https://img.shields.io/badge/platform-macOS%2014.0+-blue" alt="Platform">
   <img src="https://img.shields.io/badge/SwiftUI-6.0-orange" alt="SwiftUI">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/version-2.0.28-brightgreen" alt="Version">
+  <img src="https://img.shields.io/badge/version-2.0.29-brightgreen" alt="Version">
 </p>
 
 ---
@@ -172,6 +172,7 @@ AUTO_VERSION=false
 
 | 版本 | 构建 | 更新内容 |
 |------|------|---------|
+| v2.0.29 | r30 | 修复自定义命令中空格导致解析错误的问题 |
 | v2.0.28 | r29 | 移除 DMG 文件名中的构建号后缀 |
 | v2.0.27 | r28 | UI 细节优化：统一主机卡片高度，优化状态栏宽度自适应 |
 | v2.0.26 | r27 | 修复 macOS 15.7+ 小组件背景色崩溃问题，完善打包脚本 |
