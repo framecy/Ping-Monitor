@@ -801,11 +801,8 @@ class StatusBarController: ObservableObject {
     private var mainWindow: NSWindow?
     private var cancellables = Set<AnyCancellable>()
     
-    // 固定宽度定义
-    private let widthIconOnly: CGFloat = 28
-    private let widthWithLatency: CGFloat = 75
-    private let widthWithLatencyAndLabel: CGFloat = 110
-    private let widthWithTwoLabels: CGFloat = 145
+    // 固定宽度：仅图标
+    private let widthIconOnly: CGFloat = 32
 
     init() {
         viewModel = PingMonitorViewModel()
@@ -912,38 +909,36 @@ class StatusBarController: ObservableObject {
         guard let button = statusItem?.button else { return }
 
         let displayText = viewModel.getStatusBarDisplayText()
-        let labelCount = viewModel.getStatusBarLabelCount()
+        let font = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium)
+        button.font = font
 
         if viewModel.isRunning {
             button.image = NSImage(systemSymbolName: "network.badge.shield.half.filled", accessibilityDescription: nil)
-            button.title = " \(displayText)"
             
-            // 根据内容动态调整宽度
-            let targetWidth = calculateWidth(labelCount: labelCount)
-            statusItem?.length = targetWidth
+            let showingText = viewModel.showLatencyInMenu || viewModel.showLabelsInMenu
+            if showingText && !displayText.isEmpty && displayText != "●" {
+                button.title = " \(displayText)"
+                statusItem?.length = measureWidth(text: " \(displayText)", font: font)
+            } else {
+                button.title = ""
+                statusItem?.length = widthIconOnly
+            }
         } else {
             button.image = NSImage(systemSymbolName: "network", accessibilityDescription: nil)
             button.title = ""
             statusItem?.length = widthIconOnly
         }
-        button.font = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium)
     }
     
-    private func calculateWidth(labelCount: Int) -> CGFloat {
-        if !viewModel.showLatencyInMenu && !viewModel.showLabelsInMenu {
-            return widthIconOnly
-        } else if viewModel.showLatencyInMenu && !viewModel.showLabelsInMenu {
-            return widthWithLatency
-        } else if viewModel.showLatencyInMenu && viewModel.showLabelsInMenu {
-            if labelCount >= 2 {
-                return widthWithTwoLabels
-            } else {
-                return widthWithLatencyAndLabel
-            }
-        } else {
-            // 只显示标签，使用自适应宽度避免空白或截断
-            return NSStatusItem.variableLength
-        }
+    /// 根据实际文本内容动态计算状态栏宽度
+    private func measureWidth(text: String, font: NSFont) -> CGFloat {
+        let iconBase: CGFloat = 28  // 图标基础宽度
+        let padding: CGFloat = 8    // 右侧留白
+        
+        let attributes: [NSAttributedString.Key: Any] = [.font: font]
+        let textSize = (text as NSString).size(withAttributes: attributes)
+        
+        return ceil(iconBase + textSize.width + padding)
     }
 }
 

@@ -32,6 +32,7 @@ struct SidebarView: View {
                     SidebarSectionHeader(title: languageManager.t("sidebar.overview"))
                     SidebarRow(item: .monitor, selectedItem: $selectedItem, icon: SidebarItem.monitor.icon, title: SidebarItem.monitor.title)
                     SidebarRow(item: .statistics, selectedItem: $selectedItem, icon: SidebarItem.statistics.icon, title: SidebarItem.statistics.title)
+                    SidebarRow(item: .traceroute, selectedItem: $selectedItem, icon: SidebarItem.traceroute.icon, title: SidebarItem.traceroute.title)
                     
                     Spacer().frame(height: 16)
                     

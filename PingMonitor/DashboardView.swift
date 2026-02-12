@@ -6,24 +6,33 @@ struct DashboardView: View {
     
     var body: some View {
         ScrollView {
-            VStack(spacing: Theme.Layout.gridSpacing) {
+            Grid(horizontalSpacing: Theme.Layout.gridSpacing, verticalSpacing: Theme.Layout.gridSpacing) {
                 // Row 1: Running Status & Network Status
-                HStack(alignment: .top, spacing: Theme.Layout.gridSpacing) {
+                GridRow {
                     RunningStatusCard(viewModel: viewModel)
+                        .gridCellColumns(1)
                     NetworkStatusCard(viewModel: viewModel)
+                        .gridCellColumns(1)
                 }
+                .frame(minHeight: 180)
                 
                 // Row 2: Traffic Stats & Traffic Trend
-                HStack(alignment: .top, spacing: Theme.Layout.gridSpacing) {
+                GridRow {
                     TrafficAndLatencyCard(viewModel: viewModel)
+                        .gridCellColumns(1)
                     TrafficTrendCard(viewModel: viewModel)
+                        .gridCellColumns(1)
                 }
+                .frame(minHeight: 220)
                 
                 // Row 3: Summary & Ranking
-                HStack(alignment: .top, spacing: Theme.Layout.gridSpacing) {
+                GridRow {
                     SummaryDonutCard(viewModel: viewModel)
+                        .gridCellColumns(1)
                     RankingListCard(viewModel: viewModel)
+                        .gridCellColumns(1)
                 }
+                .frame(minHeight: 220)
             }
             .padding(Theme.Layout.cardPadding)
         }
@@ -140,8 +149,10 @@ struct StatItem: View {
                     .foregroundStyle(Theme.Colors.textSecondary)
             }
             Text(value)
-                .font(Theme.Fonts.display(20)) // Bigger font for value
+                .font(Theme.Fonts.display(18)) // Adjusted font for fit
                 .foregroundStyle(color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -170,31 +181,38 @@ struct NetworkStatusCard: View {
                 }.prefix(3)
                 
                 HStack(spacing: 0) {
-                    ForEach(Array(sortedHosts.enumerated()), id: \.element.id) { index, host in
-                        if index > 0 {
-                            Divider().frame(height: 30).padding(.horizontal, 10).opacity(0.3)
-                        }
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "server.rack")
-                                    .font(.system(size: 10))
-                                    .foregroundStyle(Theme.Colors.textSecondary)
-                                Text(host.name)
-                                    .font(Theme.Fonts.body(10))
-                                    .foregroundStyle(Theme.Colors.textSecondary)
-                                    .lineLimit(1)
+                    if sortedHosts.isEmpty {
+                        Text(languageManager.t("dashboard.no_data"))
+                            .font(Theme.Fonts.body(12))
+                            .foregroundStyle(Theme.Colors.textSecondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    } else {
+                        ForEach(Array(sortedHosts.enumerated()), id: \.element.id) { index, host in
+                            if index > 0 {
+                                Divider().frame(height: 30).padding(.horizontal, 10).opacity(0.3)
                             }
-                            if let latency = host.lastLatency {
-                                Text("\(Int(latency)) ms")
-                                    .font(Theme.Fonts.display(20))
-                                    .foregroundStyle(latency < 50 ? Theme.Colors.accentGreen : (latency < 100 ? Theme.Colors.accentOrange : Theme.Colors.accentRed))
-                            } else {
-                                Text("---")
-                                    .font(Theme.Fonts.display(20))
-                                    .foregroundStyle(Theme.Colors.textSecondary)
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "server.rack")
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(Theme.Colors.textSecondary)
+                                    Text(host.name)
+                                        .font(Theme.Fonts.body(10))
+                                        .foregroundStyle(Theme.Colors.textSecondary)
+                                        .lineLimit(1)
+                                }
+                                if let latency = host.lastLatency {
+                                    Text("\(Int(latency)) ms")
+                                        .font(Theme.Fonts.display(18))
+                                        .foregroundStyle(latency < 50 ? Theme.Colors.accentGreen : (latency < 100 ? Theme.Colors.accentOrange : Theme.Colors.accentRed))
+                                } else {
+                                    Text("---")
+                                        .font(Theme.Fonts.display(18))
+                                        .foregroundStyle(Theme.Colors.textSecondary)
+                                }
                             }
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
                 
@@ -226,7 +244,7 @@ struct TrafficAndLatencyCard: View {
          // In a real app with many hosts, calculating the average of all histories at each point is complex.
          // Here we'll just use the first available host or empty
         guard let firstHost = viewModel.hosts.first(where: { viewModel.hostStats[$0.id]?.latencyHistory.isEmpty == false }) else { return [] }
-        return viewModel.hostStats[firstHost.id]?.latencyHistory.suffix(20).map { $0.latency } ?? []
+        return viewModel.hostStats[firstHost.id]?.latencyHistory.suffix(30).map { $0.latency } ?? []
     }
     
     var body: some View {
@@ -283,6 +301,7 @@ struct TrafficAndLatencyCard: View {
                                 .foregroundStyle(Color.white.opacity(0.1))
                             AxisValueLabel()
                                 .foregroundStyle(Theme.Colors.textSecondary)
+                                .font(.system(size: 9))
                         }
                     }
                      .chartXAxis {
@@ -300,7 +319,7 @@ struct TrafficTrendCard: View {
     @ObservedObject var viewModel: PingMonitorViewModel
     @ObservedObject private var languageManager = LanguageManager.shared
     
-    // Mock data for visual consistency with reference
+    // Improved Mock data for visual consistency
     let data: [Double] = [50, 60, 45, 80, 70, 65, 55]
     let days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
     
@@ -334,20 +353,31 @@ struct TrafficTrendCard: View {
                             x: .value("Day", days[index]),
                             y: .value("Value", data[index])
                         )
-                        .foregroundStyle(Theme.Colors.textSecondary.opacity(0.3))
+                        .foregroundStyle(
+                            .linearGradient(
+                                colors: [Theme.Colors.accentOrange, Theme.Colors.accentRed],
+                                startPoint: .bottom,
+                                endPoint: .top
+                            )
+                        )
                         .cornerRadius(4)
                     }
                     
                     RuleMark(y: .value("Average", 55))
-                        .foregroundStyle(Theme.Colors.accentOrange)
-                        .lineStyle(StrokeStyle(lineWidth: 2))
+                        .foregroundStyle(Theme.Colors.accentBlue)
+                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 3]))
+                        .annotation(position: .top, alignment: .leading) {
+                            Text("Avg")
+                                .font(.system(size: 8))
+                                .foregroundStyle(Theme.Colors.accentBlue)
+                        }
                 }
                  .chartYAxis(.hidden)
                  .chartXAxis {
                      AxisMarks { value in
                          AxisValueLabel()
                              .foregroundStyle(Theme.Colors.textSecondary)
-                             .font(.system(size: 10))
+                             .font(.system(size: 9))
                      }
                  }
             }
@@ -395,11 +425,11 @@ struct SummaryDonutCard: View {
                     Spacer()
                 }
                 
-                HStack(spacing: 16) {
+                HStack(spacing: 8) {
                     // 3D Pie Chart
                     ZStack {
                         Donut3DView(slices: slices, hoveredSlice: $hoveredSlice)
-                            .frame(width: 150, height: 160)
+                            .frame(width: 140, height: 140)
                         
                         // Center label
                         VStack(spacing: 2) {
@@ -407,15 +437,17 @@ struct SummaryDonutCard: View {
                                 .font(Theme.Fonts.body(9))
                                 .foregroundStyle(Theme.Colors.textSecondary)
                             Text("\(totalPings)")
-                                .font(Theme.Fonts.display(16))
+                                .font(Theme.Fonts.display(14))
                                 .foregroundStyle(Theme.Colors.textPrimary)
                         }
                         .offset(y: -10)
                     }
                     .padding(.vertical, 4)
                     
+                    Spacer(minLength: 0)
+                    
                     // Legend
-                    VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 8) {
                         ForEach(Array(slices.enumerated()), id: \.offset) { index, slice in
                             LegendItem(
                                 color: slice.color,
@@ -443,10 +475,10 @@ struct Donut3DView: View {
     @Binding var hoveredSlice: Int?
     
     // 3D projection parameters
-    private let outerRadius: CGFloat = 58
+    private let outerRadius: CGFloat = 55
     private let innerRadius: CGFloat = 30
     private let yScale: CGFloat = 0.45      // elliptical squash for perspective
-    private let depth: CGFloat = 22          // thickness of the 3D extrusion
+    private let depth: CGFloat = 20          // thickness of the 3D extrusion
     private let gapAngle: Double = 0.04      // gap between slices in radians
     
     private var sliceAngles: [(start: Double, end: Double)] {
@@ -662,11 +694,11 @@ struct LegendItem: View {
                 .frame(width: isHovered ? 8 : 6, height: isHovered ? 8 : 6)
                 .animation(.easeInOut(duration: 0.2), value: isHovered)
             Text(label)
-                .font(Theme.Fonts.body(12))
+                .font(Theme.Fonts.body(11))
                 .foregroundStyle(isHovered ? Theme.Colors.textPrimary : Theme.Colors.textSecondary)
             Spacer()
             Text(value)
-                .font(Theme.Fonts.body(12))
+                .font(Theme.Fonts.body(11))
                 .foregroundStyle(Theme.Colors.textPrimary)
                 .fontWeight(isHovered ? .bold : .regular)
         }
@@ -697,38 +729,55 @@ struct RankingListCard: View {
                      // Sort hosts by latency
                     let sorted = viewModel.hosts.sorted { ($0.lastLatency ?? 9999) < ($1.lastLatency ?? 9999) }.prefix(5)
                     
-                    ForEach(Array(sorted.enumerated()), id: \.element.id) { index, host in
-                        HStack {
-                            Text("\(index + 1)")
-                                .font(Theme.Fonts.number(12))
-                                .foregroundStyle(.white)
-                                .frame(width: 16, height: 16)
-                                .background(Theme.Colors.accentBlue)
-                                .cornerRadius(4)
-                            
-                            Text(host.name)
-                                .font(Theme.Fonts.body(12))
-                                .foregroundStyle(Theme.Colors.textPrimary)
-                            
-                            Spacer()
-                            
-                            // Visualization Bar
-                            GeometryReader { geometry in
-                                ZStack(alignment: .leading) {
-                                    RoundedRectangle(cornerRadius: 2)
-                                        .fill(Theme.Colors.cardBackground.opacity(0.5))
-                                    
-                                    RoundedRectangle(cornerRadius: 2)
-                                        .fill(Theme.Colors.accentPurple)
-                                         .frame(width: min(CGFloat(host.lastLatency ?? 0) / 200.0 * geometry.size.width, geometry.size.width))
+                    if sorted.isEmpty {
+                        Text(languageManager.t("dashboard.no_data"))
+                            .font(Theme.Fonts.body(12))
+                            .foregroundStyle(Theme.Colors.textSecondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    } else {
+                        ForEach(Array(sorted.enumerated()), id: \.element.id) { index, host in
+                            HStack {
+                                Text("\(index + 1)")
+                                    .font(Theme.Fonts.number(12))
+                                    .foregroundStyle(.white)
+                                    .frame(width: 16, height: 16)
+                                    .background(Theme.Colors.accentBlue)
+                                    .cornerRadius(4)
+                                
+                                Text(host.name)
+                                    .font(Theme.Fonts.body(12))
+                                    .foregroundStyle(Theme.Colors.textPrimary)
+                                    .lineLimit(1)
+                                
+                                Spacer()
+                                
+                                // Visualization Bar
+                                GeometryReader { geometry in
+                                    ZStack(alignment: .leading) {
+                                        RoundedRectangle(cornerRadius: 2)
+                                            .fill(Theme.Colors.cardBackground.opacity(0.5))
+                                        
+                                        if let latency = host.lastLatency {
+                                            RoundedRectangle(cornerRadius: 2)
+                                                .fill(
+                                                    LinearGradient(
+                                                        colors: [Theme.Colors.accentBlue, Theme.Colors.accentPurple],
+                                                        startPoint: .leading,
+                                                        endPoint: .trailing
+                                                    )
+                                                )
+                                                 .frame(width: min(CGFloat(latency) / 200.0 * geometry.size.width, geometry.size.width))
+                                        }
+                                    }
                                 }
+                                .frame(height: 4)
+                                .padding(.horizontal, 8)
+                                
+                                Text(String(format: "%.0f ms", host.lastLatency ?? 0))
+                                    .font(Theme.Fonts.number(12))
+                                    .foregroundStyle(Theme.Colors.textSecondary)
+                                    .frame(width: 40, alignment: .trailing)
                             }
-                            .frame(height: 4)
-                            .padding(.horizontal, 8)
-                            
-                            Text(String(format: "%.1f ms", host.lastLatency ?? 0))
-                                .font(Theme.Fonts.number(12))
-                                .foregroundStyle(Theme.Colors.textSecondary)
                         }
                     }
                 }

@@ -6,6 +6,7 @@ import UniformTypeIdentifiers
 enum SidebarItem: String, CaseIterable, Identifiable {
     case monitor
     case statistics
+    case traceroute
     case hosts
     case logs
     case settings
@@ -16,6 +17,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         switch self {
         case .monitor: return LanguageManager.shared.t("sidebar.monitor")
         case .statistics: return LanguageManager.shared.t("sidebar.dashboard")
+        case .traceroute: return LanguageManager.shared.t("sidebar.traceroute")
         case .hosts: return LanguageManager.shared.t("sidebar.hosts")
         case .logs: return LanguageManager.shared.t("sidebar.logs")
         case .settings: return LanguageManager.shared.t("sidebar.settings")
@@ -26,6 +28,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         switch self {
         case .monitor: return "waveform.path.ecg"
         case .statistics: return "chart.bar.fill"
+        case .traceroute: return "point.topleft.down.to.point.bottomright.curvepath"
         case .hosts: return "server.rack"
         case .logs: return "doc.text.fill"
         case .settings: return "gearshape.fill"
@@ -36,6 +39,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         switch self {
         case .monitor: return .green
         case .statistics: return .blue
+        case .traceroute: return .cyan
         case .hosts: return .purple
         case .logs: return .orange
         case .settings: return .gray
@@ -81,6 +85,8 @@ struct MainView: View {
             MonitorTab(viewModel: viewModel)
         case .statistics:
             DashboardView(viewModel: viewModel)
+        case .traceroute:
+            TracerouteView(viewModel: viewModel)
         case .hosts:
             HostManagementTab(viewModel: viewModel)
         case .logs:
@@ -850,6 +856,7 @@ struct TrafficCard: View {
 struct MonitorTab: View {
     @ObservedObject var viewModel: PingMonitorViewModel
     @State private var editingHost: HostConfig?
+    @State private var selectedHost: HostConfig?
     @State private var newHostName = ""
     @State private var newHostAddress = ""
     @State private var newHostCommand = ""
@@ -858,51 +865,77 @@ struct MonitorTab: View {
     @ObservedObject private var languageManager = LanguageManager.shared
 
     var body: some View {
-        VStack(spacing: 0) {
-            // 工具栏
-            HStack {
-                Text("\(languageManager.t("monitor.title")) (\(viewModel.hosts.count))")
-                    .font(.headline)
-                Spacer()
-                Button {
-                    showingAddHost = true
-                } label: {
-                    Label(languageManager.t("monitor.add"), systemImage: "plus")
+        ZStack {
+            VStack(spacing: 0) {
+                // 工具栏
+                HStack {
+                    Text("\(languageManager.t("monitor.title")) (\(viewModel.hosts.count))")
+                        .font(.headline)
+                    Spacer()
+                    Button {
+                        showingAddHost = true
+                    } label: {
+                        Label(languageManager.t("monitor.add"), systemImage: "plus")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
-            }
-            .padding()
-            .background(.ultraThinMaterial)
-            
-            if viewModel.hosts.isEmpty {
-                ContentUnavailableView(languageManager.t("monitor.no_hosts"), systemImage: "network", description: Text(languageManager.t("monitor.add_host_hint")))
-            } else {
-                ScrollView {
-                    LazyVGrid(columns: [
-                        GridItem(.adaptive(minimum: 280, maximum: .infinity), spacing: 12)
-                    ], spacing: 12) {
-                        ForEach(viewModel.hosts) { host in
-                            EditableHostCard(
-                                host: host,
-                                viewModel: viewModel,
-                                onEdit: {
-                                    editingHost = host
-                                    newHostName = host.name
-                                    newHostAddress = host.address
-                                    newHostCommand = host.command
-                                    newHostRules = host.displayRules
-                                },
-                                onDelete: {
-                                    if let index = viewModel.hosts.firstIndex(where: { $0.id == host.id }) {
-                                        viewModel.removeHost(at: index)
+                .padding()
+                .background(.ultraThinMaterial)
+                
+                if viewModel.hosts.isEmpty {
+                    ContentUnavailableView(languageManager.t("monitor.no_hosts"), systemImage: "network", description: Text(languageManager.t("monitor.add_host_hint")))
+                } else {
+                    ScrollView {
+                        LazyVGrid(columns: [
+                            GridItem(.adaptive(minimum: 280, maximum: .infinity), spacing: 12)
+                        ], spacing: 12) {
+                            ForEach(viewModel.hosts) { host in
+                                EditableHostCard(
+                                    host: host,
+                                    viewModel: viewModel,
+                                    onEdit: {
+                                        editingHost = host
+                                        newHostName = host.name
+                                        newHostAddress = host.address
+                                        newHostCommand = host.command
+                                        newHostRules = host.displayRules
+                                    },
+                                    onDelete: {
+                                        if let index = viewModel.hosts.firstIndex(where: { $0.id == host.id }) {
+                                            viewModel.removeHost(at: index)
+                                        }
+                                    }
+                                )
+                                .onTapGesture {
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                        selectedHost = host
                                     }
                                 }
-                            )
+                            }
                         }
+                        .padding()
                     }
-                    .padding()
                 }
+            }
+            .blur(radius: selectedHost != nil ? 2 : 0)
+            
+            // Detail Overlay
+            if let host = selectedHost {
+                Color.black.opacity(0.001) // Invisible backdrop to catch taps if needed, or just let view take full space
+                    .onTapGesture {
+                        withAnimation { selectedHost = nil }
+                    }
+                
+                HostDetailView(
+                    viewModel: viewModel,
+                    host: host,
+                    onClose: {
+                        withAnimation { selectedHost = nil }
+                    }
+                )
+                .transition(.move(edge: .trailing))
+                .zIndex(1)
             }
         }
         .sheet(isPresented: $showingAddHost) {

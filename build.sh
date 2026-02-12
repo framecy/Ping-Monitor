@@ -74,6 +74,7 @@ mkdir -p "$DMG_CONTENTS_DIR"
 
 # 复制应用到临时目录
 cp -R "$APP_PATH" "$DMG_CONTENTS_DIR/"
+cp "README.md" "$DMG_CONTENTS_DIR/"
 
 # 创建 Applications 符号链接
 ln -s "/Applications" "$DMG_CONTENTS_DIR/Applications"
