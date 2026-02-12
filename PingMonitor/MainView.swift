@@ -1,15 +1,26 @@
+
 import SwiftUI
 import UniformTypeIdentifiers
 
 // MARK: - Sidebar Navigation Item
 enum SidebarItem: String, CaseIterable, Identifiable {
-    case monitor = "监控"
-    case statistics = "统计"
-    case hosts = "主机管理"
-    case logs = "日志"
-    case settings = "设置"
+    case monitor
+    case statistics
+    case hosts
+    case logs
+    case settings
     
     var id: String { rawValue }
+    
+    @MainActor var title: String {
+        switch self {
+        case .monitor: return LanguageManager.shared.t("sidebar.monitor")
+        case .statistics: return LanguageManager.shared.t("sidebar.dashboard")
+        case .hosts: return LanguageManager.shared.t("sidebar.hosts")
+        case .logs: return LanguageManager.shared.t("sidebar.logs")
+        case .settings: return LanguageManager.shared.t("sidebar.settings")
+        }
+    }
     
     var icon: String {
         switch self {
@@ -35,71 +46,30 @@ enum SidebarItem: String, CaseIterable, Identifiable {
 struct MainView: View {
     @ObservedObject var viewModel: PingMonitorViewModel
     @State private var selectedItem: SidebarItem = .monitor
+    @ObservedObject private var languageManager = LanguageManager.shared
 
     var body: some View {
-        NavigationSplitView {
-            sidebarView
-        } detail: {
+        HStack(spacing: 0) {
+            SidebarView(selectedItem: $selectedItem)
+                .frame(width: 220)
+                .background(Theme.Colors.sidebarBackground)
+            
+            Rectangle()
+                .fill(Theme.Colors.separator)
+                .frame(width: 1)
+            
             VStack(spacing: 0) {
                 headerView
+                
                 detailContent
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+            .background(Theme.Colors.background)
         }
         .frame(minWidth: 900, minHeight: 650)
-        .navigationSplitViewColumnWidth(min: 170, ideal: 190, max: 220)
-    }
-    
-    // MARK: - Sidebar
-    private var sidebarView: some View {
-        VStack(spacing: 0) {
-            // App branding
-            HStack(spacing: 10) {
-                ZStack {
-                    Circle()
-                        .fill(.linearGradient(
-                            colors: [.blue.opacity(0.7), .cyan.opacity(0.5)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ))
-                        .frame(width: 32, height: 32)
-                    Image(systemName: "network")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.white)
-                }
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Ping Monitor")
-                        .font(.system(size: 13, weight: .bold))
-                    if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String {
-                        Text("v\(version)")
-                            .font(.system(size: 10))
-                            .foregroundStyle(.tertiary)
-                    }
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
-            
-            Divider().padding(.horizontal, 12)
-            
-            // Navigation items
-            List(SidebarItem.allCases, selection: $selectedItem) { item in
-                sidebarRow(for: item)
-                    .tag(item)
-            }
-            .listStyle(.sidebar)
-        }
-        .background(.ultraThinMaterial)
-    }
-    
-    private func sidebarRow(for item: SidebarItem) -> some View {
-        Label {
-            Text(item.rawValue)
-                .font(.system(size: 13, weight: selectedItem == item ? .semibold : .regular))
-        } icon: {
-            Image(systemName: item.icon)
-                .font(.system(size: 12))
-                .foregroundStyle(selectedItem == item ? item.activeColor : .secondary)
-                .frame(width: 20)
+        .onChange(of: languageManager.currentLanguage) { _, _ in
+            viewModel.updateStatusBarDisplay()
+            viewModel.syncToWidget()
         }
     }
     
@@ -110,7 +80,7 @@ struct MainView: View {
         case .monitor:
             MonitorTab(viewModel: viewModel)
         case .statistics:
-            StatisticsTab(viewModel: viewModel)
+            DashboardView(viewModel: viewModel)
         case .hosts:
             HostManagementTab(viewModel: viewModel)
         case .logs:
@@ -140,20 +110,32 @@ struct MainView: View {
             }
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(selectedItem.rawValue)
+                Text(selectedItem.title)
                     .font(.system(size: 16, weight: .bold))
-                Text(viewModel.isRunning ? "正在监控 \(viewModel.hosts.count) 个主机" : "已停止")
+                Text(viewModel.isRunning ? String(format: languageManager.t("header.monitoring"), viewModel.hosts.count) : languageManager.t("header.stopped"))
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
 
             Spacer()
 
+            // Language Toggle
+            Button(action: { languageManager.toggle() }) {
+                Text(languageManager.currentLanguage == .zh ? "EN" : "中")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(Theme.Colors.textSecondary)
+                    .padding(6)
+                    .background(Theme.Colors.cardBackground)
+                    .clipShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .help("Switch Language")
+
             Button(action: { viewModel.toggle() }) {
                 HStack(spacing: 6) {
                     Image(systemName: viewModel.isRunning ? "stop.fill" : "play.fill")
                         .font(.system(size: 10))
-                    Text(viewModel.isRunning ? "停止" : "开始")
+                    Text(viewModel.isRunning ? languageManager.t("header.stop") : languageManager.t("header.start"))
                         .font(.system(size: 12, weight: .medium))
                 }
                 .padding(.horizontal, 14)
@@ -186,13 +168,14 @@ struct MainView: View {
 struct StatisticsTab: View {
     @ObservedObject var viewModel: PingMonitorViewModel
     @State private var selectedHost: HostConfig?
+    @ObservedObject private var languageManager = LanguageManager.shared
     
     var body: some View {
         VStack(spacing: 0) {
             // 主机选择器
             if viewModel.hosts.count > 1 {
-                Picker("选择主机", selection: $selectedHost) {
-                    Text("全部主机").tag(nil as HostConfig?)
+                Picker(languageManager.t("stats.select_host"), selection: $selectedHost) {
+                    Text(languageManager.t("stats.all_hosts")).tag(nil as HostConfig?)
                     ForEach(viewModel.hosts) { host in
                         Text(host.name).tag(host as HostConfig?)
                     }
@@ -202,17 +185,18 @@ struct StatisticsTab: View {
             }
             
             if viewModel.hosts.isEmpty {
-                ContentUnavailableView("没有主机", systemImage: "network", description: Text("添加主机查看统计"))
+                ContentUnavailableView(languageManager.t("monitor.no_hosts"), systemImage: "network", description: Text(languageManager.t("monitor.add_host_hint")))
             } else {
-                StatisticsContentView(viewModel: viewModel, host: selectedHost)
+                StatisticsContentView(host: selectedHost, viewModel: viewModel)
             }
         }
     }
 }
 
 struct StatisticsContentView: View {
-    @ObservedObject var viewModel: PingMonitorViewModel
     let host: HostConfig?
+    @ObservedObject var viewModel: PingMonitorViewModel
+    @ObservedObject private var languageManager = LanguageManager.shared
     
     // 聚合所有主机的统计数据
     var aggregatedStats: AggregatedStats {
@@ -312,13 +296,13 @@ struct StatisticsContentView: View {
                 // 操作按钮
                 HStack {
                     if let singleHost = host {
-                        Button("重置当前主机统计") {
+                        Button(languageManager.t("stats.reset_current")) {
                             viewModel.resetStats(for: singleHost.id)
                         }
                         .buttonStyle(.bordered)
                     }
                     
-                    Button("重置所有统计") {
+                    Button(languageManager.t("stats.reset_all")) {
                         viewModel.resetAllStats()
                     }
                     .buttonStyle(.bordered)
@@ -371,6 +355,7 @@ struct AggregatedStats {
 
 struct OverviewCardsView: View {
     let stats: AggregatedStats
+    @ObservedObject private var languageManager = LanguageManager.shared
     
     var body: some View {
         LazyVGrid(columns: [
@@ -380,28 +365,28 @@ struct OverviewCardsView: View {
             GridItem(.flexible())
         ], spacing: 16) {
             StatCard(
-                title: stats.isAggregated ? "总请求数" : "请求数",
+                title: stats.isAggregated ? languageManager.t("dashboard.total") : languageManager.t("stats.requests"),
                 value: "\(stats.totalPings)",
                 icon: "number.circle.fill",
                 color: .blue
             )
             
             StatCard(
-                title: "成功率",
+                title: languageManager.t("stats.success_rate"),
                 value: String(format: "%.1f%%", stats.successRate),
                 icon: "checkmark.circle.fill",
                 color: .green
             )
             
             StatCard(
-                title: "丢包率",
+                title: languageManager.t("stats.loss_rate"),
                 value: String(format: "%.1f%%", stats.packetLossRate),
                 icon: "xmark.circle.fill",
                 color: stats.packetLossRate > 5 ? .red : .orange
             )
             
             StatCard(
-                title: "总流量",
+                title: languageManager.t("stats.traffic"),
                 value: stats.totalTraffic,
                 icon: "arrow.up.arrow.down.circle.fill",
                 color: .purple
@@ -460,6 +445,7 @@ struct StatCard: View {
 struct LatencyChartView: View {
     let history: [LatencyPoint]
     @State private var animateEndpoint = false
+    @ObservedObject private var languageManager = LanguageManager.shared
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -469,7 +455,7 @@ struct LatencyChartView: View {
                     Image(systemName: "chart.xyaxis.line")
                         .font(.system(size: 12))
                         .foregroundStyle(.blue)
-                    Text("延迟趋势")
+                    Text(languageManager.t("dashboard.latency_trend"))
                         .font(.system(size: 14, weight: .semibold))
                 }
                 
@@ -480,7 +466,7 @@ struct LatencyChartView: View {
                         Circle()
                             .fill(latencyColor(for: last.latency))
                             .frame(width: 6, height: 6)
-                        Text("当前 \(Int(last.latency))ms")
+                        Text("\(languageManager.t("stats.chart.current")) \(Int(last.latency))ms")
                             .font(.system(size: 11, weight: .medium, design: .monospaced))
                             .foregroundStyle(.secondary)
                     }
@@ -495,11 +481,11 @@ struct LatencyChartView: View {
             
             // Legend
             HStack(spacing: 16) {
-                latencyLegend("<50ms 优秀", color: .green)
-                latencyLegend("<100ms 良好", color: .orange)
-                latencyLegend(">100ms 较差", color: .red)
+                latencyLegend(languageManager.t("stats.legend.excellent"), color: .green)
+                latencyLegend(languageManager.t("stats.legend.good"), color: .orange)
+                latencyLegend(languageManager.t("stats.legend.poor"), color: .red)
                 Spacer()
-                Text("共 \(history.count) 次")
+                Text(String(format: languageManager.t("stats.chart.count"), history.count))
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
             }
@@ -725,6 +711,7 @@ struct LatencyChartView: View {
 
 struct DetailedStatsView: View {
     let stats: AggregatedStats
+    @ObservedObject private var languageManager = LanguageManager.shared
     
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -732,7 +719,7 @@ struct DetailedStatsView: View {
                 Image(systemName: "list.bullet.rectangle.fill")
                     .font(.system(size: 12))
                     .foregroundStyle(.indigo)
-                Text(stats.isAggregated ? "详细统计 (\(stats.hostCount) 个主机)" : "详细统计")
+                Text(stats.isAggregated ? "\(languageManager.t("stats.detailed")) (\(stats.hostCount))" : languageManager.t("stats.detailed"))
                     .font(.system(size: 14, weight: .semibold))
             }
             
@@ -741,18 +728,18 @@ struct DetailedStatsView: View {
                 GridItem(.flexible()),
                 GridItem(.flexible())
             ], spacing: 12) {
-                DetailStatCard(icon: "checkmark.circle", color: .green, label: "成功请求", value: "\(stats.successfulPings)")
-                DetailStatCard(icon: "xmark.circle", color: .red, label: "失败请求", value: "\(stats.failedPings)")
-                DetailStatCard(icon: "timer", color: .blue, label: "运行时间", value: formatDuration(stats.startTime))
-                DetailStatCard(icon: "arrow.down.to.line", color: .cyan, label: "最小延迟", value: stats.minLatency != nil ? String(format: "%.1fms", stats.minLatency!) : "N/A")
-                DetailStatCard(icon: "arrow.up.to.line", color: .orange, label: "最大延迟", value: stats.maxLatency != nil ? String(format: "%.1fms", stats.maxLatency!) : "N/A")
-                DetailStatCard(icon: "equal.circle", color: .purple, label: "平均延迟", value: String(format: "%.1fms", stats.avgLatency))
+                DetailStatCard(icon: "checkmark.circle", color: .green, label: languageManager.t("stats.success"), value: "\(stats.successfulPings)")
+                DetailStatCard(icon: "xmark.circle", color: .red, label: languageManager.t("stats.failed"), value: "\(stats.failedPings)")
+                DetailStatCard(icon: "timer", color: .blue, label: languageManager.t("dashboard.uptime"), value: formatDuration(stats.startTime))
+                DetailStatCard(icon: "arrow.down.to.line", color: .cyan, label: languageManager.t("stats.min_latency"), value: stats.minLatency != nil ? String(format: "%.1fms", stats.minLatency!) : "N/A")
+                DetailStatCard(icon: "arrow.up.to.line", color: .orange, label: languageManager.t("stats.max_latency"), value: stats.maxLatency != nil ? String(format: "%.1fms", stats.maxLatency!) : "N/A")
+                DetailStatCard(icon: "equal.circle", color: .purple, label: languageManager.t("stats.avg_latency"), value: String(format: "%.1fms", stats.avgLatency))
             }
             
             // Traffic cards
             HStack(spacing: 12) {
-                TrafficCard(icon: "arrow.up.circle.fill", color: .blue, label: "发送流量", value: formatBytes(stats.totalBytesSent))
-                TrafficCard(icon: "arrow.down.circle.fill", color: .green, label: "接收流量", value: formatBytes(stats.totalBytesReceived))
+                TrafficCard(icon: "arrow.up.circle.fill", color: .blue, label: languageManager.t("stats.sent"), value: formatBytes(stats.totalBytesSent))
+                TrafficCard(icon: "arrow.down.circle.fill", color: .green, label: languageManager.t("stats.received"), value: formatBytes(stats.totalBytesReceived))
             }
         }
         .padding(16)
@@ -781,11 +768,11 @@ struct DetailedStatsView: View {
         let seconds = Int(interval) % 60
         
         if hours > 0 {
-            return String(format: "%d小时%d分", hours, minutes)
+            return String(format: languageManager.t("stats.time.hours"), hours, minutes)
         } else if minutes > 0 {
-            return String(format: "%d分%d秒", minutes, seconds)
+            return String(format: languageManager.t("stats.time.minutes"), minutes, seconds)
         } else {
-            return String(format: "%d秒", seconds)
+            return String(format: languageManager.t("stats.time.seconds"), seconds)
         }
     }
 }
@@ -868,18 +855,19 @@ struct MonitorTab: View {
     @State private var newHostCommand = ""
     @State private var newHostRules: [DisplayRule] = []
     @State private var showingAddHost = false
+    @ObservedObject private var languageManager = LanguageManager.shared
 
     var body: some View {
         VStack(spacing: 0) {
             // 工具栏
             HStack {
-                Text("监控中主机 (\(viewModel.hosts.count))")
+                Text("\(languageManager.t("monitor.title")) (\(viewModel.hosts.count))")
                     .font(.headline)
                 Spacer()
                 Button {
                     showingAddHost = true
                 } label: {
-                    Label("添加", systemImage: "plus")
+                    Label(languageManager.t("monitor.add"), systemImage: "plus")
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.small)
@@ -888,7 +876,7 @@ struct MonitorTab: View {
             .background(.ultraThinMaterial)
             
             if viewModel.hosts.isEmpty {
-                ContentUnavailableView("没有主机", systemImage: "network", description: Text("点击右上角添加主机"))
+                ContentUnavailableView(languageManager.t("monitor.no_hosts"), systemImage: "network", description: Text(languageManager.t("monitor.add_host_hint")))
             } else {
                 ScrollView {
                     LazyVGrid(columns: [
@@ -920,7 +908,7 @@ struct MonitorTab: View {
         .sheet(isPresented: $showingAddHost) {
             HostEditorSheet(
                 isPresented: $showingAddHost,
-                title: "添加主机",
+                title: languageManager.t("editor.add_host"),
                 name: $newHostName,
                 address: $newHostAddress,
                 command: $newHostCommand,
@@ -937,14 +925,18 @@ struct MonitorTab: View {
                     get: { editingHost != nil },
                     set: { if !$0 { editingHost = nil } }
                 ),
-                title: "编辑主机",
+                title: languageManager.t("editor.edit_host"),
                 name: $newHostName,
                 address: $newHostAddress,
                 command: $newHostCommand,
                 displayRules: $newHostRules,
                 onSave: {
+                    let trimmedName = newHostName.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let trimmedAddress = newHostAddress.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let trimmedCommand = newHostCommand.trimmingCharacters(in: .whitespacesAndNewlines)
+                    
                     if let index = viewModel.hosts.firstIndex(where: { $0.id == host.id }) {
-                        viewModel.updateHost(at: index, name: newHostName, address: newHostAddress, command: newHostCommand, displayRules: newHostRules)
+                        viewModel.updateHost(at: index, name: trimmedName, address: trimmedAddress, command: trimmedCommand, displayRules: newHostRules)
                     }
                     editingHost = nil
                 }
@@ -957,227 +949,6 @@ struct MonitorTab: View {
         newHostAddress = ""
         newHostCommand = ""
         newHostRules = []
-    }
-}
-
-struct EditableHostCard: View {
-    let host: HostConfig
-    let viewModel: PingMonitorViewModel
-    let onEdit: () -> Void
-    let onDelete: () -> Void
-    @State private var showingDeleteConfirm = false
-    @State private var isHovered = false
-    @State private var breathe = false
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .center) {
-                statusIndicator
-                
-                Text(host.name)
-                    .font(.system(size: 14, weight: .semibold))
-                    .lineLimit(1)
-                
-                Spacer()
-                
-                latencyDisplay
-            }
-            
-            Text(host.address)
-                .font(.system(size: 11, design: .monospaced))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-            
-            Spacer()
-            
-            // Mini sparkline
-            if let stats = viewModel.hostStats[host.id],
-               stats.latencyHistory.count > 1 {
-                MiniSparkline(
-                    points: Array(stats.latencyHistory.suffix(15)),
-                    color: statusColor
-                )
-                .frame(height: 24)
-            }
-            
-            HStack(spacing: 0) {
-                rulesSection
-                Spacer()
-                activeRulesSection
-            }
-        }
-        .frame(height: 140)
-        .padding(14)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(
-                    .linearGradient(
-                        colors: [
-                            statusColor.opacity(isHovered ? 0.08 : 0.04),
-                            .clear
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-        )
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(isHovered ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(.regularMaterial))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(
-                    statusColor.opacity(isHovered ? 0.4 : 0.15),
-                    lineWidth: isHovered ? 1.5 : 1
-                )
-        )
-        .shadow(color: statusColor.opacity(isHovered ? 0.12 : 0.05), radius: isHovered ? 10 : 5, y: isHovered ? 4 : 2)
-        .scaleEffect(isHovered ? 1.02 : 1.0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovered)
-        .onHover { hovering in
-            isHovered = hovering
-        }
-        .onAppear { breathe = true }
-        .contextMenu {
-            Button { onEdit() } label: { Label("编辑", systemImage: "pencil") }
-            Divider()
-            Button(role: .destructive) { onDelete() } label: { Label("删除", systemImage: "trash") }
-        }
-    }
-    
-    private var statusIndicator: some View {
-        ZStack {
-            if viewModel.isRunning && host.isReachable {
-                Circle()
-                    .fill(statusColor.opacity(0.3))
-                    .frame(width: 14, height: 14)
-                    .scaleEffect(breathe ? 1.5 : 1.0)
-                    .opacity(breathe ? 0 : 0.6)
-                    .animation(.easeInOut(duration: 2.0).repeatForever(autoreverses: false), value: breathe)
-            }
-            Circle()
-                .fill(statusColor)
-                .frame(width: 8, height: 8)
-                .shadow(color: statusColor.opacity(0.5), radius: 3)
-        }
-    }
-    
-    @ViewBuilder
-    private var latencyDisplay: some View {
-        if host.isChecking {
-            ProgressView()
-                .scaleEffect(0.7)
-                .frame(width: 50, height: 20)
-        } else if let latency = host.lastLatency {
-            HStack(spacing: 4) {
-                Image(systemName: statusIcon)
-                    .font(.system(size: 10))
-                Text("\(Int(latency))ms")
-                    .font(.system(size: 13, weight: .bold, design: .monospaced))
-            }
-            .foregroundStyle(statusColor)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(statusColor.opacity(0.12))
-            .clipShape(Capsule())
-        } else if viewModel.isRunning {
-            HStack(spacing: 2) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.system(size: 10))
-                Text("超时")
-                    .font(.system(size: 11, weight: .medium))
-            }
-            .foregroundStyle(.red)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(Color.red.opacity(0.12))
-            .clipShape(Capsule())
-        } else {
-            HStack(spacing: 2) {
-                Image(systemName: "pause.circle.fill")
-                    .font(.system(size: 10))
-                Text("未运行")
-                    .font(.system(size: 11))
-            }
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(Color.gray.opacity(0.1))
-            .clipShape(Capsule())
-        }
-    }
-    
-    private var rulesSection: some View {
-        Group {
-            if !host.displayRules.filter({ $0.enabled }).isEmpty {
-                HStack(spacing: 4) {
-                    Image(systemName: "slider.horizontal.3")
-                        .font(.system(size: 9))
-                        .foregroundStyle(.tertiary)
-                    
-                    ForEach(host.displayRules.filter { $0.enabled }.prefix(2)) { rule in
-                        Text("\(rule.condition == "less" ? "<" : ">")\(Int(rule.threshold))ms")
-                            .font(.system(size: 9, weight: .medium, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 1)
-                            .background(Color.gray.opacity(0.1))
-                            .clipShape(RoundedRectangle(cornerRadius: 3))
-                    }
-                    
-                    if host.displayRules.filter({ $0.enabled }).count > 2 {
-                        Text("+\(host.displayRules.filter({ $0.enabled }).count - 2)")
-                            .font(.system(size: 9))
-                            .foregroundStyle(.tertiary)
-                    }
-                }
-            }
-        }
-    }
-    
-    private var activeRulesSection: some View {
-        Group {
-            let activeRules = host.displayRules.filter { rule in
-                guard rule.enabled else { return false }
-                guard let latency = host.lastLatency else { return false }
-                if rule.condition == "less" {
-                    return latency < rule.threshold
-                } else {
-                    return latency > rule.threshold
-                }
-            }
-            
-            if !activeRules.isEmpty {
-                HStack(spacing: 4) {
-                    ForEach(activeRules.prefix(2)) { rule in
-                        Label(rule.label, systemImage: rule.condition == "less" ? "arrow.down.circle.fill" : "arrow.up.circle.fill")
-                            .font(.system(size: 10, weight: .medium))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 3)
-                            .background(rule.condition == "less" ? Color.green.opacity(0.15) : Color.orange.opacity(0.15))
-                            .foregroundStyle(rule.condition == "less" ? .green : .orange)
-                            .clipShape(Capsule())
-                    }
-                }
-            }
-        }
-    }
-    
-    private var statusColor: Color {
-        guard !host.isChecking else { return .blue }
-        guard let latency = host.lastLatency else { return .gray }
-        if latency < 50 { return .green }
-        if latency < 100 { return .orange }
-        return .red
-    }
-    
-    private var statusIcon: String {
-        guard !host.isChecking else { return "checkmark" }
-        guard let latency = host.lastLatency else { return "circle" }
-        if latency < 50 { return "arrow.down" }
-        if latency < 100 { return "arrow.right" }
-        return "arrow.up"
     }
 }
 
@@ -1243,12 +1014,13 @@ struct MiniSparkline: View {
 struct HostManagementTab: View {
     @ObservedObject var viewModel: PingMonitorViewModel
     @State private var selectedSection = 0
+    @ObservedObject private var languageManager = LanguageManager.shared
     
     var body: some View {
         VStack(spacing: 0) {
             Picker("", selection: $selectedSection) {
-                Text("已保存主机 (\(viewModel.hosts.count))").tag(0)
-                Text("预设 (\(viewModel.presets.count))").tag(1)
+                Text("\(languageManager.t("host.manage.section.saved")) (\(viewModel.hosts.count))").tag(0)
+                Text("\(languageManager.t("host.manage.section.presets")) (\(viewModel.presets.count))").tag(1)
             }
             .pickerStyle(.segmented)
             .padding()
@@ -1271,18 +1043,19 @@ struct HostsManagementView: View {
     @State private var newHostCommand = ""
     @State private var newHostRules: [DisplayRule] = []
     @State private var hoveredHostId: UUID?
+    @ObservedObject private var languageManager = LanguageManager.shared
 
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("管理监控主机")
+                Text(languageManager.t("sidebar.hosts"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
                 Button {
                     showingAddHost = true
                 } label: {
-                    Label("添加主机", systemImage: "plus")
+                    Label(languageManager.t("host.manage.add"), systemImage: "plus")
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.small)
@@ -1291,7 +1064,7 @@ struct HostsManagementView: View {
             .padding(.bottom, 12)
             
             if viewModel.hosts.isEmpty {
-                ContentUnavailableView("没有主机", systemImage: "server.rack", description: Text("添加主机开始监控"))
+                ContentUnavailableView(languageManager.t("host.manage.no_hosts"), systemImage: "server.rack", description: Text(languageManager.t("host.manage.add_hint")))
             } else {
                 ScrollView {
                     LazyVGrid(columns: [
@@ -1330,7 +1103,7 @@ struct HostsManagementView: View {
         .sheet(isPresented: $showingAddHost) {
             HostEditorSheet(
                 isPresented: $showingAddHost,
-                title: "添加主机",
+                title: languageManager.t("editor.add_host"),
                 name: $newHostName,
                 address: $newHostAddress,
                 command: $newHostCommand,
@@ -1353,7 +1126,7 @@ struct HostsManagementView: View {
                     get: { editingHost != nil },
                     set: { if !$0 { editingHost = nil } }
                 ),
-                title: "编辑主机",
+                title: languageManager.t("editor.edit_host"),
                 name: $newHostName,
                 address: $newHostAddress,
                 command: $newHostCommand,
@@ -1387,6 +1160,7 @@ struct HostManagementCard: View {
     let isHovered: Bool
     let onEdit: () -> Void
     let onDelete: () -> Void
+    @ObservedObject private var languageManager = LanguageManager.shared
     
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -1407,7 +1181,7 @@ struct HostManagementCard: View {
                             .foregroundStyle(.blue.opacity(0.7))
                     }
                     .buttonStyle(.plain)
-                    .help("编辑")
+                    .help(languageManager.t("menu.edit"))
                     
                     Button { onDelete() } label: {
                         Image(systemName: "trash.circle.fill")
@@ -1415,7 +1189,7 @@ struct HostManagementCard: View {
                             .foregroundStyle(.red.opacity(0.6))
                     }
                     .buttonStyle(.plain)
-                    .help("删除")
+                    .help(languageManager.t("menu.delete"))
                 }
                 .opacity(isHovered ? 1 : 0.3)
             }
@@ -1473,9 +1247,9 @@ struct HostManagementCard: View {
         )
         .scaleEffect(isHovered ? 1.01 : 1.0)
         .contextMenu {
-            Button { onEdit() } label: { Label("编辑", systemImage: "pencil") }
+            Button { onEdit() } label: { Label(languageManager.t("menu.edit"), systemImage: "pencil") }
             Divider()
-            Button(role: .destructive) { onDelete() } label: { Label("删除", systemImage: "trash") }
+            Button(role: .destructive) { onDelete() } label: { Label(languageManager.t("menu.delete"), systemImage: "trash") }
         }
     }
 }
@@ -1489,18 +1263,19 @@ struct PresetsManagementView: View {
     @State private var newPresetAddress = ""
     @State private var newPresetCommand = ""
     @State private var hoveredPresetId: UUID?
+    @ObservedObject private var languageManager = LanguageManager.shared
 
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("预设快速添加")
+                Text(languageManager.t("host.manage.quick_add"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
                 Button {
                     showingAddPreset = true
                 } label: {
-                    Label("添加预设", systemImage: "plus")
+                    Label(languageManager.t("host.manage.add_preset"), systemImage: "plus")
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.small)
@@ -1509,7 +1284,7 @@ struct PresetsManagementView: View {
             .padding(.bottom, 12)
             
             if viewModel.presets.isEmpty {
-                ContentUnavailableView("没有预设", systemImage: "bookmark", description: Text("添加预设快速创建主机"))
+                ContentUnavailableView(languageManager.t("host.manage.no_presets"), systemImage: "bookmark", description: Text(languageManager.t("host.manage.add_preset_hint")))
             } else {
                 ScrollView {
                     LazyVGrid(columns: [
@@ -1548,7 +1323,7 @@ struct PresetsManagementView: View {
         .sheet(isPresented: $showingAddPreset) {
             PresetEditorSheet(
                 isPresented: $showingAddPreset,
-                title: "添加预设",
+                title: languageManager.t("editor.add_preset"),
                 name: $newPresetName,
                 address: $newPresetAddress,
                 command: $newPresetCommand,
@@ -1564,7 +1339,7 @@ struct PresetsManagementView: View {
                     get: { editingPreset != nil },
                     set: { if !$0 { editingPreset = nil } }
                 ),
-                title: "编辑预设",
+                title: languageManager.t("editor.edit_preset"),
                 name: $newPresetName,
                 address: $newPresetAddress,
                 command: $newPresetCommand,
@@ -1591,6 +1366,7 @@ struct PresetManagementCard: View {
     let onAdd: () -> Void
     let onEdit: () -> Void
     let onDelete: () -> Void
+    @ObservedObject private var languageManager = LanguageManager.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -1609,7 +1385,7 @@ struct PresetManagementCard: View {
                         .foregroundStyle(.green)
                 }
                 .buttonStyle(.plain)
-                .help("添加到监控")
+                .help(languageManager.t("menu.add_to_monitor"))
             }
             
             HStack(spacing: 4) {
@@ -1666,10 +1442,10 @@ struct PresetManagementCard: View {
         )
         .scaleEffect(isHovered ? 1.01 : 1.0)
         .contextMenu {
-            Button { onAdd() } label: { Label("添加到监控", systemImage: "plus.circle") }
-            Button { onEdit() } label: { Label("编辑", systemImage: "pencil") }
+            Button { onAdd() } label: { Label(languageManager.t("menu.add_to_monitor"), systemImage: "plus.circle") }
+            Button { onEdit() } label: { Label(languageManager.t("menu.edit"), systemImage: "pencil") }
             Divider()
-            Button(role: .destructive) { onDelete() } label: { Label("删除", systemImage: "trash") }
+            Button(role: .destructive) { onDelete() } label: { Label(languageManager.t("menu.delete"), systemImage: "trash") }
         }
     }
 }
@@ -1684,6 +1460,7 @@ struct HostEditorSheet: View {
     @Binding var displayRules: [DisplayRule]
     let onSave: () -> Void
     @State private var showingAddRule = false
+    @ObservedObject private var languageManager = LanguageManager.shared
 
     var body: some View {
         VStack(spacing: 16) {
@@ -1692,20 +1469,20 @@ struct HostEditorSheet: View {
 
             ScrollView {
                 Form {
-                    Section("基本信息") {
-                        TextField("名称", text: $name)
-                        TextField("地址", text: $address)
+                    Section(languageManager.t("editor.section.basic")) {
+                        TextField(languageManager.t("editor.name"), text: $name)
+                        TextField(languageManager.t("editor.address"), text: $address)
                             .textContentType(.URL)
                         
                         VStack(alignment: .leading, spacing: 4) {
-                            TextField("命令 (可选)", text: $command)
-                            Text("留空默认: ping -i 1 $address\n支持 $address 占位符")
+                            TextField(languageManager.t("editor.command"), text: $command)
+                            Text(languageManager.t("editor.command_hint"))
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                         }
                     }
                     
-                    Section("显示规则") {
+                    Section(languageManager.t("editor.section.rules")) {
                         ForEach($displayRules) { $rule in
                             RuleEditorRow(rule: $rule, onDelete: {
                                 if let index = displayRules.firstIndex(where: { $0.id == rule.id }) {
@@ -1717,7 +1494,7 @@ struct HostEditorSheet: View {
                         Button {
                             showingAddRule = true
                         } label: {
-                            Label("添加规则", systemImage: "plus.circle")
+                            Label(languageManager.t("editor.add_rule"), systemImage: "plus.circle")
                         }
                         .buttonStyle(.borderless)
                     }
@@ -1726,14 +1503,14 @@ struct HostEditorSheet: View {
             }
 
             HStack {
-                Button("取消") {
+                Button(languageManager.t("common.cancel")) {
                     isPresented = false
                 }
                 .buttonStyle(.bordered)
 
                 Spacer()
 
-                Button("保存") {
+                Button(languageManager.t("common.save")) {
                     onSave()
                     isPresented = false
                 }
@@ -1752,11 +1529,12 @@ struct HostEditorSheet: View {
 struct RuleEditorRow: View {
     @Binding var rule: DisplayRule
     let onDelete: () -> Void
+    @ObservedObject private var languageManager = LanguageManager.shared
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Toggle("启用", isOn: $rule.enabled)
+                Toggle(languageManager.t("editor.rule.enable"), isOn: $rule.enabled)
                 Spacer()
                 Button(role: .destructive, action: onDelete) {
                     Image(systemName: "trash")
@@ -1766,18 +1544,18 @@ struct RuleEditorRow: View {
             }
             
             HStack {
-                Picker("条件", selection: $rule.condition) {
-                    Text("< 小于").tag("less")
-                    Text("> 大于").tag("greater")
+                Picker(languageManager.t("editor.rule.condition"), selection: $rule.condition) {
+                    Text(languageManager.t("editor.rule.less")).tag("less")
+                    Text(languageManager.t("editor.rule.greater")).tag("greater")
                 }
                 .pickerStyle(.segmented)
                 .frame(width: 120)
                 
-                TextField("阈值(ms)", value: $rule.threshold, format: .number)
+                TextField(languageManager.t("editor.rule.threshold"), value: $rule.threshold, format: .number)
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 80)
                 
-                TextField("显示文本", text: $rule.label)
+                TextField(languageManager.t("editor.rule.label"), text: $rule.label)
                     .textFieldStyle(.roundedBorder)
             }
         }
@@ -1791,40 +1569,41 @@ struct AddRuleSheet: View {
     @State private var condition = "less"
     @State private var threshold: Double = 100
     @State private var label = ""
+    @ObservedObject private var languageManager = LanguageManager.shared
     
     var body: some View {
         VStack(spacing: 20) {
-            Text("添加显示规则")
+            Text(languageManager.t("editor.add_rule"))
                 .font(.headline)
             
             Form {
-                Picker("条件", selection: $condition) {
-                    Text("延迟小于").tag("less")
-                    Text("延迟大于").tag("greater")
+                Picker(languageManager.t("editor.rule.condition"), selection: $condition) {
+                    Text(languageManager.t("editor.rule.less")).tag("less")
+                    Text(languageManager.t("editor.rule.greater")).tag("greater")
                 }
                 .pickerStyle(.segmented)
                 
                 HStack {
-                    Text("阈值")
+                    Text(languageManager.t("editor.rule.threshold"))
                     Spacer()
                     TextField("ms", value: $threshold, format: .number)
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 100)
                 }
                 
-                TextField("显示文本 (如: P2P/转发)", text: $label)
+                TextField(languageManager.t("editor.rule.label_placeholder"), text: $label)
             }
             .formStyle(.grouped)
             
             HStack {
-                Button("取消") {
+                Button(languageManager.t("common.cancel")) {
                     isPresented = false
                 }
                 .buttonStyle(.bordered)
                 
                 Spacer()
                 
-                Button("添加") {
+                Button(languageManager.t("common.add")) {
                     rules.append(DisplayRule(condition: condition, threshold: threshold, label: label, enabled: true))
                     isPresented = false
                 }
@@ -1844,6 +1623,7 @@ struct PresetEditorSheet: View {
     @Binding var address: String
     @Binding var command: String
     let onSave: () -> Void
+    @ObservedObject private var languageManager = LanguageManager.shared
 
     var body: some View {
         VStack(spacing: 20) {
@@ -1851,13 +1631,13 @@ struct PresetEditorSheet: View {
                 .font(.headline)
 
             Form {
-                TextField("名称", text: $name)
-                TextField("地址", text: $address)
+                TextField(languageManager.t("editor.name"), text: $name)
+                TextField(languageManager.t("editor.address"), text: $address)
                     .textContentType(.URL)
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    TextField("命令 (可选)", text: $command)
-                    Text("留空使用默认: ping -c 1 -W 3 $address")
+                    TextField(languageManager.t("editor.command"), text: $command)
+                    Text(languageManager.t("editor.command_hint"))
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
@@ -1865,14 +1645,14 @@ struct PresetEditorSheet: View {
             .formStyle(.grouped)
 
             HStack {
-                Button("取消") {
+                Button(languageManager.t("common.cancel")) {
                     isPresented = false
                 }
                 .buttonStyle(.bordered)
 
                 Spacer()
 
-                Button("保存") {
+                Button(languageManager.t("common.save")) {
                     onSave()
                     isPresented = false
                 }
@@ -1891,6 +1671,7 @@ struct LogsTab: View {
     @State private var selectedLevel: LogManager.LogLevel?
     @State private var showingExportSheet = false
     @State private var exportURL: URL?
+    @ObservedObject private var languageManager = LanguageManager.shared
     
     var filteredLogs: [LogManager.LogEntry] {
         if let level = selectedLevel {
@@ -1902,10 +1683,10 @@ struct LogsTab: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Picker("日志级别", selection: $selectedLevel) {
-                    Text("全部").tag(nil as LogManager.LogLevel?)
+                Picker(languageManager.t("logs.level"), selection: $selectedLevel) {
+                    Text(languageManager.t("logs.level.all")).tag(nil as LogManager.LogLevel?)
                     ForEach(LogManager.LogLevel.allCases, id: \.self) { level in
-                        Text(level.rawValue).tag(level as LogManager.LogLevel?)
+                        Text(languageManager.t("logs.level.\(level.rawValue.lowercased())")).tag(level as LogManager.LogLevel?)
                     }
                 }
                 .pickerStyle(.segmented)
@@ -1916,7 +1697,7 @@ struct LogsTab: View {
                 Button(action: {
                     logManager.clear()
                 }) {
-                    Label("清空", systemImage: "trash")
+                    Label(languageManager.t("logs.clear"), systemImage: "trash")
                 }
                 .buttonStyle(.borderless)
                 
@@ -1926,7 +1707,7 @@ struct LogsTab: View {
                         showingExportSheet = true
                     }
                 }) {
-                    Label("导出", systemImage: "square.and.arrow.up")
+                    Label(languageManager.t("logs.export"), systemImage: "square.and.arrow.up")
                 }
                 .buttonStyle(.borderless)
             }
@@ -1954,6 +1735,7 @@ struct LogsTab: View {
 
 struct LogRow: View {
     let entry: LogManager.LogEntry
+    @ObservedObject private var languageManager = LanguageManager.shared
     
     var levelColor: Color {
         switch entry.level {
@@ -1976,7 +1758,7 @@ struct LogRow: View {
                         .font(.system(size: 10, design: .monospaced))
                         .foregroundStyle(.tertiary)
                     
-                    Text(entry.level.rawValue)
+                    Text(languageManager.t("logs.level.\(entry.level.rawValue.lowercased())"))
                         .font(.system(size: 9, weight: .bold))
                         .foregroundStyle(levelColor)
                     
@@ -2023,16 +1805,16 @@ struct LogFileDocument: FileDocument {
 // MARK: - Settings Tab
 struct SettingsTab: View {
     @ObservedObject var viewModel: PingMonitorViewModel
+    @ObservedObject private var languageManager = LanguageManager.shared
 
     var body: some View {
         Form {
             Section {
-
-                Picker("显示策略", selection: $viewModel.statusBarDisplayMode) {
-                    Text("平均延迟").tag(StatusBarDisplayMode.average)
-                    Text("最差主机").tag(StatusBarDisplayMode.worst)
-                    Text("最快主机").tag(StatusBarDisplayMode.best)
-                    Text("首个主机").tag(StatusBarDisplayMode.first)
+                Picker(languageManager.t("settings.display_mode"), selection: $viewModel.statusBarDisplayMode) {
+                    Text(languageManager.t("settings.display.average")).tag(StatusBarDisplayMode.average)
+                    Text(languageManager.t("settings.display.worst")).tag(StatusBarDisplayMode.worst)
+                    Text(languageManager.t("settings.display.best")).tag(StatusBarDisplayMode.best)
+                    Text(languageManager.t("settings.display.first")).tag(StatusBarDisplayMode.first)
                 }
                 .pickerStyle(.segmented)
                 .onChange(of: viewModel.statusBarDisplayMode) { _, _ in
@@ -2043,29 +1825,29 @@ struct SettingsTab: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 
-                Toggle("显示延迟数值", isOn: $viewModel.showLatencyInMenu)
+                Toggle(languageManager.t("settings.show_latency"), isOn: $viewModel.showLatencyInMenu)
                     .onChange(of: viewModel.showLatencyInMenu) { _, _ in
                         viewModel.saveSettings()
                     }
 
-                Toggle("显示规则标签", isOn: $viewModel.showLabelsInMenu)
+                Toggle(languageManager.t("settings.show_labels"), isOn: $viewModel.showLabelsInMenu)
                     .onChange(of: viewModel.showLabelsInMenu) { _, _ in
                         viewModel.saveSettings()
                     }
             } header: {
-                Label("状态栏显示", systemImage: "menubar.rectangle")
+                Label(languageManager.t("settings.section.status_bar"), systemImage: "menubar.rectangle")
             }
 
             Section {
 
                 HStack {
-                    Text("监控间隔")
+                    Text(languageManager.t("settings.interval"))
                     Spacer()
                     Picker("", selection: $viewModel.pingInterval) {
-                        Text("3秒").tag(3.0)
-                        Text("5秒").tag(5.0)
-                        Text("10秒").tag(10.0)
-                        Text("30秒").tag(30.0)
+                        Text(languageManager.t("settings.interval.3s")).tag(3.0)
+                        Text(languageManager.t("settings.interval.5s")).tag(5.0)
+                        Text(languageManager.t("settings.interval.10s")).tag(10.0)
+                        Text(languageManager.t("settings.interval.30s")).tag(30.0)
                     }
                     .pickerStyle(.segmented)
                     .frame(width: 200)
@@ -2078,9 +1860,9 @@ struct SettingsTab: View {
                     }
                 }
                 
-                Picker("日志级别", selection: $viewModel.logLevel) {
+                Picker(languageManager.t("logs.level"), selection: $viewModel.logLevel) {
                     ForEach(LogManager.LogLevel.allCases, id: \.self) { level in
-                        Text(level.rawValue).tag(level)
+                        Text(languageManager.t("logs.level.\(level.rawValue.lowercased())")).tag(level)
                     }
                 }
                 .pickerStyle(.segmented)
@@ -2088,19 +1870,19 @@ struct SettingsTab: View {
                     viewModel.saveSettings()
                 }
             } header: {
-                Label("监控", systemImage: "waveform.path.ecg")
+                Label(languageManager.t("settings.section.monitor"), systemImage: "waveform.path.ecg")
             }
 
             Section {
 
-                Toggle("启用通知", isOn: $viewModel.notificationEnabled)
+                Toggle(languageManager.t("settings.notify.enable"), isOn: $viewModel.notificationEnabled)
                     .onChange(of: viewModel.notificationEnabled) { _, _ in
                         viewModel.saveSettings()
                     }
 
-                Picker("通知方式", selection: $viewModel.notificationType) {
-                    Text("系统通知").tag("system")
-                    Text("Bark推送").tag("bark")
+                Picker(languageManager.t("settings.notify.type"), selection: $viewModel.notificationType) {
+                    Text(languageManager.t("settings.notify.system")).tag("system")
+                    Text(languageManager.t("settings.notify.bark")).tag("bark")
                 }
                 .pickerStyle(.segmented)
                 .onChange(of: viewModel.notificationType) { _, _ in
@@ -2114,17 +1896,17 @@ struct SettingsTab: View {
                         }
                 }
             } header: {
-                Label("通知", systemImage: "bell.badge.fill")
+                Label(languageManager.t("settings.section.notify"), systemImage: "bell.badge.fill")
             }
 
             Section {
 
-                Toggle("开机自启动", isOn: $viewModel.autoStart)
+                Toggle(languageManager.t("settings.auto_start"), isOn: $viewModel.autoStart)
                     .onChange(of: viewModel.autoStart) { _, newValue in
                         viewModel.toggleAutoStart(newValue)
                     }
             } header: {
-                Label("系统", systemImage: "gear")
+                Label(languageManager.t("settings.section.system"), systemImage: "gear")
             }
         }
         .formStyle(.grouped)
@@ -2134,13 +1916,13 @@ struct SettingsTab: View {
     private var statusBarDescription: String {
         switch viewModel.statusBarDisplayMode {
         case .average:
-            return "显示所有主机的平均延迟"
+            return languageManager.t("settings.desc.average")
         case .worst:
-            return "显示延迟最高或不可达的主机"
+            return languageManager.t("settings.desc.worst")
         case .best:
-            return "显示延迟最低的主机"
+            return languageManager.t("settings.desc.best")
         case .first:
-            return "显示列表中的第一个主机"
+            return languageManager.t("settings.desc.first")
         }
     }
 }

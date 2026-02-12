@@ -532,9 +532,9 @@ class PingMonitorViewModel: ObservableObject {
 
     private func checkNotification(host: HostConfig) {
         if host.lastLatency ?? 999 > 100 {
-            sendNotification(title: "⚠️ 延迟过高", body: "\(host.name): \(String(format: "%.1f", host.lastLatency ?? 0))ms")
+            sendNotification(title: "⚠️ \(LanguageManager.shared.t("stats.legend.poor"))", body: "\(host.name): \(String(format: "%.1f", host.lastLatency ?? 0))ms")
         } else if !host.isReachable {
-            sendNotification(title: "❌ 连接失败", body: "\(host.name) 无法连接")
+            sendNotification(title: "❌ \(LanguageManager.shared.t("dashboard.failed"))", body: "\(host.name) \(LanguageManager.shared.t("dashboard.timeout"))")
         }
     }
 
@@ -569,7 +569,7 @@ class PingMonitorViewModel: ObservableObject {
     }
 
     func getDisplayText(for host: HostConfig?) -> String {
-        guard let host = host else { return "未运行" }
+        guard let host = host else { return LanguageManager.shared.t("header.stopped") }
         var parts: [String] = []
 
         if showLatencyInMenu, let latency = host.lastLatency {
@@ -585,7 +585,7 @@ class PingMonitorViewModel: ObservableObject {
             }
         }
 
-        return parts.isEmpty ? (isRunning ? "●" : "已停止") : parts.joined(separator: " ")
+        return parts.isEmpty ? (isRunning ? "●" : LanguageManager.shared.t("header.stopped")) : parts.joined(separator: " ")
     }
     
     func getStatusBarDisplayHost() -> HostConfig? {
@@ -609,26 +609,26 @@ class PingMonitorViewModel: ObservableObject {
     }
     
     func getStatusBarDisplayText() -> String {
-        guard isRunning else { return "已停止" }
-        guard !hosts.isEmpty else { return "无主机" }
+        guard isRunning else { return LanguageManager.shared.t("header.stopped") }
+        guard !hosts.isEmpty else { return LanguageManager.shared.t("monitor.no_hosts") }
         
         switch statusBarDisplayMode {
         case .average:
             let activeHosts = hosts.filter { $0.isReachable && $0.lastLatency != nil }
             if activeHosts.isEmpty {
-                return "无响应"
+                return LanguageManager.shared.t("dashboard.no_data")
             }
             let avgLatency = activeHosts.map { $0.lastLatency! }.reduce(0, +) / Double(activeHosts.count)
             var parts = ["\(Int(avgLatency))ms"]
             if showLabelsInMenu {
-                parts.append("平均")
+                parts.append(LanguageManager.shared.t("settings.avg_latency"))
             }
             return parts.joined(separator: " ")
         case .first, .best, .worst:
             if let host = getStatusBarDisplayHost() {
                 return getDisplayText(for: host)
             }
-            return "未运行"
+            return LanguageManager.shared.t("header.stopped")
         }
     }
     
