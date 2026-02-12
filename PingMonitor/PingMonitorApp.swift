@@ -413,7 +413,7 @@ class PingMonitorViewModel: ObservableObject {
         guard index < hosts.count else { return }
         
         let hostName = host.name
-        let address = host.address
+        let address = host.address.trimmingCharacters(in: .whitespacesAndNewlines)
         let customCommand = host.command.trimmingCharacters(in: .whitespacesAndNewlines)
         let hostId = host.id
         

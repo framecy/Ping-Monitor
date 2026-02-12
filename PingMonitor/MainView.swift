@@ -1336,8 +1336,14 @@ struct HostsManagementView: View {
                 command: $newHostCommand,
                 displayRules: $newHostRules,
                 onSave: {
-                    viewModel.addHost(name: newHostName, address: newHostAddress, command: newHostCommand, displayRules: newHostRules.isEmpty ? nil : newHostRules)
-                    resetForm()
+                    let trimmedName = newHostName.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let trimmedAddress = newHostAddress.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let trimmedCommand = newHostCommand.trimmingCharacters(in: .whitespacesAndNewlines)
+                    
+                    if !trimmedName.isEmpty && !trimmedAddress.isEmpty {
+                        viewModel.addHost(name: trimmedName, address: trimmedAddress, command: trimmedCommand, displayRules: newHostRules.isEmpty ? nil : newHostRules)
+                        resetForm()
+                    }
                 }
             )
         }
@@ -1353,8 +1359,14 @@ struct HostsManagementView: View {
                 command: $newHostCommand,
                 displayRules: $newHostRules,
                 onSave: {
-                    if let index = viewModel.hosts.firstIndex(where: { $0.id == host.id }) {
-                        viewModel.updateHost(at: index, name: newHostName, address: newHostAddress, command: newHostCommand, displayRules: newHostRules)
+                    let trimmedName = newHostName.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let trimmedAddress = newHostAddress.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let trimmedCommand = newHostCommand.trimmingCharacters(in: .whitespacesAndNewlines)
+                    
+                    if !trimmedName.isEmpty && !trimmedAddress.isEmpty {
+                        if let index = viewModel.hosts.firstIndex(where: { $0.id == host.id }) {
+                            viewModel.updateHost(at: index, name: trimmedName, address: trimmedAddress, command: trimmedCommand, displayRules: newHostRules)
+                        }
                     }
                     editingHost = nil
                 }
@@ -1687,7 +1699,7 @@ struct HostEditorSheet: View {
                         
                         VStack(alignment: .leading, spacing: 4) {
                             TextField("命令 (可选)", text: $command)
-                            Text("留空使用默认: ping -c 1 -W 3 $address")
+                            Text("留空默认: ping -i 1 $address\n支持 $address 占位符")
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                         }
