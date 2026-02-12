@@ -13,7 +13,7 @@
   <img src="https://img.shields.io/badge/platform-macOS%2014.0+-blue" alt="Platform">
   <img src="https://img.shields.io/badge/SwiftUI-6.0-orange" alt="SwiftUI">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/version-2.0.29-brightgreen" alt="Version">
+  <img src="https://img.shields.io/badge/version-2.0.40-brightgreen" alt="Version">
 </p>
 
 ---
@@ -106,8 +106,13 @@
 PingMonitor/
 ├── PingMonitor/
 │   ├── PingMonitorApp.swift      # 应用入口、数据模型、ViewModel
-│   ├── MainView.swift            # 全部 UI 视图
-│   ├── LanguageManager.swift     # 多语言管理
+│   ├── MainView.swift            # 主视图与标签页
+│   ├── DashboardView.swift       # 统计仪表盘（3D 饼图、趋势卡片）
+│   ├── SidebarView.swift         # 自定义侧边栏导航
+│   ├── EditableHostCard.swift    # 主机卡片组件
+│   ├── Components.swift          # 通用 UI 组件
+│   ├── Theme.swift               # 设计系统（颜色、字体、布局）
+│   ├── LanguageManager.swift     # 中英多语言管理
 │   ├── Info.plist
 │   ├── PingMonitor.entitlements
 │   └── Assets.xcassets/          # 应用图标
@@ -184,6 +189,7 @@ AUTO_VERSION=false
 
 | 版本 | 构建 | 更新内容 |
 |------|------|---------|
+| v2.0.40 | r41 | **UI 全面升级**：3D 环形统计图、实时内存监控、Dashboard 布局优化；**本地化完善**：补全所有翻译 key、日志级别本地化；侧边栏显示 macOS 用户名 |
 | v2.0.34 | r35 | **多语言支持**：完整的中文/英文界面，支持动态切换；UI 细节优化与 Bug 修复 |
 | v2.0.29 | r30 | 修复自定义命令中空格导致解析错误的问题 |
 | v2.0.28 | r29 | 移除 DMG 文件名中的构建号后缀 |
