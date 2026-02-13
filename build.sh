@@ -5,7 +5,7 @@ set -e
 cd "$(dirname "$0")"
 
 # 是否自动增加版本号 (设为 false 可禁用自动递增)
-AUTO_VERSION=true
+AUTO_VERSION=false
 
 if [ "$AUTO_VERSION" = true ]; then
     # 自动增加版本号

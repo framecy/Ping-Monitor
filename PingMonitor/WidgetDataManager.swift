@@ -12,6 +12,12 @@ struct WidgetData: Codable {
         let latency: Double
         let status: String // "green", "yellow", "red", "gray"
         let isRunning: Bool
+        
+        // Extended statistics for high-density display
+        var minLatency: Double?
+        var maxLatency: Double?
+        var avgLatency: Double?
+        var packetLoss: Double?
     }
     
     let displayMode: DisplayMode

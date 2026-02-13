@@ -13,7 +13,7 @@
   <img src="https://img.shields.io/badge/platform-macOS%2014.0+-blue" alt="Platform">
   <img src="https://img.shields.io/badge/SwiftUI-6.0-orange" alt="SwiftUI">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/version-2.0.51-brightgreen" alt="Version">
+  <img src="https://img.shields.io/badge/version-2.1.0-brightgreen" alt="Version">
 </p>
 
 ---
@@ -205,7 +205,8 @@ AUTO_VERSION=false
 
 | 版本 | 构建 | 更新内容 |
 |------|------|---------|
-| v2.0.51 | r60 | **小组件深度优化**：重构 `WidgetDataManager` 实现可靠数据同步，修复“无数据”显示；**本地化增强**：全面支持中英文动态切换，覆盖小组件设置与系统菜单；**可视化升级**：优化 Dashboard 布局与趋势图平滑度；**路由追踪改进**：增强 Traceroute/MTR 稳定性 |
+| v2.1.0 | r70 | **小组件重大重构**：信息密度大幅提升，小号组件增加多维统计，中号/大号组件采用多栏/网格布局展示完整指标；**数据流优化**：重构 `WidgetDataManager` 与 App 同步逻辑，支持统计指标实时透传；**视觉规范**：统一设计语言，优化状态识别度。 |
+| v2.0.51 | r60 | **本地化增强**：覆盖小组件设置与系统菜单；**可视化升级**：优化 Dashboard 布局与趋势图平滑度；**路由追踪改进**：增强 Traceroute/MTR 稳定性 |
 | v2.0.40 | r41 | **UI 全面升级**：3D 环形统计图、实时内存监控、Dashboard 布局优化；**本地化完善**：补全所有翻译 key、日志级别本地化；侧边栏显示 macOS 用户名 |
 | v2.0.34 | r35 | **多语言支持**：完整的中文/英文界面，支持动态切换；UI 细节优化与 Bug 修复 |
 | v2.0.29 | r30 | 修复自定义命令中空格导致解析错误的问题 |

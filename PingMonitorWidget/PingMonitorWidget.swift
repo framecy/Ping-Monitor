@@ -117,58 +117,131 @@ struct WidgetView: View {
     }
 }
 
+// MARK: - Components
+struct StatItem: View {
+    let label: String
+    let value: String
+    var color: Color = .secondary
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(label.uppercased())
+                .font(.system(size: 8, weight: .bold))
+                .foregroundStyle(.tertiary)
+            Text(value)
+                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                .foregroundStyle(color)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+struct LatencyBadge: View {
+    let latency: Double
+    let status: String
+    let isRunning: Bool
+    var size: CGFloat = 12
+    
+    var body: some View {
+        HStack(spacing: 3) {
+            if isRunning {
+                Text("\(Int(latency))")
+                    .font(.system(size: size, weight: .bold, design: .monospaced))
+                Text("ms")
+                    .font(.system(size: size * 0.7, weight: .medium))
+                    .baselineOffset(1)
+            } else {
+                Text("OFF")
+                    .font(.system(size: size * 0.8, weight: .bold))
+            }
+        }
+        .foregroundStyle(statusColor(for: status))
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background(statusColor(for: status).opacity(0.1))
+        .clipShape(Capsule())
+    }
+    
+    private func statusColor(for status: String) -> Color {
+        switch status {
+        case "green": return .green
+        case "yellow": return .orange
+        case "red": return .red
+        default: return .gray
+        }
+    }
+}
+
 // MARK: - Small Widget
 struct SmallView: View {
     let entry: Entry
 
     var body: some View {
-        VStack(spacing: 8) {
-            // Header / Title
-            if entry.displayMode == .auto {
-                 Text(entry.title)
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-            
+        VStack(alignment: .leading, spacing: 0) {
             if let host = entry.primaryHost {
-                // Single Host View
-                ZStack {
+                // Header
+                HStack(spacing: 4) {
+                    Image(systemName: "network")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.blue)
+                    Text(host.name)
+                        .font(.system(size: 11, weight: .bold))
+                        .lineLimit(1)
+                    Spacer()
                     Circle()
-                        .fill(statusColor(for: host.status).opacity(0.15))
-                        .frame(width: 44, height: 44)
-                    
-                    Image(systemName: "network.badge.shield.half.filled")
-                        .font(.system(size: 20, weight: .medium))
-                        .foregroundStyle(statusColor(for: host.status))
+                        .fill(statusColor(for: host.status))
+                        .frame(width: 6, height: 6)
+                        .shadow(color: statusColor(for: host.status).opacity(0.5), radius: 2)
                 }
+                .padding(.bottom, 8)
                 
-                Text("\(Int(host.latency))ms")
-                    .font(.system(size: 20, weight: .bold, design: .rounded))
-                    .foregroundStyle(statusColor(for: host.status))
-                    .contentTransition(.numericText())
+                // Main Latency
+                HStack(alignment: .firstTextBaseline, spacing: 2) {
+                    Text("\(Int(host.latency))")
+                        .font(.system(size: 34, weight: .bold, design: .rounded))
+                        .foregroundStyle(statusColor(for: host.status))
+                    Text("ms")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.bottom, 4)
+                }
+                .padding(.bottom, 8)
                 
-                Text(host.name)
-                    .font(.system(size: 8, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .padding(.horizontal, 4)
+                // Stats Grid
+                Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 6) {
+                    GridRow {
+                        StatItem(label: "Min", value: formatMs(host.minLatency))
+                        StatItem(label: "Max", value: formatMs(host.maxLatency))
+                    }
+                    GridRow {
+                        StatItem(label: "Avg", value: formatMs(host.avgLatency))
+                        StatItem(label: "Loss", value: formatLoss(host.packetLoss), color: (host.packetLoss ?? 0) > 0 ? .red : .secondary)
+                    }
+                }
             } else {
-                // Summary View (Auto mode but no primary host logic hit?)
-                // Just verify if entries exist
-                if let first = entry.entries.first {
-                     // Fallback to first entry display
-                     Text(first.name)
-                } else {
-                    Text("No Hosts (v2.0.51)")
-                        .font(.caption)
+                VStack {
+                    Image(systemName: "network.badge.shield.half.filled")
+                        .font(.system(size: 30))
+                        .foregroundStyle(.tertiary)
+                    Text("No Data")
+                        .font(.caption.bold())
                         .foregroundStyle(.secondary)
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            Text("v2.0.51")
-                .font(.system(size: 8))
-                .foregroundStyle(.tertiary)
         }
+        .padding(12)
+    }
+
+    private func formatMs(_ value: Double?) -> String {
+        guard let v = value else { return "--" }
+        return "\(Int(v))ms"
+    }
+    
+    private func formatLoss(_ value: Double?) -> String {
+        guard let v = value else { return "0%" }
+        return "\(Int(v))%"
     }
 
     private func statusColor(for status: String) -> Color {
@@ -186,63 +259,124 @@ struct MediumView: View {
     let entry: Entry
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            // Header
-            HStack {
-                Image(systemName: "network")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.blue)
-                Text(entry.title)
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.secondary)
-            }
-            
-            // List of top 3
-            VStack(spacing: 8) {
-                ForEach(entry.entries.prefix(3)) { host in
+        HStack(spacing: 0) {
+            // Left Panel: Primary Host Details
+            VStack(alignment: .leading, spacing: 0) {
+                if let host = entry.primaryHost {
                     HStack {
-                        Circle()
-                            .fill(statusColor(for: host.status))
-                            .frame(width: 6, height: 6)
-                        
-                        Text(host.name)
-                            .font(.system(size: 12, weight: .medium))
-                            .lineLimit(1)
-                        
+                        Label(host.name, systemImage: "bolt.fill")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(.blue)
                         Spacer()
-                        
-                        if host.isRunning {
-                            Text("\(Int(host.latency))ms")
-                                .font(.system(size: 12, weight: .bold, design: .monospaced))
-                                .foregroundStyle(statusColor(for: host.status))
-                        } else {
-                             Text("Stopped")
-                                 .font(.system(size: 10))
-                                 .foregroundStyle(.secondary)
+                        LatencyBadge(latency: host.latency, status: host.status, isRunning: host.isRunning, size: 14)
+                    }
+                    .padding(.bottom, 12)
+                    
+                    VStack(spacing: 12) {
+                        HStack(spacing: 16) {
+                            StatItem(label: "Minimum", value: formatMs(host.minLatency))
+                            StatItem(label: "Maximum", value: formatMs(host.maxLatency))
+                        }
+                        HStack(spacing: 16) {
+                            StatItem(label: "Average", value: formatMs(host.avgLatency))
+                            StatItem(label: "Loss Rate", value: formatLoss(host.packetLoss), color: (host.packetLoss ?? 0) > 0 ? .red : .secondary)
                         }
                     }
-                    .padding(.vertical, 4)
-                    .padding(.horizontal, 8)
-                    .background(Color.secondary.opacity(0.05))
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                }
-                
-                if entry.entries.isEmpty {
-                   Text("No hosts available")
-                       .font(.caption)
-                       .foregroundStyle(.secondary)
-                       .frame(maxWidth: .infinity, alignment: .center)
+                    
+                    Spacer()
+                    
+                    // Simple Trend indicator (last updated)
+                    HStack {
+                        Image(systemName: "clock")
+                            .font(.system(size: 8))
+                        Text("Updated \(entry.lastUpdated, style: .time)")
+                            .font(.system(size: 8))
+                        Spacer()
+                        Text("v2.1.0")
+                            .font(.system(size: 8))
+                    }
+                    .foregroundStyle(.tertiary)
+                } else {
+                    Text("Select a host")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
+            .padding(12)
+            .background(Color.primary.opacity(0.03))
+            
+            Divider()
+            
+            // Right Panel: Top Hosts List
+            VStack(alignment: .leading, spacing: 8) {
+                Text("MONITORING")
+                    .font(.system(size: 8, weight: .black))
+                    .foregroundStyle(.tertiary)
+                    .padding(.bottom, 2)
+                
+                ForEach(entry.entries.prefix(4).dropFirst()) { host in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(host.name)
+                                .font(.system(size: 10, weight: .semibold))
+                                .lineLimit(1)
+                            Text(statusText(for: host.status))
+                                .font(.system(size: 7, weight: .bold))
+                                .foregroundStyle(statusColor(for: host.status))
+                        }
+                        Spacer()
+                        Text("\(Int(host.latency))")
+                            .font(.system(size: 11, weight: .bold, design: .monospaced))
+                            .foregroundStyle(statusColor(for: host.status))
+                    }
+                    .padding(.vertical, 4)
+                    .padding(.horizontal, 6)
+                    .background(statusColor(for: host.status).opacity(0.05))
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                }
+                
+                if entry.entries.count <= 1 {
+                    Spacer()
+                    Text("No other hosts")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.tertiary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                    Spacer()
+                } else {
+                    Spacer()
+                }
+            }
+            .padding(12)
+            .frame(width: 140)
         }
-        .padding(10)
     }
     
+    private func formatMs(_ value: Double?) -> String {
+        guard let v = value else { return "--" }
+        return "\(Int(v)) ms"
+    }
+    
+    private func formatLoss(_ value: Double?) -> String {
+        guard let v = value else { return "0%" }
+        return "\(String(format: "%.1f", v))%"
+    }
+    
+    private func statusText(for status: String) -> String {
+        switch status {
+        case "green": return "STABLE"
+        case "yellow": return "JITTER"
+        case "red": return "OFFLINE"
+        case "orange": return "HIGH"
+        default: return "UNKNOWN"
+        }
+    }
+
     private func statusColor(for status: String) -> Color {
         switch status {
         case "green": return .green
         case "yellow": return .orange
         case "red": return .red
+        case "orange": return .orange
         default: return .gray
         }
     }
@@ -253,72 +387,82 @@ struct LargeView: View {
     let entry: Entry
 
     var body: some View {
-        VStack(spacing: 12) {
-             // Header
+        VStack(spacing: 0) {
+            // Header
             HStack {
-                Image(systemName: "server.rack")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.purple)
-                Text(entry.title)
-                    .font(.system(size: 12, weight: .bold))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(entry.title.uppercased())
+                        .font(.system(size: 10, weight: .black))
+                        .foregroundStyle(.blue)
+                    Text("\(entry.entries.count) Hosts Active")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(.secondary)
+                }
                 Spacer()
-                Text(entry.lastUpdated, style: .time)
-                     .font(.system(size: 10))
-                     .foregroundStyle(.tertiary)
+                Image(systemName: "chart.bar.fill")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.tertiary)
             }
-            .padding(.bottom, 4)
+            .padding(12)
             
-            // List of top 6
-            VStack(spacing: 6) {
-                ForEach(entry.entries.prefix(6)) { host in
-                    HStack {
-                        // Status Indicator
-                        Capsule()
-                            .fill(statusColor(for: host.status))
-                            .frame(width: 3, height: 12)
+            // Grid of Hosts
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                ForEach(entry.entries.prefix(8)) { host in
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text(host.name)
+                                .font(.system(size: 10, weight: .bold))
+                                .lineLimit(1)
+                            Spacer()
+                            Circle()
+                                .fill(statusColor(for: host.status))
+                                .frame(width: 5, height: 5)
+                        }
                         
-                        Text(host.name)
-                            .font(.system(size: 13, weight: .medium))
-                            .lineLimit(1)
+                        HStack(alignment: .firstTextBaseline, spacing: 1) {
+                            Text("\(Int(host.latency))")
+                                .font(.system(size: 16, weight: .bold, design: .rounded))
+                            Text("ms")
+                                .font(.system(size: 8, weight: .medium))
+                                .foregroundStyle(.secondary)
+                        }
+                        .foregroundStyle(statusColor(for: host.status))
                         
-                        Spacer()
-                        
-                        if host.isRunning {
-                            HStack(spacing: 4) {
-                                Image(systemName: "wifi")
-                                    .font(.system(size: 8))
-                                    .foregroundStyle(.secondary)
-                                Text("\(Int(host.latency))ms")
-                                    .font(.system(size: 12, weight: .bold, design: .monospaced))
-                                    .foregroundStyle(statusColor(for: host.status))
-                            }
-                        } else {
-                             Text("STOPPED")
-                                 .font(.system(size: 9, weight: .bold))
-                                 .foregroundStyle(.secondary)
-                                 .padding(.horizontal, 4)
-                                 .padding(.vertical, 2)
-                                 .background(Color.secondary.opacity(0.1))
-                                 .clipShape(Capsule())
+                        HStack {
+                            Text("LOSS \(formatLoss(host.packetLoss))")
+                                .font(.system(size: 7, weight: .black))
+                                .foregroundStyle(host.packetLoss ?? 0 > 0 ? Color.red : Color.secondary)
+                            Spacer()
+                            Text("AVG \(Int(host.avgLatency ?? 0))")
+                                .font(.system(size: 7, weight: .black))
+                                .foregroundStyle(Color.secondary)
                         }
                     }
-                    .padding(.vertical, 6)
-                    .padding(.horizontal, 10)
-                    .background(Color.white.opacity(0.05)) // Dynamic background
-                    .background(.ultraThinMaterial)
+                    .padding(8)
+                    .background(Color.primary.opacity(0.04))
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
-                
-                 if entry.entries.isEmpty {
-                   Text("No hosts monitored")
-                       .font(.title3)
-                       .foregroundStyle(.secondary)
-                       .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
             }
-             Spacer()
+            .padding(.horizontal, 12)
+            
+            Spacer()
+            
+            // Footer
+            HStack {
+                Text(entry.lastUpdated, style: .date)
+                Text(entry.lastUpdated, style: .time)
+                Spacer()
+                Text("v2.1.0")
+            }
+            .font(.system(size: 8, weight: .medium, design: .monospaced))
+            .foregroundStyle(.tertiary)
+            .padding(12)
         }
-        .padding(12)
+    }
+
+    private func formatLoss(_ value: Double?) -> String {
+        guard let v = value else { return "0%" }
+        return "\(Int(v))%"
     }
     
     private func statusColor(for status: String) -> Color {

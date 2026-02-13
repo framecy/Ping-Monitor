@@ -597,7 +597,7 @@ class PingMonitorViewModel: ObservableObject {
                 return false // Keep user order if not running
             }
             
-            for host in sortedHosts.prefix(5) {
+            for host in sortedHosts.prefix(8) { // Increase prefix for larger layouts
                 widgetEntries.append(createWidgetStatus(for: host))
             }
         }
@@ -629,12 +629,25 @@ class PingMonitorViewModel: ObservableObject {
             color = "orange"
         }
         
-        return WidgetData.HostStatus(
+        var status = WidgetData.HostStatus(
             name: host.name,
             latency: latency,
             status: color,
             isRunning: isRunning
         )
+        
+        // Fill statistics from hostStats
+        if let stats = hostStats[host.id] {
+            status.minLatency = stats.minLatency
+            status.maxLatency = stats.maxLatency
+            status.avgLatency = stats.avgLatency
+            
+            if stats.totalPings > 0 {
+                status.packetLoss = Double(stats.failedPings) / Double(stats.totalPings) * 100
+            }
+        }
+        
+        return status
     }
 
     func getDisplayText(for host: HostConfig?) -> String {
