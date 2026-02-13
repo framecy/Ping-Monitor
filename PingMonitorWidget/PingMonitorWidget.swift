@@ -292,7 +292,7 @@ struct MediumView: View {
                         Text("Updated \(entry.lastUpdated, style: .time)")
                             .font(.system(size: 8))
                         Spacer()
-                        Text("v2.1.0")
+                        Text("v2.1.0-r2")
                             .font(.system(size: 8))
                     }
                     .foregroundStyle(.tertiary)
@@ -452,7 +452,7 @@ struct LargeView: View {
                 Text(entry.lastUpdated, style: .date)
                 Text(entry.lastUpdated, style: .time)
                 Spacer()
-                Text("v2.1.0")
+                Text("v2.1.0-r2")
             }
             .font(.system(size: 8, weight: .medium, design: .monospaced))
             .foregroundStyle(.tertiary)
