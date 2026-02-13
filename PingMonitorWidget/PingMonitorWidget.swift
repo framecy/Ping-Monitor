@@ -24,7 +24,18 @@ struct PingMonitorWidget: Widget {
 
 struct Provider: TimelineProvider {
     func placeholder(in context: Context) -> Entry {
-        Entry(date: Date(), latency: 25, host: "8.8.8.8", isRunning: true, displayText: "25ms", color: "green")
+        Entry(
+            date: Date(),
+            displayMode: .auto,
+            title: "PingMonitor",
+            entries: [
+                WidgetData.HostStatus(name: "Google DNS", latency: 25, status: "green", isRunning: true),
+                WidgetData.HostStatus(name: "Cloudflare", latency: 12, status: "green", isRunning: true),
+                WidgetData.HostStatus(name: "Gateway", latency: 3, status: "green", isRunning: true)
+            ],
+            lastUpdated: Date(),
+            primaryHost: WidgetData.HostStatus(name: "Google DNS", latency: 25, status: "green", isRunning: true)
+        )
     }
 
     func getSnapshot(in context: Context, completion: @escaping (Entry) -> Void) {
@@ -38,31 +49,41 @@ struct Provider: TimelineProvider {
     }
 
     private func loadEntry() -> Entry {
-        let defaults = UserDefaults(suiteName: "group.com.pingmonitor.shared") ?? UserDefaults.standard
-        let isRunning = defaults.bool(forKey: "isRunning")
-        let latency = defaults.double(forKey: "lastLatency")
-        let host = defaults.string(forKey: "targetHost") ?? "8.8.8.8"
-        let color = defaults.string(forKey: "color") ?? "gray"
-        let displayText = defaults.string(forKey: "displayText") ?? (isRunning ? "请求中..." : "未运行")
-
+        // Try to load from shared file
+        if let data = WidgetDataManager.shared.load() {
+            return Entry(
+                date: Date(),
+                displayMode: data.displayMode,
+                title: data.title,
+                entries: data.entries,
+                lastUpdated: data.lastUpdated,
+                // Backward compatibility helpers
+                primaryHost: data.entries.first,
+                debugMessage: data.debugMessage
+            )
+        }
+        
+        // Fallback or default
         return Entry(
             date: Date(),
-            latency: latency > 0 ? latency : nil,
-            host: host,
-            isRunning: isRunning,
-            displayText: displayText,
-            color: color
+            displayMode: .auto,
+            title: "PingMonitor",
+            entries: [],
+            lastUpdated: Date(),
+            primaryHost: nil,
+            debugMessage: "Load returned nil completely."
         )
     }
 }
 
 struct Entry: TimelineEntry {
     let date: Date
-    let latency: Double?
-    let host: String
-    let isRunning: Bool
-    let displayText: String
-    let color: String
+    let displayMode: WidgetData.DisplayMode
+    let title: String
+    let entries: [WidgetData.HostStatus]
+    let lastUpdated: Date
+    let primaryHost: WidgetData.HostStatus? // Helper for Small view
+    var debugMessage: String? = nil
 }
 
 struct WidgetView: View {
@@ -70,15 +91,28 @@ struct WidgetView: View {
     @Environment(\.widgetFamily) var family
 
     var body: some View {
-        switch family {
-        case .systemSmall:
-            SmallView(entry: entry)
-        case .systemMedium:
-            MediumView(entry: entry)
-        case .systemLarge:
-            LargeView(entry: entry)
-        default:
-            SmallView(entry: entry)
+        if let debug = entry.debugMessage {
+            VStack {
+                Text("⚠️ Debug Info")
+                    .font(.caption.bold())
+                    .foregroundStyle(.red)
+                Text(debug)
+                    .font(.system(size: 8, design: .monospaced))
+                    .foregroundStyle(.red)
+                    .multilineTextAlignment(.center)
+            }
+            .containerBackground(.fill.tertiary, for: .widget)
+        } else {
+            switch family {
+            case .systemSmall:
+                SmallView(entry: entry)
+            case .systemMedium:
+                MediumView(entry: entry)
+            case .systemLarge:
+                LargeView(entry: entry)
+            default:
+                SmallView(entry: entry)
+            }
         }
     }
 }
@@ -88,30 +122,57 @@ struct SmallView: View {
     let entry: Entry
 
     var body: some View {
-        VStack(spacing: 10) {
-            ZStack {
-                Circle()
-                    .fill(statusColor.opacity(0.15))
-                    .frame(width: 48, height: 48)
-                
-                Image(systemName: entry.isRunning ? "network.badge.shield.half.filled" : "network")
-                    .font(.system(size: 22, weight: .medium))
-                    .foregroundStyle(statusColor)
+        VStack(spacing: 8) {
+            // Header / Title
+            if entry.displayMode == .auto {
+                 Text(entry.title)
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
-
-            Text(entry.displayText)
-                .font(.system(size: 22, weight: .bold, design: .rounded))
-                .foregroundStyle(statusColor)
             
-            Text(entry.host)
-                .font(.system(size: 10, design: .monospaced))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
+            if let host = entry.primaryHost {
+                // Single Host View
+                ZStack {
+                    Circle()
+                        .fill(statusColor(for: host.status).opacity(0.15))
+                        .frame(width: 44, height: 44)
+                    
+                    Image(systemName: "network.badge.shield.half.filled")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(statusColor(for: host.status))
+                }
+                
+                Text("\(Int(host.latency))ms")
+                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                    .foregroundStyle(statusColor(for: host.status))
+                    .contentTransition(.numericText())
+                
+                Text(host.name)
+                    .font(.system(size: 8, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .padding(.horizontal, 4)
+            } else {
+                // Summary View (Auto mode but no primary host logic hit?)
+                // Just verify if entries exist
+                if let first = entry.entries.first {
+                     // Fallback to first entry display
+                     Text(first.name)
+                } else {
+                    Text("No Hosts (v2.0.51)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Text("v2.0.51")
+                .font(.system(size: 8))
+                .foregroundStyle(.tertiary)
         }
     }
 
-    private var statusColor: Color {
-        switch entry.color {
+    private func statusColor(for status: String) -> Color {
+        switch status {
         case "green": return .green
         case "yellow": return .orange
         case "red": return .red
@@ -125,54 +186,60 @@ struct MediumView: View {
     let entry: Entry
 
     var body: some View {
-        HStack(spacing: 20) {
-            VStack(spacing: 8) {
-                ZStack {
-                    Circle()
-                        .fill(statusColor.opacity(0.15))
-                        .frame(width: 52, height: 52)
-                    
-                    Image(systemName: "network.badge.shield.half.filled")
-                        .font(.system(size: 24, weight: .medium))
-                        .foregroundStyle(statusColor)
-                }
-
-                Text(entry.displayText)
-                    .font(.system(size: 20, weight: .bold, design: .rounded))
-                    .foregroundStyle(statusColor)
+        VStack(alignment: .leading, spacing: 10) {
+            // Header
+            HStack {
+                Image(systemName: "network")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.blue)
+                Text(entry.title)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.secondary)
             }
             
-            Rectangle()
-                .fill(Color.secondary.opacity(0.2))
-                .frame(width: 1)
-                .padding(.vertical, 8)
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text(entry.host)
-                    .font(.system(size: 13, weight: .semibold))
-                    .lineLimit(1)
-                
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(entry.isRunning ? Color.green : Color.gray)
-                        .frame(width: 6, height: 6)
-                    Text(entry.isRunning ? "运行中" : "已停止")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
+            // List of top 3
+            VStack(spacing: 8) {
+                ForEach(entry.entries.prefix(3)) { host in
+                    HStack {
+                        Circle()
+                            .fill(statusColor(for: host.status))
+                            .frame(width: 6, height: 6)
+                        
+                        Text(host.name)
+                            .font(.system(size: 12, weight: .medium))
+                            .lineLimit(1)
+                        
+                        Spacer()
+                        
+                        if host.isRunning {
+                            Text("\(Int(host.latency))ms")
+                                .font(.system(size: 12, weight: .bold, design: .monospaced))
+                                .foregroundStyle(statusColor(for: host.status))
+                        } else {
+                             Text("Stopped")
+                                 .font(.system(size: 10))
+                                 .foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                    .padding(.horizontal, 8)
+                    .background(Color.secondary.opacity(0.05))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
                 }
                 
-                if let latency = entry.latency {
-                    Text("延迟: \(Int(latency))ms")
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(.secondary)
+                if entry.entries.isEmpty {
+                   Text("No hosts available")
+                       .font(.caption)
+                       .foregroundStyle(.secondary)
+                       .frame(maxWidth: .infinity, alignment: .center)
                 }
             }
         }
-        .padding(.horizontal, 8)
+        .padding(10)
     }
-
-    private var statusColor: Color {
-        switch entry.color {
+    
+    private func statusColor(for status: String) -> Color {
+        switch status {
         case "green": return .green
         case "yellow": return .orange
         case "red": return .red
@@ -186,81 +253,76 @@ struct LargeView: View {
     let entry: Entry
 
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 12) {
+             // Header
             HStack {
-                HStack(spacing: 6) {
-                    Image(systemName: "network")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.blue)
-                    Text("Ping Monitor")
-                        .font(.system(size: 14, weight: .semibold))
-                }
+                Image(systemName: "server.rack")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.purple)
+                Text(entry.title)
+                    .font(.system(size: 12, weight: .bold))
                 Spacer()
-                Text(entry.host)
-                    .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(Color.secondary.opacity(0.1))
-                    .clipShape(Capsule())
+                Text(entry.lastUpdated, style: .time)
+                     .font(.system(size: 10))
+                     .foregroundStyle(.tertiary)
             }
-
-            Rectangle()
-                .fill(Color.blue.opacity(0.2))
-                .frame(height: 1)
-
-            HStack(spacing: 24) {
-                VStack(spacing: 10) {
-                    ZStack {
-                        Circle()
-                            .fill(statusColor.opacity(0.15))
-                            .frame(width: 60, height: 60)
+            .padding(.bottom, 4)
+            
+            // List of top 6
+            VStack(spacing: 6) {
+                ForEach(entry.entries.prefix(6)) { host in
+                    HStack {
+                        // Status Indicator
+                        Capsule()
+                            .fill(statusColor(for: host.status))
+                            .frame(width: 3, height: 12)
                         
-                        Image(systemName: "antenna.radiowaves.left.and.right")
-                            .font(.system(size: 26, weight: .medium))
-                            .foregroundStyle(statusColor)
-                    }
-                    
-                    Text(entry.displayText)
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
-                        .foregroundStyle(statusColor)
-                }
-
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(entry.isRunning ? Color.green : Color.gray)
-                            .frame(width: 8, height: 8)
-                        Text(entry.isRunning ? "运行中" : "已停止")
-                            .font(.system(size: 12, weight: .medium))
-                    }
-                    
-                    if let latency = entry.latency {
-                        HStack(spacing: 6) {
-                            Image(systemName: "clock")
-                                .font(.system(size: 11))
-                                .foregroundStyle(.secondary)
-                            Text("\(Int(latency))ms")
-                                .font(.system(size: 12, design: .monospaced))
+                        Text(host.name)
+                            .font(.system(size: 13, weight: .medium))
+                            .lineLimit(1)
+                        
+                        Spacer()
+                        
+                        if host.isRunning {
+                            HStack(spacing: 4) {
+                                Image(systemName: "wifi")
+                                    .font(.system(size: 8))
+                                    .foregroundStyle(.secondary)
+                                Text("\(Int(host.latency))ms")
+                                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                                    .foregroundStyle(statusColor(for: host.status))
+                            }
+                        } else {
+                             Text("STOPPED")
+                                 .font(.system(size: 9, weight: .bold))
+                                 .foregroundStyle(.secondary)
+                                 .padding(.horizontal, 4)
+                                 .padding(.vertical, 2)
+                                 .background(Color.secondary.opacity(0.1))
+                                 .clipShape(Capsule())
                         }
                     }
-                    
-                    HStack(spacing: 6) {
-                        Image(systemName: "clock.arrow.circlepath")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
-                        Text(entry.date, style: .time)
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
-                    }
+                    .padding(.vertical, 6)
+                    .padding(.horizontal, 10)
+                    .background(Color.white.opacity(0.05)) // Dynamic background
+                    .background(.ultraThinMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+                
+                 if entry.entries.isEmpty {
+                   Text("No hosts monitored")
+                       .font(.title3)
+                       .foregroundStyle(.secondary)
+                       .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
+             Spacer()
         }
-        .padding(4)
+        .padding(12)
     }
-
-    private var statusColor: Color {
-        switch entry.color {
+    
+    private func statusColor(for status: String) -> Color {
+        switch status {
         case "green": return .green
         case "yellow": return .orange
         case "red": return .red

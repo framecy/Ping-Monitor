@@ -1841,7 +1841,7 @@ struct SettingsTab: View {
     @ObservedObject private var languageManager = LanguageManager.shared
 
     var body: some View {
-        Form {
+        List {
             Section {
                 Picker(languageManager.t("settings.display_mode"), selection: $viewModel.statusBarDisplayMode) {
                     Text(languageManager.t("settings.display.average")).tag(StatusBarDisplayMode.average)
@@ -1933,16 +1933,55 @@ struct SettingsTab: View {
             }
 
             Section {
+                 Picker(languageManager.t("settings.language"), selection: $languageManager.currentLanguage) {
+                     Text("中文").tag(Language.zh)
+                     Text("English").tag(Language.en)
+                 }
+                 .pickerStyle(.segmented)
+                 .onChange(of: languageManager.currentLanguage) { _, newValue in
+                     languageManager.languageString = newValue.rawValue
+                 }
 
                 Toggle(languageManager.t("settings.auto_start"), isOn: $viewModel.autoStart)
                     .onChange(of: viewModel.autoStart) { _, newValue in
                         viewModel.toggleAutoStart(newValue)
                     }
+                
+                HStack {
+                    Text(languageManager.t("settings.version"))
+                    Spacer()
+                    Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "2.0") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"))")
+                        .foregroundStyle(.secondary)
+                }
             } header: {
                 Label(languageManager.t("settings.section.system"), systemImage: "gear")
             }
+            
+            Section {
+                Picker(languageManager.t("settings.widget.mode"), selection: $viewModel.widgetDisplayMode) {
+                    Text(languageManager.t("settings.widget.auto")).tag("auto")
+                    Text(languageManager.t("settings.widget.specific")).tag("specific")
+                }
+                .pickerStyle(.segmented)
+                .onChange(of: viewModel.widgetDisplayMode) { _, _ in
+                    viewModel.syncToWidget()
+                }
+                
+                if viewModel.widgetDisplayMode == "specific" {
+                    Picker(languageManager.t("settings.widget.select_host"), selection: $viewModel.widgetSelectedHostId) {
+                        Text(languageManager.t("settings.widget.none")).tag("")
+                        ForEach(viewModel.hosts) { host in
+                            Text(host.name).tag(host.id.uuidString)
+                        }
+                    }
+                    .onChange(of: viewModel.widgetSelectedHostId) { _, _ in
+                        viewModel.syncToWidget()
+                    }
+                }
+            } header: {
+                Label(languageManager.t("settings.section.widget"), systemImage: "rectangle.3.group")
+            }
         }
-        .formStyle(.grouped)
         .padding()
     }
     

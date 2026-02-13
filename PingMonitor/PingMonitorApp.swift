@@ -7,7 +7,7 @@ import Combine
 @main
 struct PingMonitorApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-
+    
     var body: some Scene {
         Settings {
             EmptyView()
@@ -205,6 +205,8 @@ class PingMonitorViewModel: ObservableObject {
     @Published var statusBarDisplayMode: StatusBarDisplayMode = .first
     @Published var hostStats: [UUID: HostStats] = [:]
     @Published var selectedStatHost: HostConfig?
+    @Published var widgetDisplayMode: String = "auto"
+    @Published var widgetSelectedHostId: String = ""
     
     var statusBarController: StatusBarController?
     private var pingProcesses: [UUID: Process] = [:]
@@ -266,6 +268,9 @@ class PingMonitorViewModel: ObservableObject {
             statusBarDisplayMode = mode
         }
         
+        widgetDisplayMode = defaults.string(forKey: "widgetDisplayMode") ?? "auto"
+        widgetSelectedHostId = defaults.string(forKey: "widgetSelectedHostId") ?? ""
+        
         LogManager.shared.info("Settings loaded: \(hosts.count) hosts, \(presets.count) presets")
     }
 
@@ -294,6 +299,8 @@ class PingMonitorViewModel: ObservableObject {
         defaults.set(pingInterval, forKey: "pingInterval")
         defaults.set(logLevel.rawValue, forKey: "logLevel")
         defaults.set(statusBarDisplayMode.rawValue, forKey: "statusBarDisplayMode")
+        defaults.set(widgetDisplayMode, forKey: "widgetDisplayMode")
+        defaults.set(widgetSelectedHostId, forKey: "widgetSelectedHostId")
     }
 
     func setupAutoStart() {
@@ -560,12 +567,74 @@ class PingMonitorViewModel: ObservableObject {
     }
 
     func syncToWidget() {
+        // Legacy updates (optional, for internal app state persistence)
         defaults.set(isRunning, forKey: "isRunning")
-        defaults.set(hosts.first?.lastLatency ?? 0, forKey: "lastLatency")
-        defaults.set(hosts.first?.address ?? "8.8.8.8", forKey: "targetHost")
-        defaults.set(hosts.first?.lastLatency.map { $0 < 50 ? "green" : $0 < 100 ? "yellow" : "red" } ?? "gray", forKey: "color")
-        defaults.set(getDisplayText(for: hosts.first), forKey: "displayText")
+        
+        // Prepare entries
+        var widgetEntries: [WidgetData.HostStatus] = []
+        
+        let mode = WidgetData.DisplayMode(rawValue: widgetDisplayMode) ?? .auto
+        var title = "PingMonitor"
+        
+        if mode == .specific, let host = hosts.first(where: { $0.id.uuidString == widgetSelectedHostId }) {
+            // Specific Host Mode
+            title = host.name
+            widgetEntries.append(createWidgetStatus(for: host))
+        } else {
+            // Auto/Summary Mode: Top 5 hosts (prioritize high latency/offline if running, else by order)
+            // For now, just take first 5 active hosts
+            title = isRunning ? "Monitoring" : "Stopped"
+            let sortedHosts = hosts.sorted { h1, h2 in
+                // Sort concept: Offline > High Latency > Low Latency
+                let l1 = h1.lastLatency ?? 0
+                let l2 = h2.lastLatency ?? 0
+                // If one is 0 (timeout/offline) and running, it's "worse" than high latency
+                if isRunning {
+                     if l1 == 0 && l2 > 0 { return true } // h1 timeout
+                     if l1 > 0 && l2 == 0 { return false } // h2 timeout
+                     return l1 > l2 // Higher latency first
+                }
+                return false // Keep user order if not running
+            }
+            
+            for host in sortedHosts.prefix(5) {
+                widgetEntries.append(createWidgetStatus(for: host))
+            }
+        }
+        
+        // File-based update for Widget
+        let data = WidgetData(
+            displayMode: mode,
+            title: title,
+            entries: widgetEntries,
+            lastUpdated: Date()
+        )
+        WidgetDataManager.shared.save(data)
+        
         WidgetCenter.shared.reloadAllTimelines()
+    }
+    
+    private func createWidgetStatus(for host: HostConfig) -> WidgetData.HostStatus {
+        let latency = host.lastLatency ?? 0
+        let color: String
+        if !isRunning {
+            color = "gray"
+        } else if latency == 0 {
+            color = "red" // Timeout
+        } else if latency < 50 {
+            color = "green"
+        } else if latency < 100 {
+            color = "yellow"
+        } else {
+            color = "orange"
+        }
+        
+        return WidgetData.HostStatus(
+            name: host.name,
+            latency: latency,
+            status: color,
+            isRunning: isRunning
+        )
     }
 
     func getDisplayText(for host: HostConfig?) -> String {

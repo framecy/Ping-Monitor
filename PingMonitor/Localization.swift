@@ -13,8 +13,8 @@ enum Language: String, CaseIterable {
 }
 
 @MainActor
-final class LanguageManager: ObservableObject {
-    static let shared = LanguageManager()
+public final class LanguageManager: ObservableObject {
+    public static let shared = LanguageManager()
     
     @AppStorage("appLanguage", store: UserDefaults(suiteName: "group.com.pingmonitor.shared")) var languageString: String = "zh" {
         didSet {
@@ -195,6 +195,15 @@ final class LanguageManager: ObservableObject {
             "settings.auto_start": "Launch at Login",
             "settings.autostart": "Auto Start",
             "settings.system": "System",
+            "settings.language": "Language",
+            "settings.version": "Version",
+            
+            // Widget Settings
+            "settings.widget.mode": "Widget Mode",
+            "settings.widget.none": "None",
+            "settings.widget.auto": "Auto (Top 5)",
+            "settings.widget.specific": "Specific Host",
+            "settings.widget.select_host": "Select Host",
             
             // Stats Details
             "stats.detailed": "Detailed Stats",
@@ -408,7 +417,7 @@ final class LanguageManager: ObservableObject {
             "settings.desc.average": "显示所有主机的平均延迟",
             "settings.desc.worst": "显示延迟最高或不可达的主机",
             "settings.desc.best": "显示延迟最低的主机",
-            "settings.desc.first": "显示列表中第一个主机",
+            "settings.desc.first": "显示列表中的第一个主机",
             "settings.desc.avg": "显示所有主机的平均延迟",
             "settings.desc.worst_old": "显示延迟最高或不可达的主机",
             "settings.desc.best_old": "显示延迟最低的主机",
@@ -418,6 +427,7 @@ final class LanguageManager: ObservableObject {
             "settings.status_bar": "状态栏显示",
             "settings.section.status_bar": "状态栏显示",
             "settings.section.monitor": "监控",
+            "settings.section.widget": "小组件",
             "settings.section.notify": "通知",
             "settings.section.system": "系统",
             "settings.interval": "Ping 间隔",
@@ -438,6 +448,15 @@ final class LanguageManager: ObservableObject {
             "settings.auto_start": "开机自启动",
             "settings.autostart": "开机自启动",
             "settings.system": "系统",
+            "settings.language": "语言",
+            "settings.version": "版本",
+            
+            // Widget Settings
+            "settings.widget.mode": "小组件模式",
+            "settings.widget.none": "无",
+            "settings.widget.auto": "自动 (前5个)",
+            "settings.widget.specific": "指定主机",
+            "settings.widget.select_host": "选择展示主机",
             
             // Stats Details
             "stats.detailed": "详细统计",

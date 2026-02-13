@@ -50,8 +50,8 @@ rm -rf ~/Library/Developer/Xcode/DerivedData/PingMonitor-*
 xcodebuild -scheme PingMonitor -configuration Release \
     -derivedDataPath ~/Library/Developer/Xcode/DerivedData/PingMonitor \
     CODE_SIGN_IDENTITY="-" \
-    CODE_SIGNING_REQUIRED=NO \
-    CODE_SIGNING_ALLOWED=NO \
+    CODE_SIGNING_REQUIRED=YES \
+    CODE_SIGNING_ALLOWED=YES \
     ONLY_ACTIVE_ARCH=NO
 
 APP_PATH="$HOME/Library/Developer/Xcode/DerivedData/PingMonitor/Build/Products/Release/PingMonitor.app"

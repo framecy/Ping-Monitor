@@ -7,17 +7,19 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		0851F15430B7BE7C2C3A2903 /* LanguageManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F84DBEB8C68CFEDA2867374C /* LanguageManager.swift */; };
 		136DB684B38ECE24B8F16B29 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = EC930EE8636979AACD15BBB7 /* Assets.xcassets */; };
 		18216F0F2CCA0F345936B0DE /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC7D0D255C49F352EA4083FB /* SidebarView.swift */; };
+		1AFE7BF654F793AC8ACFEFD9 /* WidgetDataManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C62A376D664EEDA030D950E1 /* WidgetDataManager.swift */; };
 		2E8FE799A9C7CCD844B33CED /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BEF6778E3667CA0C05B7AF6 /* DashboardView.swift */; };
 		2FD465BABC8894AAD9918845 /* TracerouteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 042BBDE30A6C82BE3B5E0276 /* TracerouteView.swift */; };
 		3330EB9A488B83DBABE5AD53 /* PingMonitorApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E41F61BD4463C6191AD4EDE /* PingMonitorApp.swift */; };
 		33AD6AB75AE993FC3E52C539 /* TracerouteManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F8FBCAF71E64AA07B49E06E /* TracerouteManager.swift */; };
+		4C3C437301B189F841D93F10 /* WidgetDataManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C62A376D664EEDA030D950E1 /* WidgetDataManager.swift */; };
 		5BF5E72CF22CF7843AFC6FEB /* HostDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFBB594A7F65924059D8AAE0 /* HostDetailView.swift */; };
 		8F84DCCB37A985B1311F07CD /* PingMonitorWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0474E749B23CD3D59A534A02 /* PingMonitorWidget.swift */; };
 		ACAE48593119B446A7CAF1E8 /* EditableHostCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCE2F25F03FD5A086CB489B3 /* EditableHostCard.swift */; };
 		AE4DFB14EB5C0241FFF90C09 /* PingMonitorWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 019A9A5FF0AE2400BEA630D5 /* PingMonitorWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		BD48291C728E07252C391F44 /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5594A1194F05016AEA7F7897 /* Localization.swift */; };
 		CEB7B9C677A78A18AF0ED5DD /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E15E69887F7957EA47FA06D /* MainView.swift */; };
 		D51F554F7B9137143E3F303B /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7666F60CCBB8B7ADFCB51FB /* Components.swift */; };
 		EA5962C4457A4AAC9D4C60CA /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C04ACB73A62AC186335F394B /* Assets.xcassets */; };
@@ -54,6 +56,7 @@
 		0474E749B23CD3D59A534A02 /* PingMonitorWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PingMonitorWidget.swift; sourceTree = "<group>"; };
 		3E15E69887F7957EA47FA06D /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
 		491A22FB66A984CCBB76CACC /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		5594A1194F05016AEA7F7897 /* Localization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Localization.swift; sourceTree = "<group>"; };
 		608C42835018CF66383AF67E /* PingMonitorWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PingMonitorWidget.entitlements; sourceTree = "<group>"; };
 		6F8FBCAF71E64AA07B49E06E /* TracerouteManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TracerouteManager.swift; sourceTree = "<group>"; };
 		7DFD8FDF48D0DAAE46E9D261 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -63,12 +66,12 @@
 		9BEF6778E3667CA0C05B7AF6 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		A7666F60CCBB8B7ADFCB51FB /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
 		C04ACB73A62AC186335F394B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		C62A376D664EEDA030D950E1 /* WidgetDataManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetDataManager.swift; sourceTree = "<group>"; };
 		CFBB594A7F65924059D8AAE0 /* HostDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostDetailView.swift; sourceTree = "<group>"; };
 		DCE2F25F03FD5A086CB489B3 /* EditableHostCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditableHostCard.swift; sourceTree = "<group>"; };
 		EC7D0D255C49F352EA4083FB /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
 		EC930EE8636979AACD15BBB7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		F2CC1A1E9C5BE46DCAB3B7C3 /* PingMonitor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PingMonitor.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		F84DBEB8C68CFEDA2867374C /* LanguageManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LanguageManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -81,7 +84,7 @@
 				DCE2F25F03FD5A086CB489B3 /* EditableHostCard.swift */,
 				CFBB594A7F65924059D8AAE0 /* HostDetailView.swift */,
 				491A22FB66A984CCBB76CACC /* Info.plist */,
-				F84DBEB8C68CFEDA2867374C /* LanguageManager.swift */,
+				5594A1194F05016AEA7F7897 /* Localization.swift */,
 				3E15E69887F7957EA47FA06D /* MainView.swift */,
 				8256800946515CA010ECF247 /* PingMonitor.entitlements */,
 				7E41F61BD4463C6191AD4EDE /* PingMonitorApp.swift */,
@@ -89,6 +92,7 @@
 				857B8B71FC13AC1C33464767 /* Theme.swift */,
 				6F8FBCAF71E64AA07B49E06E /* TracerouteManager.swift */,
 				042BBDE30A6C82BE3B5E0276 /* TracerouteView.swift */,
+				C62A376D664EEDA030D950E1 /* WidgetDataManager.swift */,
 			);
 			path = PingMonitor;
 			sourceTree = "<group>";
@@ -227,6 +231,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				8F84DCCB37A985B1311F07CD /* PingMonitorWidget.swift in Sources */,
+				4C3C437301B189F841D93F10 /* WidgetDataManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -238,13 +243,14 @@
 				2E8FE799A9C7CCD844B33CED /* DashboardView.swift in Sources */,
 				ACAE48593119B446A7CAF1E8 /* EditableHostCard.swift in Sources */,
 				5BF5E72CF22CF7843AFC6FEB /* HostDetailView.swift in Sources */,
-				0851F15430B7BE7C2C3A2903 /* LanguageManager.swift in Sources */,
+				BD48291C728E07252C391F44 /* Localization.swift in Sources */,
 				CEB7B9C677A78A18AF0ED5DD /* MainView.swift in Sources */,
 				3330EB9A488B83DBABE5AD53 /* PingMonitorApp.swift in Sources */,
 				18216F0F2CCA0F345936B0DE /* SidebarView.swift in Sources */,
 				FD908B3EBFD3A95E91601B6C /* Theme.swift in Sources */,
 				33AD6AB75AE993FC3E52C539 /* TracerouteManager.swift in Sources */,
 				2FD465BABC8894AAD9918845 /* TracerouteView.swift in Sources */,
+				1AFE7BF654F793AC8ACFEFD9 /* WidgetDataManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -315,7 +321,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 44;
+				CURRENT_PROJECT_VERSION = 52;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -334,7 +340,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 2.0.43;
+				MARKETING_VERSION = 2.0.51;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -421,7 +427,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 44;
+				CURRENT_PROJECT_VERSION = 52;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -434,7 +440,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 2.0.43;
+				MARKETING_VERSION = 2.0.51;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";

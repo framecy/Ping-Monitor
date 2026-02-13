@@ -20,6 +20,10 @@ struct EditableHostCard: View {
         return Theme.Colors.textSecondary
     }
 
+    var borderColor: Color {
+        isHovered ? statusColor.opacity(0.5) : Color.white.opacity(0.05)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Header: Icon, Name, Status
@@ -139,7 +143,7 @@ struct EditableHostCard: View {
         .cornerRadius(Theme.Layout.cardCornerRadius)
         .overlay(
             RoundedRectangle(cornerRadius: Theme.Layout.cardCornerRadius)
-                .stroke(isHovered ? statusColor.opacity(0.5) : Color.white.opacity(0.05), lineWidth: 1)
+                .stroke(borderColor, lineWidth: 1)
         )
         .shadow(color: isHovered ? statusColor.opacity(0.1) : Color.clear, radius: 8, y: 4)
         .scaleEffect(isHovered ? 1.01 : 1.0)

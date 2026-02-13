@@ -8,10 +8,16 @@ struct TracerouteHop: Identifiable, Sendable {
     let hopNumber: Int
     var hostName: String
     var ip: String
-    var latencies: [Double?]  // Up to 3 latency probes
+    var latencies: [Double?]  // Up to 3 latency probes (most recent for MTR)
     var avgLatency: Double?
     var packetLoss: Double     // 0.0 - 100.0
     var isTimeout: Bool
+    
+    // MTR Cumulative Stats
+    var sent: Int = 0
+    var received: Int = 0
+    var best: Double?
+    var worst: Double?
     
     var latencyColor: Color {
         guard let avg = avgLatency else { return .gray }
@@ -26,93 +32,118 @@ struct TracerouteHop: Identifiable, Sendable {
     }
     
     var formattedLoss: String {
-        if isTimeout { return "100%" }
+        if sent == 0 { return "0%" }
+        // If we have MTR stats, calculated based on sent/received
+        // Otherwise use the snapshot loss
+        if sent > 0 {
+             let loss = Double(sent - received) / Double(sent) * 100
+             return String(format: "%.0f%%", loss)
+        }
         return String(format: "%.0f%%", packetLoss)
     }
 }
 
 // MARK: - Hop Line Parser (nonisolated, Sendable-safe)
 
-/// Parse a single traceroute output line like:
-///  1  router.local (192.168.1.1)  1.234 ms  1.456 ms  1.789 ms
-///  2  * * *
-///  3  10.0.0.1 (10.0.0.1)  5.678 ms  * 6.123 ms
+/// Parse a single traceroute output line
 func parseHopLine(_ line: String) -> TracerouteHop? {
     let trimmed = line.trimmingCharacters(in: .whitespaces)
+    if trimmed.isEmpty { return nil }
     
-    // Must start with a hop number
-    guard let firstSpaceIdx = trimmed.firstIndex(of: " "),
-          let hopNumber = Int(trimmed[trimmed.startIndex..<firstSpaceIdx]) else {
+    // 1. Hop Number
+    let range = NSRange(location: 0, length: trimmed.utf16.count)
+    let hopRegex = try? NSRegularExpression(pattern: "^(\\d+)\\s+(.*)$")
+    guard let regex = hopRegex,
+          let match = regex.firstMatch(in: trimmed, options: [], range: range),
+          let hopNumRange = Range(match.range(at: 1), in: trimmed),
+          let hopNumber = Int(trimmed[hopNumRange]),
+          let restRange = Range(match.range(at: 2), in: trimmed) else {
         return nil
     }
     
     // Ignore hop 0 or negative
     guard hopNumber > 0 else { return nil }
     
-    let rest = String(trimmed[firstSpaceIdx...]).trimmingCharacters(in: .whitespaces)
+    let content = String(trimmed[restRange]).trimmingCharacters(in: .whitespaces)
     
-    // Check if all timeouts: "* * *"
-    if rest.replacingOccurrences(of: "*", with: "").replacingOccurrences(of: " ", with: "").isEmpty {
-        return TracerouteHop(
-            hopNumber: hopNumber,
-            hostName: "*",
-            ip: "*",
-            latencies: [nil, nil, nil],
-            avgLatency: nil,
-            packetLoss: 100,
-            isTimeout: true
-        )
-    }
+    // Tokenize by spaces
+    let tokens = content.split(separator: " ").map { String($0) }
     
-    // Extract hostname and IP
-    var hostName = ""
-    var ip = ""
+    var hostName = "*"
+    var ip = "*"
     var latencies: [Double?] = []
     
-    // Try to extract hostname (IP) pattern
-    let ipPattern = #"(\S+)\s+\(([^)]+)\)"#
-    if let regex = try? NSRegularExpression(pattern: ipPattern),
-       let match = regex.firstMatch(in: rest, range: NSRange(rest.startIndex..., in: rest)) {
-        if let nameRange = Range(match.range(at: 1), in: rest) {
-            hostName = String(rest[nameRange])
+    var i = 0
+    var latencyStartIndex = 0
+    var foundLatencyStart = false
+    
+    // 2. Scan for start of latencies (number followed by ms, or *)
+    while i < tokens.count {
+        let t = tokens[i]
+        
+        if t == "*" {
+            foundLatencyStart = true
+            latencyStartIndex = i
+            break
         }
-        if let ipRange = Range(match.range(at: 2), in: rest) {
-            ip = String(rest[ipRange])
+        
+        if let _ = Double(t), i + 1 < tokens.count, tokens[i+1] == "ms" {
+            foundLatencyStart = true
+            latencyStartIndex = i
+            break
         }
-    } else {
-        // Try simple IP-only format
-        let parts = rest.split(separator: " ")
-        if let first = parts.first {
-            let firstStr = String(first)
-            if firstStr.contains(".") || firstStr.contains(":") {
-                ip = firstStr
-                hostName = firstStr
+        
+        i += 1
+    }
+    
+    if foundLatencyStart {
+        // Everything before is Host/IP
+        let hostTokens = tokens[0..<latencyStartIndex]
+        if !hostTokens.isEmpty {
+            let hostStr = hostTokens.joined(separator: " ")
+            
+            let ipParenRegex = try? NSRegularExpression(pattern: "^(\\S+)\\s+\\(([\\d\\.:]+)\\)")
+            let simpleIpRegex = try? NSRegularExpression(pattern: "^([\\d\\.:]+)$")
+            let hostRange = NSRange(location: 0, length: hostStr.utf16.count)
+            
+            if let regex = ipParenRegex,
+               let m = regex.firstMatch(in: hostStr, options: [], range: hostRange),
+               let r1 = Range(m.range(at: 1), in: hostStr),
+               let r2 = Range(m.range(at: 2), in: hostStr) {
+                hostName = String(hostStr[r1])
+                ip = String(hostStr[r2])
+            } else if let regex = simpleIpRegex,
+                      let _ = regex.firstMatch(in: hostStr, options: [], range: hostRange) {
+                hostName = hostStr
+                ip = hostStr
+            } else {
+                 hostName = hostStr
+                 ip = hostStr
             }
         }
     }
     
-    // Extract latency values (ms)
-    let latencyPattern = #"(\d+\.?\d*)\s*ms"#
-    if let regex = try? NSRegularExpression(pattern: latencyPattern) {
-        let matches = regex.matches(in: rest, range: NSRange(rest.startIndex..., in: rest))
-        for match in matches {
-            if let range = Range(match.range(at: 1), in: rest),
-               let val = Double(String(rest[range])) {
-                latencies.append(val)
-            }
-        }
-    }
-    
-    // Count timeouts in the rest (standalone *)
-    let starPattern = #"(?<!\S)\*(?!\S)"#
-    if let regex = try? NSRegularExpression(pattern: starPattern) {
-        let starCount = regex.numberOfMatches(in: rest, range: NSRange(rest.startIndex..., in: rest))
-        for _ in 0..<starCount {
+    // 3. Parse Latencies
+    i = latencyStartIndex
+    while i < tokens.count {
+        let t = tokens[i]
+        
+        if t == "*" {
             latencies.append(nil)
+            i += 1
+        } else if let val = Double(t), i+1 < tokens.count, tokens[i+1] == "ms" {
+            latencies.append(val)
+            i += 2
+        } else if t.hasPrefix("!") {
+            // Error flag (e.g. !X), ignore for latency value but consume
+            i += 1
+        } else {
+            // Unknown token, skip
+            i += 1
         }
     }
     
-    // Calculate average
+    // Stats calculation
     let validLatencies = latencies.compactMap { $0 }
     let avg = validLatencies.isEmpty ? nil : validLatencies.reduce(0, +) / Double(validLatencies.count)
     let totalProbes = max(latencies.count, 1)
@@ -121,12 +152,16 @@ func parseHopLine(_ line: String) -> TracerouteHop? {
     
     return TracerouteHop(
         hopNumber: hopNumber,
-        hostName: hostName.isEmpty ? ip : hostName,
-        ip: ip.isEmpty ? hostName : ip,
+        hostName: hostName,
+        ip: ip,
         latencies: latencies,
         avgLatency: avg,
         packetLoss: loss,
-        isTimeout: validLatencies.isEmpty
+        isTimeout: validLatencies.isEmpty,
+        sent: latencies.count,
+        received: validLatencies.count,
+        best: validLatencies.min(),
+        worst: validLatencies.max()
     )
 }
 
@@ -188,7 +223,9 @@ class TracerouteManager: ObservableObject {
         proc.standardOutput = pipe
         proc.standardError = pipe
         proc.executableURL = URL(fileURLWithPath: "/bin/sh")
-        proc.arguments = ["-c", "/usr/sbin/traceroute -I -m \(maxHops) -q 3 \(host) 2>&1"]
+        // Use -I (ICMP) as it's generally more standard for reading, but if it fails, we might want UDP.
+        // For now sticking to -I as in original, but with better parsing.
+        proc.arguments = ["-c", "/usr/sbin/traceroute -I -m \(maxHops) -q 3 -w 1 \(host) 2>&1"]
         
         self.process = proc
         
@@ -247,7 +284,8 @@ class TracerouteManager: ObservableObject {
         proc.standardOutput = pipe
         proc.standardError = pipe
         proc.executableURL = URL(fileURLWithPath: "/bin/sh")
-        proc.arguments = ["-c", "/usr/sbin/traceroute -I -m \(maxHops) -q 1 -w 2 \(host) 2>&1"]
+        // MTR mode: quick probes (-q 1), wait 1s (-w 1)
+        proc.arguments = ["-c", "/usr/sbin/traceroute -I -m \(maxHops) -q 1 -w 1 \(host) 2>&1"]
         
         self.process = proc
         
@@ -298,6 +336,7 @@ class TracerouteManager: ObservableObject {
             hops[idx] = hop
         } else {
             hops.append(hop)
+            hops.sort { $0.hopNumber < $1.hopNumber }
         }
         progress = String(format: LanguageManager.shared.t("traceroute.tracing"), targetHost) + " (\(hops.count)/\(maxHops))"
     }
@@ -308,39 +347,64 @@ class TracerouteManager: ObservableObject {
                 // Update existing hop with new data
                 var existing = hops[idx]
                 
-                // Update hostname/ip if we got a real one
-                if !roundHop.isTimeout {
+                // Update hostname/ip if we got a real one (prioritize non-star)
+                if !roundHop.isTimeout && (existing.hostName == "*" || existing.hostName.isEmpty) {
                     existing.hostName = roundHop.hostName
                     existing.ip = roundHop.ip
                 }
                 
-                // Add new latency and recalculate average
+                // Accumulate stats
+                existing.sent += roundHop.sent
+                existing.received += roundHop.received
+                
+                // Update latencies (keep last 3 for display)
                 let newLatency = roundHop.latencies.first ?? nil
-                var allLatencies = existing.latencies
-                allLatencies.append(newLatency)
-                
-                // Keep only last 10 latencies
-                if allLatencies.count > 10 {
-                    allLatencies = Array(allLatencies.suffix(10))
+                var displayLatencies = existing.latencies
+                displayLatencies.append(newLatency)
+                if displayLatencies.count > 3 {
+                    displayLatencies = Array(displayLatencies.suffix(3))
                 }
-                existing.latencies = allLatencies
+                existing.latencies = displayLatencies
                 
-                let validLatencies = allLatencies.compactMap { $0 }
-                if !validLatencies.isEmpty {
-                    existing.avgLatency = validLatencies.reduce(0, +) / Double(validLatencies.count)
-                    let totalProbes = allLatencies.count
-                    let timeouts = allLatencies.filter { $0 == nil }.count
-                    existing.packetLoss = Double(timeouts) / Double(totalProbes) * 100
-                    existing.isTimeout = false
-                } else {
-                    existing.isTimeout = true
-                    existing.packetLoss = 100
+                // Accumulate Min/Max
+                if let newLat = newLatency {
+                    existing.best = min(existing.best ?? newLat, newLat)
+                    existing.worst = max(existing.worst ?? newLat, newLat)
+                    
+                    // Update rolling Average
+                    // We need a way to store sum. Since we don't have it in struct explicitly,
+                    // we can approximate or if we want precision, calculate from avg * count.
+                    // But `received` is the count of valid latencies.
+                    // New Avg = ((Old Avg * Old Count) + New Val) / New Count
+                    let oldRec = Double(existing.received - 1) // we already incremented received
+                     let oldAvg = existing.avgLatency ?? 0
+                     let newTotal = (oldAvg * oldRec) + newLat
+                     existing.avgLatency = newTotal / Double(existing.received)
+                }
+                
+                // Loss is calculated dynamically in the property based on sent/received
+                
+                existing.isTimeout = (existing.received == 0)
+                // If it was a timeout this round, packetLoss property update handled by computed var?
+                // No, existing.packetLoss is a stored property in struct, we need to update it for the View to see it if it uses the stored prop.
+                // The struct has computed `formattedLoss` but stored `packetLoss`.
+                // Let's update stored `packetLoss` too.
+                if existing.sent > 0 {
+                    existing.packetLoss = Double(existing.sent - existing.received) / Double(existing.sent) * 100.0
                 }
                 
                 hops[idx] = existing
             } else {
-                // New hop number, add it
-                hops.append(roundHop)
+                // New hop
+                var newHop = roundHop
+                // Initialize MTR counters if not already (parseHopLine does it, but check)
+                if newHop.sent == 0 { // Should match latencies.count
+                    newHop.sent = newHop.latencies.count
+                    newHop.received = newHop.latencies.compactMap{$0}.count
+                    newHop.best = newHop.latencies.compactMap{$0}.min()
+                    newHop.worst = newHop.latencies.compactMap{$0}.max()
+                }
+                hops.append(newHop)
                 hops.sort { $0.hopNumber < $1.hopNumber }
             }
         }

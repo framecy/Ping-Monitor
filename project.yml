@@ -8,8 +8,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "6.0"
-    MARKETING_VERSION: "2.0.43"
-    CURRENT_PROJECT_VERSION: "44"
+    MARKETING_VERSION: "2.0.51"
+    CURRENT_PROJECT_VERSION: "52"
 
 targets:
   PingMonitor:
@@ -17,6 +17,10 @@ targets:
     platform: macOS
     sources:
       - path: PingMonitor
+      - path: PingMonitor/HostDetailView.swift
+      - path: PingMonitor/TracerouteManager.swift
+      - path: PingMonitor/TracerouteView.swift
+      - path: PingMonitor/WidgetDataManager.swift
     settings:
       base:
         INFOPLIST_FILE: PingMonitor/Info.plist
@@ -29,16 +33,18 @@ targets:
     entitlements:
       path: PingMonitor/PingMonitor.entitlements
       properties:
-        com.apple.security.application-groups:
-          - group.com.pingmonitor.shared
+        # com.apple.security.application-groups:
+        #   - group.com.pingmonitor.shared
     dependencies:
       - target: PingMonitorWidget
+        embed: true
 
   PingMonitorWidget:
     type: app-extension
     platform: macOS
     sources:
       - path: PingMonitorWidget
+      - path: PingMonitor/WidgetDataManager.swift
     settings:
       base:
         INFOPLIST_FILE: PingMonitorWidget/Info.plist
@@ -52,6 +58,6 @@ targets:
     entitlements:
       path: PingMonitorWidget/PingMonitorWidget.entitlements
       properties:
-        com.apple.security.application-groups:
-          - group.com.pingmonitor.shared
+        # com.apple.security.application-groups:
+        #   - group.com.pingmonitor.shared
         com.apple.security.app-sandbox: true

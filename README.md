@@ -108,7 +108,7 @@
 | UI 框架 | SwiftUI 6.0 |
 | 最低系统 | macOS 14.0+ |
 | 架构模式 | MVVM |
-| 数据存储 | UserDefaults (App Groups) |
+| 数据存储 | File-based Data Sharing (JSON) |
 | 小组件 | WidgetKit |
 | 自启动 | ServiceManagement |
 | 多语言 | Localization (Dynamic) |
@@ -205,6 +205,7 @@ AUTO_VERSION=false
 
 | 版本 | 构建 | 更新内容 |
 |------|------|---------|
+| v2.0.51 | r52 | **深度调试**：在小组件界面强制显示版本号 (v2.0.51) 以验证更新状态；Main App 增加路径写入日志 |
 | v2.0.40 | r41 | **UI 全面升级**：3D 环形统计图、实时内存监控、Dashboard 布局优化；**本地化完善**：补全所有翻译 key、日志级别本地化；侧边栏显示 macOS 用户名 |
 | v2.0.34 | r35 | **多语言支持**：完整的中文/英文界面，支持动态切换；UI 细节优化与 Bug 修复 |
 | v2.0.29 | r30 | 修复自定义命令中空格导致解析错误的问题 |
