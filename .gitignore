@@ -4,6 +4,15 @@
 
 ## User settings
 xcuserdata/
+.DS_Store
+
+## Logs and Build Artifacts
+*.log
+build_log.txt
+*.dmg
+
+## Reproduction Scripts
+repro_*.swift
 
 ## Obj-C/Swift specific
 *.hmap
