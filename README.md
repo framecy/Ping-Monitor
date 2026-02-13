@@ -13,7 +13,7 @@
   <img src="https://img.shields.io/badge/platform-macOS%2014.0+-blue" alt="Platform">
   <img src="https://img.shields.io/badge/SwiftUI-6.0-orange" alt="SwiftUI">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/version-2.0.40-brightgreen" alt="Version">
+  <img src="https://img.shields.io/badge/version-2.1.0-brightgreen" alt="Version">
 </p>
 
 ---
@@ -205,6 +205,7 @@ AUTO_VERSION=false
 
 | 版本 | 构建 | 更新内容 |
 |------|------|---------|
+| v2.1.0 | r60 | **小组件深度优化**：重构 `WidgetDataManager` 实现可靠的数据同步，修复“无数据”显示问题；**本地化增强**：全面支持中英文动态切换，覆盖小组件设置与系统菜单；**可视化升级**：优化 Dashboard 布局与趋势图平滑度；**路由追踪改进**：增强 Traceroute/MTR 稳定性 |
 | v2.0.51 | r52 | **深度调试**：在小组件界面强制显示版本号 (v2.0.51) 以验证更新状态；Main App 增加路径写入日志 |
 | v2.0.40 | r41 | **UI 全面升级**：3D 环形统计图、实时内存监控、Dashboard 布局优化；**本地化完善**：补全所有翻译 key、日志级别本地化；侧边栏显示 macOS 用户名 |
 | v2.0.34 | r35 | **多语言支持**：完整的中文/英文界面，支持动态切换；UI 细节优化与 Bug 修复 |
