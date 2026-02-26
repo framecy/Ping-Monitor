@@ -62,10 +62,13 @@ xcodebuild -scheme PingMonitor -configuration Release \
     CODE_SIGN_IDENTITY="-" \
     CODE_SIGNING_REQUIRED=YES \
     CODE_SIGNING_ALLOWED=YES \
-    CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO \
     ONLY_ACTIVE_ARCH=NO
 
 APP_PATH="$HOME/Library/Developer/Xcode/DerivedData/PingMonitor/Build/Products/Release/PingMonitor.app"
+
+# 重新签名以满足 Gatekeeper 的要求 (Apple Silicon 必须严格 Ad-hoc 签名)
+echo "🔐 修复签名..."
+codesign --force --deep -s - -o runtime "$APP_PATH"
 
 # 验证构建
 if [ ! -d "$APP_PATH" ]; then
