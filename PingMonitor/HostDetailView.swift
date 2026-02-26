@@ -8,6 +8,7 @@ struct HostDetailView: View {
     @ObservedObject private var languageManager = LanguageManager.shared
     @ObservedObject private var logManager = LogManager.shared
     @State private var showShortcutEditor = false
+    @State private var editingShortcut: ServiceShortcut? = nil
     
     private var stats: HostStats? {
         viewModel.hostStats[host.id]
@@ -56,12 +57,21 @@ struct HostDetailView: View {
         }
         .background(Theme.Colors.background)
         .sheet(isPresented: $showShortcutEditor) {
-            ShortcutEditorSheet(hostAddress: host.address) { shortcut in
+            ShortcutEditorSheet(existingShortcut: editingShortcut, hostAddress: host.address) { shortcut in
                 if let index = viewModel.hosts.firstIndex(where: { $0.id == host.id }) {
-                    viewModel.hosts[index].serviceShortcuts.append(shortcut)
+                    if let existing = editingShortcut,
+                       let sIndex = viewModel.hosts[index].serviceShortcuts.firstIndex(where: { $0.id == existing.id }) {
+                        // Edit existing
+                        viewModel.hosts[index].serviceShortcuts[sIndex] = shortcut
+                        LogManager.shared.info("Updated shortcut: \(shortcut.name)", host: host.name)
+                    } else {
+                        // Add new
+                        viewModel.hosts[index].serviceShortcuts.append(shortcut)
+                        LogManager.shared.info("Added shortcut: \(shortcut.name)", host: host.name)
+                    }
                     viewModel.saveSettings()
-                    LogManager.shared.info("Added shortcut: \(shortcut.name)", host: host.name)
                 }
+                editingShortcut = nil
             }
         }
     }
@@ -549,7 +559,10 @@ struct HostDetailView: View {
                         .foregroundStyle(Theme.Colors.textPrimary)
                     Spacer()
                     
-                    Button(action: { showShortcutEditor = true }) {
+                    Button(action: {
+                        editingShortcut = nil
+                        showShortcutEditor = true
+                    }) {
                         HStack(spacing: 4) {
                             Image(systemName: "plus")
                                 .font(.system(size: 10, weight: .semibold))
@@ -612,6 +625,13 @@ struct HostDetailView: View {
                             }
                             .buttonStyle(.plain)
                             .contextMenu {
+                                Button {
+                                    editingShortcut = shortcut
+                                    showShortcutEditor = true
+                                } label: {
+                                    Label(languageManager.t("services.edit"), systemImage: "pencil")
+                                }
+                                Divider()
                                 Button(role: .destructive) {
                                     if let hostIndex = viewModel.hosts.firstIndex(where: { $0.id == host.id }),
                                        let sIndex = viewModel.hosts[hostIndex].serviceShortcuts.firstIndex(where: { $0.id == shortcut.id }) {

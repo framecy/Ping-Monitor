@@ -5,6 +5,9 @@ import SwiftUI
 struct ServicesTab: View {
     @ObservedObject var viewModel: PingMonitorViewModel
     @ObservedObject private var languageManager = LanguageManager.shared
+    @State private var showShortcutEditor = false
+    @State private var editingShortcut: ServiceShortcut? = nil
+    @State private var editingHostId: UUID? = nil
     
     private var hostsWithServices: [HostConfig] {
         viewModel.hosts.filter { !$0.serviceShortcuts.isEmpty }
@@ -24,6 +27,22 @@ struct ServicesTab: View {
             .padding(Theme.Layout.cardPadding)
         }
         .background(Theme.Colors.background)
+        .sheet(isPresented: $showShortcutEditor) {
+            let hostAddr = editingHostId.flatMap { hid in viewModel.hosts.first(where: { $0.id == hid })?.address }
+            ShortcutEditorSheet(existingShortcut: editingShortcut, hostAddress: hostAddr) { shortcut in
+                if let hid = editingHostId,
+                   let hIndex = viewModel.hosts.firstIndex(where: { $0.id == hid }) {
+                    if let existing = editingShortcut,
+                       let sIndex = viewModel.hosts[hIndex].serviceShortcuts.firstIndex(where: { $0.id == existing.id }) {
+                        viewModel.hosts[hIndex].serviceShortcuts[sIndex] = shortcut
+                        LogManager.shared.info("Updated shortcut: \(shortcut.name)", host: viewModel.hosts[hIndex].name)
+                    }
+                    viewModel.saveSettings()
+                }
+                editingShortcut = nil
+                editingHostId = nil
+            }
+        }
     }
     
     // MARK: - Empty State
@@ -116,6 +135,25 @@ struct ServicesTab: View {
             )
         }
         .buttonStyle(.plain)
+        .contextMenu {
+            Button {
+                editingShortcut = shortcut
+                editingHostId = host.id
+                showShortcutEditor = true
+            } label: {
+                Label(languageManager.t("services.edit"), systemImage: "pencil")
+            }
+            Divider()
+            Button(role: .destructive) {
+                if let hIndex = viewModel.hosts.firstIndex(where: { $0.id == host.id }),
+                   let sIndex = viewModel.hosts[hIndex].serviceShortcuts.firstIndex(where: { $0.id == shortcut.id }) {
+                    viewModel.hosts[hIndex].serviceShortcuts.remove(at: sIndex)
+                    viewModel.saveSettings()
+                }
+            } label: {
+                Label(languageManager.t("menu.delete"), systemImage: "trash")
+            }
+        }
     }
     
     // MARK: - Helpers

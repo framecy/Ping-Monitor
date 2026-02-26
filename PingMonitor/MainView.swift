@@ -1649,11 +1649,11 @@ struct AddRuleSheet: View {
                 Spacer()
                 
                 Button(languageManager.t("common.add")) {
-                    rules.append(DisplayRule(condition: condition, threshold: threshold, label: label, enabled: true))
+                    let finalLabel = label.isEmpty ? "\(condition == "less" ? "<" : ">") \(Int(threshold))ms" : label
+                    rules.append(DisplayRule(condition: condition, threshold: threshold, label: finalLabel, enabled: true))
                     isPresented = false
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(label.isEmpty)
             }
         }
         .padding()

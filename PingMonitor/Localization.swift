@@ -316,7 +316,7 @@ public final class LanguageManager: ObservableObject {
             
             // Services
             "services.title": "Service Shortcuts",
-            "services.add": "Add Shortcut",
+            "services.add": "Add",
             "services.edit": "Edit Shortcut",
             "services.empty": "No service shortcuts",
             "services.empty_hint": "Add shortcuts in host details",
@@ -619,7 +619,7 @@ public final class LanguageManager: ObservableObject {
             
             // Services
             "services.title": "服务快捷方式",
-            "services.add": "添加快捷方式",
+            "services.add": "添加",
             "services.edit": "编辑快捷方式",
             "services.empty": "暂无服务快捷方式",
             "services.empty_hint": "在主机详情中添加快捷方式",
