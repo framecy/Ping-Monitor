@@ -438,7 +438,7 @@ class PingMonitorViewModel: ObservableObject {
         hostStats[hostId] = stats
     }
     
-    private func startPingProcess(for host: HostConfig, at index: Int) {
+    func startPingProcess(for host: HostConfig, at index: Int) {
         guard index < hosts.count else { return }
         
         let hostName = host.name
@@ -841,6 +841,28 @@ class PingMonitorViewModel: ObservableObject {
     }
 }
 
+struct ServiceShortcut: Codable, Identifiable {
+    let id: UUID
+    var name: String          // e.g. "Synology DSM"
+    var url: String           // e.g. "http://100.100.1.30:5000"
+    var icon: String          // SF Symbol name, e.g. "globe"
+    var type: ServiceType
+
+    enum ServiceType: String, Codable, CaseIterable {
+        case web = "web"
+        case ssh = "ssh"
+        case custom = "custom"
+    }
+
+    init(name: String, url: String, icon: String = "globe", type: ServiceType = .web) {
+        self.id = UUID()
+        self.name = name
+        self.url = url
+        self.icon = icon
+        self.type = type
+    }
+}
+
 struct HostConfig: Codable, Identifiable, Hashable {
     let id = UUID()
     var name: String
@@ -853,6 +875,9 @@ struct HostConfig: Codable, Identifiable, Hashable {
         DisplayRule(condition: "less", threshold: 50, label: "P2P", enabled: true),
         DisplayRule(condition: "greater", threshold: 50, label: "转发", enabled: true)
     ]
+    var serviceShortcuts: [ServiceShortcut] = []
+    var isTailscaleNode: Bool = false
+    var tailscaleHostname: String?
     
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
@@ -868,6 +893,7 @@ struct HostPreset: Codable, Identifiable {
     var name: String
     var address: String
     var command: String = ""
+    var serviceShortcuts: [ServiceShortcut] = []
 }
 
 struct DisplayRule: Codable, Identifiable {

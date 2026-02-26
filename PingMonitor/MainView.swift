@@ -7,6 +7,8 @@ enum SidebarItem: String, CaseIterable, Identifiable {
     case monitor
     case statistics
     case traceroute
+    case tailscale
+    case services
     case hosts
     case logs
     case settings
@@ -18,6 +20,8 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .monitor: return LanguageManager.shared.t("sidebar.monitor")
         case .statistics: return LanguageManager.shared.t("sidebar.dashboard")
         case .traceroute: return LanguageManager.shared.t("sidebar.traceroute")
+        case .tailscale: return LanguageManager.shared.t("sidebar.tailscale")
+        case .services: return LanguageManager.shared.t("sidebar.services")
         case .hosts: return LanguageManager.shared.t("sidebar.hosts")
         case .logs: return LanguageManager.shared.t("sidebar.logs")
         case .settings: return LanguageManager.shared.t("sidebar.settings")
@@ -29,6 +33,8 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .monitor: return "waveform.path.ecg"
         case .statistics: return "chart.bar.fill"
         case .traceroute: return "point.topleft.down.to.point.bottomright.curvepath"
+        case .tailscale: return "network"
+        case .services: return "square.grid.2x2.fill"
         case .hosts: return "server.rack"
         case .logs: return "doc.text.fill"
         case .settings: return "gearshape.fill"
@@ -40,6 +46,8 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .monitor: return .green
         case .statistics: return .blue
         case .traceroute: return .cyan
+        case .tailscale: return .indigo
+        case .services: return .mint
         case .hosts: return .purple
         case .logs: return .orange
         case .settings: return .gray
@@ -87,6 +95,10 @@ struct MainView: View {
             DashboardView(viewModel: viewModel)
         case .traceroute:
             TracerouteView(viewModel: viewModel)
+        case .tailscale:
+            TailscaleTab(viewModel: viewModel)
+        case .services:
+            ServicesTab(viewModel: viewModel)
         case .hosts:
             HostManagementTab(viewModel: viewModel)
         case .logs:

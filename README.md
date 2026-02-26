@@ -6,14 +6,14 @@
 
 <p align="center">
   <strong>macOS 菜单栏网络延迟监控工具</strong><br>
-  多主机监控 · 实时统计 · 可视化图表 · 智能通知 · 桌面小组件
+  多主机监控 · Tailscale 集成 · 服务快捷方式 · 实时统计 · 桌面小组件
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/platform-macOS%2014.0+-blue" alt="Platform">
   <img src="https://img.shields.io/badge/SwiftUI-6.0-orange" alt="SwiftUI">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/version-2.0.53-brightgreen" alt="Version">
+  <img src="https://img.shields.io/badge/version-2.0.54-brightgreen" alt="Version">
 </p>
 
 ---
@@ -91,6 +91,20 @@
 | 小 | 延迟数值 + 状态图标 + 主机地址 |
 | 中 | 延迟数值 + 主机名 + 运行状态 |
 | 大 | 完整面板：图标 + 延迟 + 主机 + 状态 + 更新时间 |
+
+### 🔗 Tailscale 集成
+
+- **自动节点发现** — 自动检测 Tailscale CLI，一键读取私有网络中所有设备
+- **智能导入** — 将 Tailscale 节点导入为监控主机，支持单台或批量导入
+- **状态面板** — 实时显示 Tailscale 连接状态、本机 IP、网络节点在线情况
+- **优雅降级** — 未安装 Tailscale 时自动隐藏相关面板
+
+### 🚀 服务快捷方式
+
+- 为每个主机配置多个 **Web / SSH / 自定义** 服务快捷入口
+- 点击即可在浏览器打开 Web 服务或在终端中发起 SSH 连接
+- 全局 **服务面板** 汇总展示所有主机的快捷方式
+- 16 种 SF Symbols 图标可选，支持右键删除
 
 ### ⚙️ 更多特性
 
@@ -208,6 +222,7 @@ AUTO_VERSION=false
 
 | 版本 | 构建 | 更新内容 |
 |------|------|---------|
+| v2.0.54 | r63 | **Tailscale 集成**：自动发现私有网络节点并一键导入监控；**服务快捷方式**：为每个主机配置 Web/SSH/自定义快捷入口，全局服务面板汇总展示；**新增侧边栏模块**：Tailscale 面板与服务面板；完善中英文本地化 |
 | v2.0.53 | r62 | **UI 全面优化**：统计仪表盘引入极具质感的 3D 立体饼图，并运用严格风格的 Grid 网格布局重置了延迟排行榜；**设置页重构**：全面采用 `ModernCard` 与原生列表结合的卡片式分组设计；**审计与日志增强**：新增针对应用设置修改的操作审计跟踪，并在主机详情页提供了支持一键导出的单主机专项历史日志功能 |
 | v2.0.51 | r60 | **小组件深度优化**：重构 `WidgetDataManager` 实现可靠数据同步，修复“无数据”显示；**本地化增强**：全面支持中英文动态切换，覆盖小组件设置与系统菜单；**可视化升级**：优化 Dashboard 布局与趋势图平滑度；**路由追踪改进**：增强 Traceroute/MTR 稳定性 |
 | v2.0.40 | r41 | **UI 全面升级**：3D 环形统计图、实时内存监控、Dashboard 布局优化；**本地化完善**：补全所有翻译 key、日志级别本地化；侧边栏显示 macOS 用户名 |

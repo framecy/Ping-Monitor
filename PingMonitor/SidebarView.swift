@@ -34,10 +34,15 @@ struct SidebarView: View {
                     SidebarRow(item: .statistics, selectedItem: $selectedItem, icon: SidebarItem.statistics.icon, title: SidebarItem.statistics.title)
                     SidebarRow(item: .traceroute, selectedItem: $selectedItem, icon: SidebarItem.traceroute.icon, title: SidebarItem.traceroute.title)
                     
+                    if TailscaleManager.shared.isAvailable {
+                        SidebarRow(item: .tailscale, selectedItem: $selectedItem, icon: SidebarItem.tailscale.icon, title: SidebarItem.tailscale.title)
+                    }
+                    
                     Spacer().frame(height: 16)
                     
                     SidebarSectionHeader(title: languageManager.t("sidebar.management"))
                     SidebarRow(item: .hosts, selectedItem: $selectedItem, icon: SidebarItem.hosts.icon, title: SidebarItem.hosts.title)
+                    SidebarRow(item: .services, selectedItem: $selectedItem, icon: SidebarItem.services.icon, title: SidebarItem.services.title)
                     SidebarRow(item: .logs, selectedItem: $selectedItem, icon: SidebarItem.logs.icon, title: SidebarItem.logs.title)
                     
                     Spacer().frame(height: 16)

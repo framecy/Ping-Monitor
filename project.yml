@@ -8,8 +8,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "6.0"
-    MARKETING_VERSION: "2.0.53"
-    CURRENT_PROJECT_VERSION: "62"
+    MARKETING_VERSION: "2.0.54"
+    CURRENT_PROJECT_VERSION: "63"
 
 targets:
   PingMonitor:
@@ -21,6 +21,9 @@ targets:
       - path: PingMonitor/TracerouteManager.swift
       - path: PingMonitor/TracerouteView.swift
       - path: PingMonitor/WidgetDataManager.swift
+      - path: PingMonitor/TailscaleManager.swift
+      - path: PingMonitor/TailscaleTab.swift
+      - path: PingMonitor/ServicesTab.swift
     settings:
       base:
         INFOPLIST_FILE: PingMonitor/Info.plist

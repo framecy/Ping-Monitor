@@ -289,6 +289,45 @@ public final class LanguageManager: ObservableObject {
             "host_detail.display_rules": "Display Rules",
             "host_detail.enabled": "Enabled",
             "host_detail.disabled": "Disabled",
+            
+            // Tailscale
+            "sidebar.tailscale": "Tailscale",
+            "sidebar.services": "Services",
+            "tailscale.title": "Tailscale Network",
+            "tailscale.status": "Status",
+            "tailscale.connected": "Connected",
+            "tailscale.disconnected": "Disconnected",
+            "tailscale.my_ip": "My IP",
+            "tailscale.nodes": "Network Nodes",
+            "tailscale.refresh": "Refresh",
+            "tailscale.import": "Import",
+            "tailscale.import_all": "Import All Online",
+            "tailscale.online": "Online",
+            "tailscale.offline": "Offline",
+            "tailscale.self": "This Device",
+            "tailscale.already_monitored": "Monitored",
+            "tailscale.not_available": "Tailscale is not installed or not running",
+            "tailscale.loading": "Loading...",
+            
+            // Services
+            "services.title": "Service Shortcuts",
+            "services.add": "Add Shortcut",
+            "services.edit": "Edit Shortcut",
+            "services.empty": "No service shortcuts",
+            "services.empty_hint": "Add shortcuts in host details",
+            "services.name": "Name",
+            "services.url": "URL / Address",
+            "services.icon": "Icon",
+            "services.type": "Type",
+            "services.type.web": "Web",
+            "services.type.ssh": "SSH",
+            "services.type.custom": "Custom",
+            "services.open": "Open",
+            "services.host_services": "%@ Services",
+            
+            // Logs (additions)
+            "logs.title": "Logs",
+            "logs.empty": "No logs yet",
         ],
         .zh: [
             // Sidebar
@@ -542,6 +581,45 @@ public final class LanguageManager: ObservableObject {
             "host_detail.display_rules": "显示规则",
             "host_detail.enabled": "已启用",
             "host_detail.disabled": "已禁用",
+            
+            // Tailscale
+            "sidebar.tailscale": "Tailscale",
+            "sidebar.services": "服务",
+            "tailscale.title": "Tailscale 网络",
+            "tailscale.status": "状态",
+            "tailscale.connected": "已连接",
+            "tailscale.disconnected": "未连接",
+            "tailscale.my_ip": "本机 IP",
+            "tailscale.nodes": "网络节点",
+            "tailscale.refresh": "刷新",
+            "tailscale.import": "导入",
+            "tailscale.import_all": "导入全部在线节点",
+            "tailscale.online": "在线",
+            "tailscale.offline": "离线",
+            "tailscale.self": "本设备",
+            "tailscale.already_monitored": "监控中",
+            "tailscale.not_available": "Tailscale 未安装或未运行",
+            "tailscale.loading": "加载中...",
+            
+            // Services
+            "services.title": "服务快捷方式",
+            "services.add": "添加快捷方式",
+            "services.edit": "编辑快捷方式",
+            "services.empty": "暂无服务快捷方式",
+            "services.empty_hint": "在主机详情中添加快捷方式",
+            "services.name": "名称",
+            "services.url": "地址",
+            "services.icon": "图标",
+            "services.type": "类型",
+            "services.type.web": "网页",
+            "services.type.ssh": "SSH",
+            "services.type.custom": "自定义",
+            "services.open": "打开",
+            "services.host_services": "%@ 的服务",
+            
+            // Logs (additions)
+            "logs.title": "日志",
+            "logs.empty": "暂无日志",
         ]
     ]
 }

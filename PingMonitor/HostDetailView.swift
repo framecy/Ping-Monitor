@@ -7,6 +7,7 @@ struct HostDetailView: View {
     let onClose: () -> Void
     @ObservedObject private var languageManager = LanguageManager.shared
     @ObservedObject private var logManager = LogManager.shared
+    @State private var showShortcutEditor = false
     
     private var stats: HostStats? {
         viewModel.hostStats[host.id]
@@ -44,13 +45,25 @@ struct HostDetailView: View {
                         displayRulesCard
                     }
                     
-                    // Row 5: Logs
+                    // Row 5: Service Shortcuts
+                    serviceShortcutsCard
+                    
+                    // Row 6: Logs
                     logsCard
                 }
                 .padding()
             }
         }
         .background(Theme.Colors.background)
+        .sheet(isPresented: $showShortcutEditor) {
+            ShortcutEditorSheet { shortcut in
+                if let index = viewModel.hosts.firstIndex(where: { $0.id == host.id }) {
+                    viewModel.hosts[index].serviceShortcuts.append(shortcut)
+                    viewModel.saveSettings()
+                    LogManager.shared.info("Added shortcut: \(shortcut.name)", host: host.name)
+                }
+            }
+        }
     }
     
     // MARK: - Header
@@ -521,6 +534,127 @@ struct HostDetailView: View {
         if latency < 50 { return .green }
         if latency < 100 { return .orange }
         return .red
+    }
+    
+    // MARK: - Service Shortcuts Card
+    
+    private var serviceShortcutsCard: some View {
+        ModernCard {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Image(systemName: "square.grid.2x2.fill")
+                        .foregroundStyle(Theme.Colors.accentGreen)
+                    Text(languageManager.t("services.title"))
+                        .font(Theme.Fonts.display(14))
+                        .foregroundStyle(Theme.Colors.textPrimary)
+                    Spacer()
+                    
+                    Button(action: { showShortcutEditor = true }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "plus")
+                                .font(.system(size: 10, weight: .semibold))
+                            Text(languageManager.t("services.add"))
+                                .font(Theme.Fonts.body(11))
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Theme.Colors.accentGreen.opacity(0.15))
+                        .cornerRadius(6)
+                    }
+                    .buttonStyle(.plain)
+                }
+                
+                let shortcuts = currentHost?.serviceShortcuts ?? []
+                
+                if shortcuts.isEmpty {
+                    Text(languageManager.t("services.empty"))
+                        .font(Theme.Fonts.body(12))
+                        .foregroundStyle(Theme.Colors.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 16)
+                } else {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 10)], spacing: 10) {
+                        ForEach(shortcuts) { shortcut in
+                            Button(action: {
+                                openShortcut(shortcut)
+                            }) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: shortcut.icon)
+                                        .font(.system(size: 14))
+                                        .foregroundStyle(shortcutColor(for: shortcut.type))
+                                        .frame(width: 28, height: 28)
+                                        .background(shortcutColor(for: shortcut.type).opacity(0.12))
+                                        .cornerRadius(6)
+                                    
+                                    VStack(alignment: .leading, spacing: 1) {
+                                        Text(shortcut.name)
+                                            .font(Theme.Fonts.body(11))
+                                            .foregroundStyle(Theme.Colors.textPrimary)
+                                            .lineLimit(1)
+                                        Text(shortcut.type.rawValue.uppercased())
+                                            .font(.system(size: 8, weight: .bold))
+                                            .foregroundStyle(shortcutColor(for: shortcut.type))
+                                    }
+                                    
+                                    Spacer()
+                                    
+                                    Image(systemName: "arrow.up.right")
+                                        .font(.system(size: 9))
+                                        .foregroundStyle(Theme.Colors.textTertiary)
+                                }
+                                .padding(8)
+                                .background(Theme.Colors.cardBackground)
+                                .cornerRadius(8)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .contextMenu {
+                                Button(role: .destructive) {
+                                    if let hostIndex = viewModel.hosts.firstIndex(where: { $0.id == host.id }),
+                                       let sIndex = viewModel.hosts[hostIndex].serviceShortcuts.firstIndex(where: { $0.id == shortcut.id }) {
+                                        viewModel.hosts[hostIndex].serviceShortcuts.remove(at: sIndex)
+                                        viewModel.saveSettings()
+                                    }
+                                } label: {
+                                    Label(languageManager.t("menu.delete"), systemImage: "trash")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    private func shortcutColor(for type: ServiceShortcut.ServiceType) -> Color {
+        switch type {
+        case .web: return Theme.Colors.accentBlue
+        case .ssh: return Theme.Colors.accentGreen
+        case .custom: return Theme.Colors.accentOrange
+        }
+    }
+    
+    private func openShortcut(_ shortcut: ServiceShortcut) {
+        switch shortcut.type {
+        case .web:
+            if let url = URL(string: shortcut.url) {
+                NSWorkspace.shared.open(url)
+            }
+        case .ssh:
+            let script = "tell application \"Terminal\" to do script \"ssh \(shortcut.url)\""
+            if let appleScript = NSAppleScript(source: script) {
+                var error: NSDictionary?
+                appleScript.executeAndReturnError(&error)
+            }
+        case .custom:
+            if let url = URL(string: shortcut.url) {
+                NSWorkspace.shared.open(url)
+            }
+        }
+        LogManager.shared.info("Opened service: \(shortcut.name)", host: host.name)
     }
     
     // MARK: - Logs Card
