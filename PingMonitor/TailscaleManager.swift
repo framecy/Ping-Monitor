@@ -55,6 +55,32 @@ private struct TailscalePeer: Codable {
     let ExitNodeOption: Bool?
 }
 
+// MARK: - Netcheck Result Model
+
+struct NetcheckRegionLatency: Identifiable {
+    var id: String { regionName }
+    let regionCode: String
+    let regionName: String
+    let latency: Double  // milliseconds
+}
+
+private struct NetcheckResponse: Codable {
+    let UDP: Bool?
+    let IPv6: Bool?
+    let IPv4: Bool?
+    let MappingVariesByDestIP: Bool?  // Symmetric NAT indicator
+    let HairPinning: Bool?
+    let PreferredDERP: Int?
+    let RegionLatency: [String: Double]?  // regionID -> latency in nanoseconds
+    let RegionV4Latency: [String: Double]?
+    let UPnP: Bool?
+    let PMP: Bool?
+    let PCP: Bool?
+    let GlobalV4: String?
+    let GlobalV6: String?
+    let CaptivePortal: Bool?
+}
+
 // MARK: - Tailscale Manager
 
 @MainActor
@@ -69,6 +95,20 @@ class TailscaleManager: ObservableObject {
     @Published var nodes: [TailscaleNode] = []
     @Published var isLoading = false
     @Published var lastError: String?
+    
+    // Netcheck properties
+    @Published var netcheckLoading = false
+    @Published var natType: String = "—"
+    @Published var udpEnabled: Bool = false
+    @Published var ipv4Enabled: Bool = false
+    @Published var ipv6Enabled: Bool = false
+    @Published var hairPinning: Bool? = nil
+    @Published var upnp: Bool? = nil
+    @Published var preferredDERP: String = "—"
+    @Published var globalIPv4: String = "—"
+    @Published var globalIPv6: String = "—"
+    @Published var regionLatencies: [NetcheckRegionLatency] = []
+    @Published var captivePortal: Bool = false
     
     private var cliPath: String?
     
@@ -242,6 +282,104 @@ class TailscaleManager: ObservableObject {
         let onlineNodes = nodes.filter { $0.online && !$0.isSelf }
         for node in onlineNodes {
             importNode(node, into: viewModel)
+        }
+    }
+    
+    // MARK: - Netcheck
+    
+    private let derpRegionNames: [String: String] = [
+        "1": "New York", "2": "San Francisco", "3": "Singapore",
+        "4": "Frankfurt", "5": "Sydney", "6": "Bangalore",
+        "7": "Tokyo", "8": "London", "9": "Dallas",
+        "10": "Seattle", "11": "São Paulo", "12": "Toronto",
+        "13": "Johannesburg", "14": "Nairobi", "15": "Dubai",
+        "16": "Chicago", "17": "Hong Kong", "18": "Honolulu",
+        "19": "Warsaw", "20": "Paris", "21": "Madrid",
+        "22": "Amsterdam", "23": "Mumbai", "24": "Los Angeles",
+        "25": "Denver", "26": "Miami"
+    ]
+    
+    func fetchNetcheck() {
+        guard let cli = cliPath else { return }
+        
+        netcheckLoading = true
+        
+        Task.detached { [cli, derpRegionNames] in
+            let process = Process()
+            let pipe = Pipe()
+            let errPipe = Pipe()
+            process.executableURL = URL(fileURLWithPath: cli)
+            process.arguments = ["netcheck", "--format=json"]
+            process.standardOutput = pipe
+            process.standardError = errPipe
+            
+            do {
+                try process.run()
+                process.waitUntilExit()
+                
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                
+                guard process.terminationStatus == 0 else {
+                    await MainActor.run {
+                        self.netcheckLoading = false
+                    }
+                    return
+                }
+                
+                let decoder = JSONDecoder()
+                let result = try decoder.decode(NetcheckResponse.self, from: data)
+                
+                // Determine NAT type
+                let natType: String
+                if result.MappingVariesByDestIP == true {
+                    natType = "Symmetric NAT"
+                } else if result.HairPinning == true {
+                    natType = "Full Cone NAT"
+                } else if result.UDP == true {
+                    natType = "Easy NAT"
+                } else {
+                    natType = "Hard NAT"
+                }
+                
+                // Parse region latencies (nanoseconds → ms)
+                var latencies: [NetcheckRegionLatency] = []
+                if let regions = result.RegionLatency {
+                    for (regionId, nsLatency) in regions {
+                        let msLatency = nsLatency / 1_000_000.0  // ns to ms
+                        if msLatency > 0 {
+                            let name = derpRegionNames[regionId] ?? "DERP \(regionId)"
+                            latencies.append(NetcheckRegionLatency(
+                                regionCode: regionId,
+                                regionName: name,
+                                latency: msLatency
+                            ))
+                        }
+                    }
+                }
+                latencies.sort { $0.latency < $1.latency }
+                
+                let preferredDERP = derpRegionNames[String(result.PreferredDERP ?? 0)] ?? "DERP \(result.PreferredDERP ?? 0)"
+                
+                await MainActor.run {
+                    self.netcheckLoading = false
+                    self.natType = natType
+                    self.udpEnabled = result.UDP ?? false
+                    self.ipv4Enabled = result.IPv4 ?? false
+                    self.ipv6Enabled = result.IPv6 ?? false
+                    self.hairPinning = result.HairPinning
+                    self.upnp = result.UPnP
+                    self.preferredDERP = preferredDERP
+                    self.globalIPv4 = result.GlobalV4 ?? "—"
+                    self.globalIPv6 = result.GlobalV6 ?? "—"
+                    self.regionLatencies = latencies
+                    self.captivePortal = result.CaptivePortal ?? false
+                }
+                
+            } catch {
+                await MainActor.run {
+                    self.netcheckLoading = false
+                }
+            }
         }
     }
 }

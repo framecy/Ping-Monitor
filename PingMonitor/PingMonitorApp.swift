@@ -844,9 +844,14 @@ class PingMonitorViewModel: ObservableObject {
 struct ServiceShortcut: Codable, Identifiable {
     let id: UUID
     var name: String          // e.g. "Synology DSM"
-    var url: String           // e.g. "http://100.100.1.30:5000"
+    var url: String           // e.g. "http://100.100.1.30:5000" or host address for SSH
     var icon: String          // SF Symbol name, e.g. "globe"
     var type: ServiceType
+    
+    // SSH-specific fields
+    var sshUser: String = ""
+    var sshPort: Int = 22
+    var sshKeyPath: String = ""   // e.g. "~/.ssh/id_rsa"
 
     enum ServiceType: String, Codable, CaseIterable {
         case web = "web"
@@ -854,12 +859,33 @@ struct ServiceShortcut: Codable, Identifiable {
         case custom = "custom"
     }
 
-    init(name: String, url: String, icon: String = "globe", type: ServiceType = .web) {
+    init(name: String, url: String, icon: String = "globe", type: ServiceType = .web,
+         sshUser: String = "", sshPort: Int = 22, sshKeyPath: String = "") {
         self.id = UUID()
         self.name = name
         self.url = url
         self.icon = icon
         self.type = type
+        self.sshUser = sshUser
+        self.sshPort = sshPort
+        self.sshKeyPath = sshKeyPath
+    }
+    
+    /// Build the full SSH command string
+    var sshCommand: String {
+        var cmd = "ssh"
+        if sshPort != 22 {
+            cmd += " -p \(sshPort)"
+        }
+        if !sshKeyPath.isEmpty {
+            cmd += " -i \(sshKeyPath)"
+        }
+        if !sshUser.isEmpty {
+            cmd += " \(sshUser)@\(url)"
+        } else {
+            cmd += " \(url)"
+        }
+        return cmd
     }
 }
 

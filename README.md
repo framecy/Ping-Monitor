@@ -13,7 +13,7 @@
   <img src="https://img.shields.io/badge/platform-macOS%2014.0+-blue" alt="Platform">
   <img src="https://img.shields.io/badge/SwiftUI-6.0-orange" alt="SwiftUI">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/version-2.0.54-brightgreen" alt="Version">
+  <img src="https://img.shields.io/badge/version-2.0.55-brightgreen" alt="Version">
 </p>
 
 ---
@@ -222,6 +222,7 @@ AUTO_VERSION=false
 
 | 版本 | 构建 | 更新内容 |
 |------|------|---------|
+| v2.0.55 | r64 | **SSH 快捷方式增强**：支持配置用户名/端口/密钥路径，实时命令预览；**NAT 检测**：集成 `tailscale netcheck`，显示 NAT 类型/UDP/IPv4/IPv6/全局 IP/DERP 区域延迟图表；**小组件修复**：重构 `WidgetDataManager` 三级回退策略，禁用小组件沙箱确保数据同步 |
 | v2.0.54 | r63 | **Tailscale 集成**：自动发现私有网络节点并一键导入监控；**服务快捷方式**：为每个主机配置 Web/SSH/自定义快捷入口，全局服务面板汇总展示；**新增侧边栏模块**：Tailscale 面板与服务面板；完善中英文本地化 |
 | v2.0.53 | r62 | **UI 全面优化**：统计仪表盘引入极具质感的 3D 立体饼图，并运用严格风格的 Grid 网格布局重置了延迟排行榜；**设置页重构**：全面采用 `ModernCard` 与原生列表结合的卡片式分组设计；**审计与日志增强**：新增针对应用设置修改的操作审计跟踪，并在主机详情页提供了支持一键导出的单主机专项历史日志功能 |
 | v2.0.51 | r60 | **小组件深度优化**：重构 `WidgetDataManager` 实现可靠数据同步，修复“无数据”显示；**本地化增强**：全面支持中英文动态切换，覆盖小组件设置与系统菜单；**可视化升级**：优化 Dashboard 布局与趋势图平滑度；**路由追踪改进**：增强 Traceroute/MTR 稳定性 |

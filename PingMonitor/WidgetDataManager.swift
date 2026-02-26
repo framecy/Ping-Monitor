@@ -1,4 +1,5 @@
 import Foundation
+import WidgetKit
 
 struct WidgetData: Codable {
     enum DisplayMode: String, Codable {
@@ -19,77 +20,131 @@ struct WidgetData: Codable {
     let entries: [HostStatus]
     let lastUpdated: Date
     
-    // Debug info to show on Widget if something goes wrong
     var debugMessage: String?
-    
-    // Legacy support / Single host compatibility (optional, but good for safety)
     var primaryHost: HostStatus? { entries.first }
 }
 
 struct WidgetDataManager {
     static let shared = WidgetDataManager()
     
-    // Path to the Widget's container Documents directory.
-    // Since the Main App is not sandboxed, it can write here.
-    // The Widget is sandboxed, so it can read/write here (its own container).
-    private var dataFileURL: URL? {
-        let fileManager = FileManager.default
-        
-        // Check if we are running in the Main App or the Widget Extension
+    private let appGroupID = "group.com.pingmonitor.shared"
+    private let userDefaultsKey = "widget_data_json"
+    
+    // MARK: - Primary: UserDefaults (suiteName) via App Group
+    // This works when App Groups are properly configured with a valid Team ID.
+    
+    private var sharedDefaults: UserDefaults? {
+        UserDefaults(suiteName: appGroupID)
+    }
+    
+    // MARK: - Fallback: Direct file in widget container
+    // Main app (non-sandboxed) writes to widget's sandbox container.
+    // Widget (sandboxed) reads from its own Documents.
+    
+    private var fileURL: URL? {
+        let fm = FileManager.default
         if let bundleID = Bundle.main.bundleIdentifier, bundleID == "com.pingmonitor.app.widget" {
-            // Widget Context (Sandboxed): Use local Documents directory
-            return fileManager.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("widget_data.json")
+            // Widget reads from its own Documents
+            return fm.urls(for: .documentDirectory, in: .userDomainMask).first?
+                .appendingPathComponent("widget_data.json")
         } else {
-            // Main App Context (Non-Sandboxed): Write to the Widget's Container
-            let home = fileManager.homeDirectoryForCurrentUser
-            return home.appendingPathComponent("Library/Containers/com.pingmonitor.app.widget/Data/Documents/widget_data.json")
+            // Main app writes to widget's container
+            let home = fm.homeDirectoryForCurrentUser
+            return home.appendingPathComponent(
+                "Library/Containers/com.pingmonitor.app.widget/Data/Documents/widget_data.json"
+            )
         }
     }
+    
+    // MARK: - Secondary fallback: Shared temp location
+    // If the widget container doesn't exist yet, use a shared temp folder
+    
+    private var sharedFileURL: URL {
+        let fm = FileManager.default
+        let sharedDir = fm.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support/PingMonitor")
+        try? fm.createDirectory(at: sharedDir, withIntermediateDirectories: true)
+        return sharedDir.appendingPathComponent("widget_data.json")
+    }
+    
+    // MARK: - Save
     
     func save(_ data: WidgetData) {
-        guard let url = dataFileURL else { return }
-        do {
-            // Ensure directory exists
-            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-            
-            let encoder = JSONEncoder()
-            let jsonData = try encoder.encode(data)
-            try jsonData.write(to: url)
-            
-            // Only log if in Main App (LogManager might not be available/safe in Widget)
-            if Bundle.main.bundleIdentifier != "com.pingmonitor.app.widget" {
-                 print("WidgetDataManager: Saved to \(url.path)") // Will show in system logs
-            }
-        } catch {
-             print("WidgetDataManager: Failed to save: \(error)")
-        }
-    }
-    
-    func load() -> WidgetData? {
-        // If URL resolution fails, return a debug object immediately
-        guard let url = dataFileURL else {
-            return WidgetData(
-                displayMode: .auto,
-                title: "Path Error",
-                entries: [],
-                lastUpdated: Date(),
-                debugMessage: "Err: dataFileURL is nil\nBundle: \(Bundle.main.bundleIdentifier ?? "nil")"
-            )
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .secondsSince1970
+        
+        guard let jsonData = try? encoder.encode(data) else {
+            print("WidgetDataManager: Failed to encode data")
+            return
         }
         
-        do {
-            let data = try Data(contentsOf: url)
-            let decoder = JSONDecoder()
-            return try decoder.decode(WidgetData.self, from: data)
-        } catch {
-            // Return a dummy object with the error and path for debugging
-            return WidgetData(
-                displayMode: .auto,
-                title: "Load Failed",
-                entries: [],
-                lastUpdated: Date(),
-                debugMessage: "Err: \(error.localizedDescription)\nPath: \(url.path)"
-            )
+        let jsonString = String(data: jsonData, encoding: .utf8)
+        
+        // Strategy 1: App Group UserDefaults (most reliable when configured)
+        if let defaults = sharedDefaults {
+            defaults.set(jsonString, forKey: userDefaultsKey)
+            defaults.synchronize()
         }
+        
+        // Strategy 2: Direct file to widget container
+        if let url = fileURL {
+            do {
+                try FileManager.default.createDirectory(
+                    at: url.deletingLastPathComponent(),
+                    withIntermediateDirectories: true
+                )
+                try jsonData.write(to: url, options: .atomic)
+            } catch {
+                // Container doesn't exist yet — fall through to Strategy 3
+                print("WidgetDataManager: Container write failed: \(error.localizedDescription)")
+            }
+        }
+        
+        // Strategy 3: Shared Application Support location (always writable)
+        do {
+            try jsonData.write(to: sharedFileURL, options: .atomic)
+        } catch {
+            print("WidgetDataManager: Shared file write failed: \(error.localizedDescription)")
+        }
+        
+        // Trigger widget timeline refresh
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+    
+    // MARK: - Load
+    
+    func load() -> WidgetData? {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .secondsSince1970
+        
+        // Strategy 1: App Group UserDefaults
+        if let defaults = sharedDefaults,
+           let jsonString = defaults.string(forKey: userDefaultsKey),
+           let jsonData = jsonString.data(using: .utf8),
+           let data = try? decoder.decode(WidgetData.self, from: jsonData) {
+            return data
+        }
+        
+        // Strategy 2: Direct file (widget's own Documents)
+        if let url = fileURL,
+           let jsonData = try? Data(contentsOf: url),
+           let data = try? decoder.decode(WidgetData.self, from: jsonData) {
+            return data
+        }
+        
+        // Strategy 3: Shared Application Support location
+        if let jsonData = try? Data(contentsOf: sharedFileURL),
+           let data = try? decoder.decode(WidgetData.self, from: jsonData) {
+            return data
+        }
+        
+        // Nothing found
+        return WidgetData(
+            displayMode: .auto,
+            title: "No Data",
+            entries: [],
+            lastUpdated: Date(),
+            debugMessage: "No data found. Bundle: \(Bundle.main.bundleIdentifier ?? "nil")"
+        )
     }
 }

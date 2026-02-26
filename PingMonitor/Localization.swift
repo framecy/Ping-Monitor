@@ -308,6 +308,11 @@ public final class LanguageManager: ObservableObject {
             "tailscale.already_monitored": "Monitored",
             "tailscale.not_available": "Tailscale is not installed or not running",
             "tailscale.loading": "Loading...",
+            "tailscale.netcheck": "Network Check",
+            "tailscale.nat_type": "NAT Type",
+            "tailscale.preferred_derp": "Preferred DERP",
+            "tailscale.derp_latency": "DERP Region Latency",
+            "tailscale.captive_portal": "No Portal",
             
             // Services
             "services.title": "Service Shortcuts",
@@ -324,6 +329,12 @@ public final class LanguageManager: ObservableObject {
             "services.type.custom": "Custom",
             "services.open": "Open",
             "services.host_services": "%@ Services",
+            "services.ssh.host": "Host Address",
+            "services.ssh.user": "Username",
+            "services.ssh.port": "Port",
+            "services.ssh.key": "Key Path",
+            "services.ssh.key_optional": "optional",
+            "services.ssh.preview": "Command Preview",
             
             // Logs (additions)
             "logs.title": "Logs",
@@ -600,6 +611,11 @@ public final class LanguageManager: ObservableObject {
             "tailscale.already_monitored": "监控中",
             "tailscale.not_available": "Tailscale 未安装或未运行",
             "tailscale.loading": "加载中...",
+            "tailscale.netcheck": "网络检测",
+            "tailscale.nat_type": "NAT 类型",
+            "tailscale.preferred_derp": "首选 DERP",
+            "tailscale.derp_latency": "DERP 区域延迟",
+            "tailscale.captive_portal": "无强制门户",
             
             // Services
             "services.title": "服务快捷方式",
@@ -616,6 +632,12 @@ public final class LanguageManager: ObservableObject {
             "services.type.custom": "自定义",
             "services.open": "打开",
             "services.host_services": "%@ 的服务",
+            "services.ssh.host": "主机地址",
+            "services.ssh.user": "用户名",
+            "services.ssh.port": "端口",
+            "services.ssh.key": "密钥路径",
+            "services.ssh.key_optional": "可选",
+            "services.ssh.preview": "命令预览",
             
             // Logs (additions)
             "logs.title": "日志",

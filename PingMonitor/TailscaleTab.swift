@@ -13,6 +13,14 @@ struct TailscaleTab: View {
                 // Status Card
                 statusCard
                 
+                // NAT / Netcheck Card
+                netcheckCard
+                
+                // DERP Region Latency
+                if !tailscale.regionLatencies.isEmpty {
+                    derpLatencyCard
+                }
+                
                 // Nodes List
                 nodesCard
             }
@@ -21,6 +29,7 @@ struct TailscaleTab: View {
         .background(Theme.Colors.background)
         .onAppear {
             tailscale.fetchStatus()
+            tailscale.fetchNetcheck()
         }
     }
     
@@ -32,7 +41,10 @@ struct TailscaleTab: View {
                 HStack {
                     SectionHeader(title: languageManager.t("tailscale.title"), icon: "network")
                     Spacer()
-                    Button(action: { tailscale.fetchStatus() }) {
+                    Button(action: {
+                        tailscale.fetchStatus()
+                        tailscale.fetchNetcheck()
+                    }) {
                         HStack(spacing: 4) {
                             if tailscale.isLoading {
                                 ProgressView()
@@ -59,7 +71,6 @@ struct TailscaleTab: View {
                 }
                 
                 HStack(spacing: 24) {
-                    // Status
                     VStack(alignment: .leading, spacing: 4) {
                         Text(languageManager.t("tailscale.status"))
                             .font(Theme.Fonts.body(10))
@@ -76,7 +87,6 @@ struct TailscaleTab: View {
                     
                     Divider().frame(height: 30).opacity(0.3)
                     
-                    // My IP
                     VStack(alignment: .leading, spacing: 4) {
                         Text(languageManager.t("tailscale.my_ip"))
                             .font(Theme.Fonts.body(10))
@@ -88,7 +98,6 @@ struct TailscaleTab: View {
                     
                     Divider().frame(height: 30).opacity(0.3)
                     
-                    // Node count
                     VStack(alignment: .leading, spacing: 4) {
                         Text(languageManager.t("tailscale.nodes"))
                             .font(Theme.Fonts.body(10))
@@ -111,6 +120,169 @@ struct TailscaleTab: View {
                 }
             }
         }
+    }
+    
+    // MARK: - Netcheck Card
+    
+    private var netcheckCard: some View {
+        ModernCard {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack {
+                    SectionHeader(title: languageManager.t("tailscale.netcheck"), icon: "shield.checkered")
+                    Spacer()
+                    if tailscale.netcheckLoading {
+                        ProgressView()
+                            .controlSize(.small)
+                            .scaleEffect(0.7)
+                    }
+                }
+                
+                // NAT Type (prominent)
+                HStack(spacing: 12) {
+                    Image(systemName: natIcon)
+                        .font(.system(size: 22))
+                        .foregroundStyle(natColor)
+                        .frame(width: 36, height: 36)
+                        .background(natColor.opacity(0.12))
+                        .cornerRadius(8)
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(languageManager.t("tailscale.nat_type"))
+                            .font(Theme.Fonts.body(10))
+                            .foregroundStyle(Theme.Colors.textSecondary)
+                        Text(tailscale.natType)
+                            .font(Theme.Fonts.display(16))
+                            .foregroundStyle(natColor)
+                    }
+                    
+                    Spacer()
+                    
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(languageManager.t("tailscale.preferred_derp"))
+                            .font(Theme.Fonts.body(10))
+                            .foregroundStyle(Theme.Colors.textSecondary)
+                        Text(tailscale.preferredDERP)
+                            .font(Theme.Fonts.display(14))
+                            .foregroundStyle(Theme.Colors.accentBlue)
+                    }
+                }
+                
+                Divider().opacity(0.2)
+                
+                // Protocol indicators
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
+                    protocolBadge(label: "UDP", enabled: tailscale.udpEnabled)
+                    protocolBadge(label: "IPv4", enabled: tailscale.ipv4Enabled)
+                    protocolBadge(label: "IPv6", enabled: tailscale.ipv6Enabled)
+                    protocolBadge(label: "UPnP", enabled: tailscale.upnp ?? false)
+                    protocolBadge(label: "Hairpin", enabled: tailscale.hairPinning ?? false)
+                    protocolBadge(label: languageManager.t("tailscale.captive_portal"), enabled: !tailscale.captivePortal, invertColor: true)
+                }
+                
+                // Global IPs
+                if tailscale.globalIPv4 != "—" || tailscale.globalIPv6 != "—" {
+                    Divider().opacity(0.2)
+                    HStack(spacing: 20) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Global IPv4")
+                                .font(Theme.Fonts.body(10))
+                                .foregroundStyle(Theme.Colors.textSecondary)
+                            Text(tailscale.globalIPv4)
+                                .font(.system(size: 12, design: .monospaced))
+                                .foregroundStyle(Theme.Colors.textPrimary)
+                        }
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Global IPv6")
+                                .font(Theme.Fonts.body(10))
+                                .foregroundStyle(Theme.Colors.textSecondary)
+                            Text(tailscale.globalIPv6)
+                                .font(.system(size: 12, design: .monospaced))
+                                .foregroundStyle(Theme.Colors.textPrimary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                        Spacer()
+                    }
+                }
+            }
+        }
+    }
+    
+    // MARK: - DERP Latency Card
+    
+    private var derpLatencyCard: some View {
+        ModernCard {
+            VStack(alignment: .leading, spacing: 12) {
+                SectionHeader(title: languageManager.t("tailscale.derp_latency"), icon: "globe.americas.fill")
+                
+                ForEach(tailscale.regionLatencies.prefix(10)) { region in
+                    HStack(spacing: 10) {
+                        Text(region.regionName)
+                            .font(Theme.Fonts.body(12))
+                            .foregroundStyle(Theme.Colors.textPrimary)
+                            .frame(width: 120, alignment: .leading)
+                        
+                        GeometryReader { geo in
+                            let maxLatency = tailscale.regionLatencies.map(\.latency).max() ?? 1
+                            let ratio = min(region.latency / maxLatency, 1.0)
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(latencyBarColor(region.latency))
+                                .frame(width: max(geo.size.width * ratio, 4))
+                        }
+                        .frame(height: 8)
+                        
+                        Text(String(format: "%.0fms", region.latency))
+                            .font(.system(size: 11, weight: .medium, design: .monospaced))
+                            .foregroundStyle(latencyBarColor(region.latency))
+                            .frame(width: 55, alignment: .trailing)
+                    }
+                    .frame(height: 20)
+                }
+            }
+        }
+    }
+    
+    // MARK: - Helpers
+    
+    private func protocolBadge(label: String, enabled: Bool, invertColor: Bool = false) -> some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(invertColor ? (enabled ? Color.green : Color.red) : (enabled ? Color.green : Color.red.opacity(0.5)))
+                .frame(width: 6, height: 6)
+            Text(label)
+                .font(Theme.Fonts.body(11))
+                .foregroundStyle(Theme.Colors.textPrimary)
+            Spacer()
+            Text(enabled ? "✓" : "✗")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(enabled ? Color.green : Color.red.opacity(0.6))
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Theme.Colors.cardBackground)
+        .cornerRadius(6)
+    }
+    
+    private var natIcon: String {
+        switch tailscale.natType {
+        case "Easy NAT", "Full Cone NAT": return "checkmark.shield.fill"
+        case "Symmetric NAT": return "exclamationmark.shield.fill"
+        default: return "xmark.shield.fill"
+        }
+    }
+    
+    private var natColor: Color {
+        switch tailscale.natType {
+        case "Easy NAT", "Full Cone NAT": return .green
+        case "Symmetric NAT": return Theme.Colors.accentOrange
+        default: return .red
+        }
+    }
+    
+    private func latencyBarColor(_ ms: Double) -> Color {
+        if ms < 50 { return .green }
+        if ms < 150 { return Theme.Colors.accentOrange }
+        return .red
     }
     
     // MARK: - Nodes Card
@@ -172,7 +344,6 @@ struct TailscaleTab: View {
         let isMonitored = viewModel.hosts.contains(where: { $0.address == node.tailscaleIP })
         
         return HStack(spacing: 12) {
-            // OS Icon
             Image(systemName: node.osIcon)
                 .font(.system(size: 16))
                 .foregroundStyle(node.online ? Theme.Colors.accentBlue : Theme.Colors.textTertiary)
@@ -202,7 +373,6 @@ struct TailscaleTab: View {
             
             Spacer()
             
-            // Online indicator
             HStack(spacing: 4) {
                 Circle()
                     .fill(node.online ? Color.green : Color.red.opacity(0.5))
@@ -213,7 +383,6 @@ struct TailscaleTab: View {
             }
             .frame(width: 60)
             
-            // Import button
             if !node.isSelf {
                 if isMonitored {
                     Text(languageManager.t("tailscale.already_monitored"))

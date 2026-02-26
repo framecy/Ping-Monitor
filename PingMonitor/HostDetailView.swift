@@ -56,7 +56,7 @@ struct HostDetailView: View {
         }
         .background(Theme.Colors.background)
         .sheet(isPresented: $showShortcutEditor) {
-            ShortcutEditorSheet { shortcut in
+            ShortcutEditorSheet(hostAddress: host.address) { shortcut in
                 if let index = viewModel.hosts.firstIndex(where: { $0.id == host.id }) {
                     viewModel.hosts[index].serviceShortcuts.append(shortcut)
                     viewModel.saveSettings()
@@ -644,11 +644,13 @@ struct HostDetailView: View {
                 NSWorkspace.shared.open(url)
             }
         case .ssh:
-            let script = "tell application \"Terminal\" to do script \"ssh \(shortcut.url)\""
+            let sshCmd = shortcut.sshCommand
+            let script = "tell application \"Terminal\" to do script \"\(sshCmd)\""
             if let appleScript = NSAppleScript(source: script) {
                 var error: NSDictionary?
                 appleScript.executeAndReturnError(&error)
             }
+            NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app"))
         case .custom:
             if let url = URL(string: shortcut.url) {
                 NSWorkspace.shared.open(url)

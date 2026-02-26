@@ -135,11 +135,13 @@ struct ServicesTab: View {
                 NSWorkspace.shared.open(url)
             }
         case .ssh:
-            let script = "tell application \"Terminal\" to do script \"ssh \(shortcut.url)\""
+            let sshCmd = shortcut.sshCommand
+            let script = "tell application \"Terminal\" to do script \"\(sshCmd)\""
             if let appleScript = NSAppleScript(source: script) {
                 var error: NSDictionary?
                 appleScript.executeAndReturnError(&error)
             }
+            NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app"))
         case .custom:
             if let url = URL(string: shortcut.url) {
                 NSWorkspace.shared.open(url)
@@ -154,6 +156,7 @@ struct ServicesTab: View {
 struct ShortcutEditorSheet: View {
     @ObservedObject private var languageManager = LanguageManager.shared
     let existingShortcut: ServiceShortcut?
+    let hostAddress: String?
     let onSave: (ServiceShortcut) -> Void
     @Environment(\.dismiss) private var dismiss
     
@@ -161,6 +164,9 @@ struct ShortcutEditorSheet: View {
     @State private var url: String = ""
     @State private var icon: String = "globe"
     @State private var type: ServiceShortcut.ServiceType = .web
+    @State private var sshUser: String = ""
+    @State private var sshPort: String = "22"
+    @State private var sshKeyPath: String = ""
     
     private let iconOptions = [
         "globe", "network", "server.rack", "desktopcomputer",
@@ -170,8 +176,9 @@ struct ShortcutEditorSheet: View {
         "terminal.fill", "cloud.fill", "gear"
     ]
     
-    init(existingShortcut: ServiceShortcut? = nil, onSave: @escaping (ServiceShortcut) -> Void) {
+    init(existingShortcut: ServiceShortcut? = nil, hostAddress: String? = nil, onSave: @escaping (ServiceShortcut) -> Void) {
         self.existingShortcut = existingShortcut
+        self.hostAddress = hostAddress
         self.onSave = onSave
     }
     
@@ -183,25 +190,7 @@ struct ShortcutEditorSheet: View {
                 .foregroundStyle(Theme.Colors.textPrimary)
             
             VStack(alignment: .leading, spacing: 14) {
-                // Name
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(languageManager.t("services.name"))
-                        .font(Theme.Fonts.body(11))
-                        .foregroundStyle(Theme.Colors.textSecondary)
-                    TextField("Synology DSM", text: $name)
-                        .textFieldStyle(.roundedBorder)
-                }
-                
-                // URL
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(languageManager.t("services.url"))
-                        .font(Theme.Fonts.body(11))
-                        .foregroundStyle(Theme.Colors.textSecondary)
-                    TextField("http://100.100.1.30:5000", text: $url)
-                        .textFieldStyle(.roundedBorder)
-                }
-                
-                // Type
+                // Type (moved to top so form adapts)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(languageManager.t("services.type"))
                         .font(Theme.Fonts.body(11))
@@ -212,6 +201,82 @@ struct ShortcutEditorSheet: View {
                         Text(languageManager.t("services.type.custom")).tag(ServiceShortcut.ServiceType.custom)
                     }
                     .pickerStyle(.segmented)
+                    .onChange(of: type) { _, newType in
+                        // Auto-set icon and defaults when switching type
+                        if newType == .ssh {
+                            icon = "terminal.fill"
+                            if url.isEmpty, let addr = hostAddress {
+                                url = addr
+                            }
+                        } else if newType == .web {
+                            icon = "globe"
+                        }
+                    }
+                }
+                
+                // Name
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(languageManager.t("services.name"))
+                        .font(Theme.Fonts.body(11))
+                        .foregroundStyle(Theme.Colors.textSecondary)
+                    TextField(type == .ssh ? "My Server SSH" : "Synology DSM", text: $name)
+                        .textFieldStyle(.roundedBorder)
+                }
+                
+                // URL / Host
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(type == .ssh ? languageManager.t("services.ssh.host") : languageManager.t("services.url"))
+                        .font(Theme.Fonts.body(11))
+                        .foregroundStyle(Theme.Colors.textSecondary)
+                    TextField(type == .ssh ? "100.100.1.30" : "http://100.100.1.30:5000", text: $url)
+                        .textFieldStyle(.roundedBorder)
+                }
+                
+                // SSH-specific fields
+                if type == .ssh {
+                    HStack(spacing: 12) {
+                        // Username
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(languageManager.t("services.ssh.user"))
+                                .font(Theme.Fonts.body(11))
+                                .foregroundStyle(Theme.Colors.textSecondary)
+                            TextField("root", text: $sshUser)
+                                .textFieldStyle(.roundedBorder)
+                        }
+                        
+                        // Port
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(languageManager.t("services.ssh.port"))
+                                .font(Theme.Fonts.body(11))
+                                .foregroundStyle(Theme.Colors.textSecondary)
+                            TextField("22", text: $sshPort)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(width: 70)
+                        }
+                    }
+                    
+                    // Key Path
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(languageManager.t("services.ssh.key"))
+                            .font(Theme.Fonts.body(11))
+                            .foregroundStyle(Theme.Colors.textSecondary)
+                        TextField("~/.ssh/id_rsa (\(languageManager.t("services.ssh.key_optional")))", text: $sshKeyPath)
+                            .textFieldStyle(.roundedBorder)
+                    }
+                    
+                    // Preview
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(languageManager.t("services.ssh.preview"))
+                            .font(Theme.Fonts.body(11))
+                            .foregroundStyle(Theme.Colors.textSecondary)
+                        Text(previewSSHCommand)
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundStyle(Theme.Colors.accentGreen)
+                            .padding(8)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color.black.opacity(0.3))
+                            .cornerRadius(6)
+                    }
                 }
                 
                 // Icon
@@ -244,7 +309,11 @@ struct ShortcutEditorSheet: View {
                     .keyboardShortcut(.cancelAction)
                 Spacer()
                 Button(languageManager.t("common.save")) {
-                    let shortcut = ServiceShortcut(name: name, url: url, icon: icon, type: type)
+                    let port = Int(sshPort) ?? 22
+                    let shortcut = ServiceShortcut(
+                        name: name, url: url, icon: icon, type: type,
+                        sshUser: sshUser, sshPort: port, sshKeyPath: sshKeyPath
+                    )
                     onSave(shortcut)
                     dismiss()
                 }
@@ -253,14 +322,31 @@ struct ShortcutEditorSheet: View {
             }
         }
         .padding(24)
-        .frame(width: 400)
+        .frame(width: 420)
         .onAppear {
             if let s = existingShortcut {
                 name = s.name
                 url = s.url
                 icon = s.icon
                 type = s.type
+                sshUser = s.sshUser
+                sshPort = String(s.sshPort)
+                sshKeyPath = s.sshKeyPath
             }
         }
     }
+    
+    private var previewSSHCommand: String {
+        var cmd = "ssh"
+        let port = Int(sshPort) ?? 22
+        if port != 22 { cmd += " -p \(port)" }
+        if !sshKeyPath.isEmpty { cmd += " -i \(sshKeyPath)" }
+        if !sshUser.isEmpty {
+            cmd += " \(sshUser)@\(url.isEmpty ? "host" : url)"
+        } else {
+            cmd += " \(url.isEmpty ? "host" : url)"
+        }
+        return cmd
+    }
 }
+

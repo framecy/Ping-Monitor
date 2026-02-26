@@ -8,8 +8,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "6.0"
-    MARKETING_VERSION: "2.0.54"
-    CURRENT_PROJECT_VERSION: "63"
+    MARKETING_VERSION: "2.0.55"
+    CURRENT_PROJECT_VERSION: "64"
 
 targets:
   PingMonitor:
@@ -36,6 +36,7 @@ targets:
     entitlements:
       path: PingMonitor/PingMonitor.entitlements
       properties:
+        # App Groups require a valid DEVELOPMENT_TEAM
         # com.apple.security.application-groups:
         #   - group.com.pingmonitor.shared
     dependencies:
@@ -61,6 +62,8 @@ targets:
     entitlements:
       path: PingMonitorWidget/PingMonitorWidget.entitlements
       properties:
+        # App Groups require a valid DEVELOPMENT_TEAM
         # com.apple.security.application-groups:
         #   - group.com.pingmonitor.shared
-        com.apple.security.app-sandbox: true
+        # Sandbox disabled: allows shared file access without App Groups
+        com.apple.security.app-sandbox: false
