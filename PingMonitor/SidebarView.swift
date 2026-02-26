@@ -33,6 +33,7 @@ struct SidebarView: View {
                     SidebarRow(item: .monitor, selectedItem: $selectedItem, icon: SidebarItem.monitor.icon, title: SidebarItem.monitor.title)
                     SidebarRow(item: .statistics, selectedItem: $selectedItem, icon: SidebarItem.statistics.icon, title: SidebarItem.statistics.title)
                     SidebarRow(item: .traceroute, selectedItem: $selectedItem, icon: SidebarItem.traceroute.icon, title: SidebarItem.traceroute.title)
+                    SidebarRow(item: .netspeed, selectedItem: $selectedItem, icon: SidebarItem.netspeed.icon, title: SidebarItem.netspeed.title)
                     
                     if TailscaleManager.shared.isAvailable {
                         SidebarRow(item: .tailscale, selectedItem: $selectedItem, icon: SidebarItem.tailscale.icon, title: SidebarItem.tailscale.title)

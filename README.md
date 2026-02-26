@@ -13,7 +13,7 @@
   <img src="https://img.shields.io/badge/platform-macOS%2014.0+-blue" alt="Platform">
   <img src="https://img.shields.io/badge/SwiftUI-6.0-orange" alt="SwiftUI">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/version-2.0.55-brightgreen" alt="Version">
+  <img src="https://img.shields.io/badge/version-2.1.0-brightgreen" alt="Version">
 </p>
 
 ---
@@ -22,7 +22,7 @@
 
 ### 🖥 侧边栏导航
 
-原生 macOS `NavigationSplitView` 侧边栏，配合 SF Symbols 图标，快速切换五大模块：监控、统计、主机管理、日志、设置。
+原生 macOS `NavigationSplitView` 侧边栏，配合 SF Symbols 图标，快速切换六大模块：监控、统计、网速、追踪、主机管理、服务快捷、历史日志。
 
 ### 📡 多主机监控
 
@@ -97,7 +97,14 @@
 - **自动节点发现** — 自动检测 Tailscale CLI，一键读取私有网络中所有设备
 - **智能导入** — 将 Tailscale 节点导入为监控主机，支持单台或批量导入
 - **状态面板** — 实时显示 Tailscale 连接状态、本机 IP、网络节点在线情况
-- **优雅降级** — 未安装 Tailscale 时自动隐藏相关面板
+
+### 🚀 统一服务快捷与网速监控
+
+- **实时网速监控** — 上传/下载速度追踪，支持按应用/网卡分类（60秒动态折线图）
+- **多接口数据统计** — 一键切换全部网卡与单张网卡，显示包量与错误率
+- **服务快捷面板** — 统一管理所有主机的 Web/SSH 服务跳转
+- **SSH 密码与密钥认证** — 支持自定义端口与自动登录模式
+- **开机自启动** — 保留数据设置并在应用重启时自动恢复运行状态
 
 ### 🚀 服务快捷方式
 

@@ -344,6 +344,18 @@ public final class LanguageManager: ObservableObject {
             "services.open": "Open",
             "services.ssh.preview": "Command Preview",
             
+            // Network Speed
+            "sidebar.netspeed": "Net Speed",
+            "netspeed.title": "Real-time Network Speed",
+            "netspeed.upload": "Upload",
+            "netspeed.download": "Download",
+            "netspeed.all_interfaces": "All Interfaces",
+            "netspeed.realtime_chart": "Real-time Chart",
+            "netspeed.collecting": "Collecting data...",
+            "netspeed.last_60s": "Last 60s",
+            "netspeed.interfaces": "Network Interfaces",
+            "netspeed.no_interfaces": "No interfaces detected",
+            
             // Logs (additions)
             "logs.title": "Logs",
             "logs.empty": "No logs yet",
@@ -654,6 +666,18 @@ public final class LanguageManager: ObservableObject {
             "services.ssh.password_hint": "输入密码",
             "services.open": "打开",
             "services.ssh.preview": "命令预览",
+            
+            // Network Speed
+            "sidebar.netspeed": "网速",
+            "netspeed.title": "实时网速监控",
+            "netspeed.upload": "上传速度",
+            "netspeed.download": "下载速度",
+            "netspeed.all_interfaces": "所有接口",
+            "netspeed.realtime_chart": "实时图表",
+            "netspeed.collecting": "采集数据中...",
+            "netspeed.last_60s": "近 60 秒",
+            "netspeed.interfaces": "网络接口",
+            "netspeed.no_interfaces": "未检测到接口",
             
             // Logs (additions)
             "logs.title": "日志",

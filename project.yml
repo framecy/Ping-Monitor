@@ -8,8 +8,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "6.0"
-    MARKETING_VERSION: "2.0.57"
-    CURRENT_PROJECT_VERSION: "66"
+    MARKETING_VERSION: "2.1.0"
+    CURRENT_PROJECT_VERSION: "68"
 
 targets:
   PingMonitor:
@@ -24,6 +24,8 @@ targets:
       - path: PingMonitor/TailscaleManager.swift
       - path: PingMonitor/TailscaleTab.swift
       - path: PingMonitor/ServicesTab.swift
+      - path: PingMonitor/NetworkSpeedManager.swift
+      - path: PingMonitor/NetworkSpeedTab.swift
     settings:
       base:
         INFOPLIST_FILE: PingMonitor/Info.plist

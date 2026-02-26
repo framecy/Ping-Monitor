@@ -7,6 +7,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
     case monitor
     case statistics
     case traceroute
+    case netspeed
     case tailscale
     case services
     case hosts
@@ -20,6 +21,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .monitor: return LanguageManager.shared.t("sidebar.monitor")
         case .statistics: return LanguageManager.shared.t("sidebar.dashboard")
         case .traceroute: return LanguageManager.shared.t("sidebar.traceroute")
+        case .netspeed: return LanguageManager.shared.t("sidebar.netspeed")
         case .tailscale: return LanguageManager.shared.t("sidebar.tailscale")
         case .services: return LanguageManager.shared.t("sidebar.services")
         case .hosts: return LanguageManager.shared.t("sidebar.hosts")
@@ -33,6 +35,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .monitor: return "waveform.path.ecg"
         case .statistics: return "chart.bar.fill"
         case .traceroute: return "point.topleft.down.to.point.bottomright.curvepath"
+        case .netspeed: return "chart.line.uptrend.xyaxis"
         case .tailscale: return "network"
         case .services: return "square.grid.2x2.fill"
         case .hosts: return "server.rack"
@@ -46,6 +49,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .monitor: return .green
         case .statistics: return .blue
         case .traceroute: return .cyan
+        case .netspeed: return .teal
         case .tailscale: return .indigo
         case .services: return .mint
         case .hosts: return .purple
@@ -95,6 +99,8 @@ struct MainView: View {
             DashboardView(viewModel: viewModel)
         case .traceroute:
             TracerouteView(viewModel: viewModel)
+        case .netspeed:
+            NetworkSpeedTab(viewModel: viewModel)
         case .tailscale:
             TailscaleTab(viewModel: viewModel)
         case .services:

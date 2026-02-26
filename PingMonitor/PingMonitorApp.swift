@@ -232,7 +232,7 @@ class PingMonitorViewModel: ObservableObject {
     
     var statusBarController: StatusBarController?
     private var pingProcesses: [UUID: Process] = [:]
-    private let defaults = UserDefaults(suiteName: "group.com.pingmonitor.shared") ?? UserDefaults.standard
+    private let defaults = UserDefaults.standard
 
     init() {
         loadSettings()
@@ -879,6 +879,26 @@ struct ServiceShortcut: Codable, Identifiable {
         self.sshAuthMode = sshAuthMode
         self.sshKeyPath = sshKeyPath
         self.sshPassword = sshPassword
+    }
+    
+    // Custom decoder for backward compatibility with older saved data
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        url = try container.decode(String.self, forKey: .url)
+        icon = try container.decode(String.self, forKey: .icon)
+        type = try container.decode(ServiceType.self, forKey: .type)
+        sshUser = try container.decodeIfPresent(String.self, forKey: .sshUser) ?? ""
+        sshPort = try container.decodeIfPresent(Int.self, forKey: .sshPort) ?? 22
+        sshAuthMode = try container.decodeIfPresent(SSHAuthMode.self, forKey: .sshAuthMode) ?? .key
+        sshKeyPath = try container.decodeIfPresent(String.self, forKey: .sshKeyPath) ?? ""
+        sshPassword = try container.decodeIfPresent(String.self, forKey: .sshPassword) ?? ""
+    }
+    
+    enum CodingKeys: String, CodingKey {
+        case id, name, url, icon, type
+        case sshUser, sshPort, sshAuthMode, sshKeyPath, sshPassword
     }
     
     /// Build the full SSH command string

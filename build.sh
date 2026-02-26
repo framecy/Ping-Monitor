@@ -4,38 +4,48 @@ set -e
 
 cd "$(dirname "$0")"
 
-# 是否自动增加版本号 (设为 false 可禁用自动递增)
-AUTO_VERSION=true
+BUMP_TYPE="none"
+for arg in "$@"; do
+    if [ "$arg" == "--feature" ]; then BUMP_TYPE="feature"; fi
+    if [ "$arg" == "--bug" ]; then BUMP_TYPE="bug"; fi
+done
 
-if [ "$AUTO_VERSION" = true ]; then
-    # 自动增加版本号
-    INFO_PLIST="PingMonitor/Info.plist"
-    WIDGET_PLIST="PingMonitorWidget/Info.plist"
-    CURRENT_VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "$INFO_PLIST" 2>/dev/null || echo "2.0.0")
-    CURRENT_BUILD=$(/usr/libexec/PlistBuddy -c "Print CFBundleVersion" "$INFO_PLIST" 2>/dev/null || echo "1")
-    
-    # 解析版本号 (格式: x.y.z)
-    IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
-    NEW_PATCH=$((PATCH + 1))
-    NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
+INFO_PLIST="PingMonitor/Info.plist"
+WIDGET_PLIST="PingMonitorWidget/Info.plist"
+CURRENT_VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "$INFO_PLIST" 2>/dev/null || echo "2.1.0")
+CURRENT_BUILD=$(/usr/libexec/PlistBuddy -c "Print CFBundleVersion" "$INFO_PLIST" 2>/dev/null || echo "68")
+
+NEW_VERSION="$CURRENT_VERSION"
+NEW_BUILD="$CURRENT_BUILD"
+
+if [ "$BUMP_TYPE" == "feature" ]; then
+    BASE=$(echo "$CURRENT_VERSION" | sed 's/r[0-9]*//')
+    IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE"
+    NEW_MINOR=$((MINOR + 1))
+    NEW_VERSION="$MAJOR.$NEW_MINOR.0"
     NEW_BUILD=$((CURRENT_BUILD + 1))
-    
-    echo "📦 构建版本: $NEW_VERSION (Build $NEW_BUILD)"
-    
-    # 更新版本号
+elif [ "$BUMP_TYPE" == "bug" ]; then
+    if [[ "$CURRENT_VERSION" == *r* ]]; then
+        BASE_VERSION=${CURRENT_VERSION%%r*}
+        R_NUM=${CURRENT_VERSION##*r}
+        NEW_R=$((R_NUM + 1))
+        NEW_VERSION="${BASE_VERSION}r${NEW_R}"
+    else
+        NEW_VERSION="${CURRENT_VERSION}r1"
+    fi
+    NEW_BUILD=$((CURRENT_BUILD + 1))
+fi
+
+if [ "$BUMP_TYPE" != "none" ]; then
+    echo "📦 升级版本: $CURRENT_VERSION -> $NEW_VERSION (Build $NEW_BUILD)"
     /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $NEW_VERSION" "$INFO_PLIST"
     /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $NEW_BUILD" "$INFO_PLIST"
     /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $NEW_VERSION" "$WIDGET_PLIST" 2>/dev/null || true
     /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $NEW_BUILD" "$WIDGET_PLIST" 2>/dev/null || true
     
-    # 更新 project.yml 中的版本
     sed -i '' "s/MARKETING_VERSION: \".*\"/MARKETING_VERSION: \"$NEW_VERSION\"/" project.yml
     sed -i '' "s/CURRENT_PROJECT_VERSION: \".*\"/CURRENT_PROJECT_VERSION: \"$NEW_BUILD\"/" project.yml
 else
-    # 使用当前版本号
-    INFO_PLIST="PingMonitor/Info.plist"
-    NEW_VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "$INFO_PLIST" 2>/dev/null)
-    NEW_BUILD=$(/usr/libexec/PlistBuddy -c "Print CFBundleVersion" "$INFO_PLIST" 2>/dev/null)
     echo "📦 使用当前版本: $NEW_VERSION (Build $NEW_BUILD)"
 fi
 
@@ -52,6 +62,7 @@ xcodebuild -scheme PingMonitor -configuration Release \
     CODE_SIGN_IDENTITY="-" \
     CODE_SIGNING_REQUIRED=YES \
     CODE_SIGNING_ALLOWED=YES \
+    CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO \
     ONLY_ACTIVE_ARCH=NO
 
 APP_PATH="$HOME/Library/Developer/Xcode/DerivedData/PingMonitor/Build/Products/Release/PingMonitor.app"

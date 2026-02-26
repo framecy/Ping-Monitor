@@ -11,6 +11,7 @@ struct Theme {
         static let accentPurple = Color(hex: "BF5AF2")
         static let accentOrange = Color(hex: "FF9F0A")
         static let accentRed = Color(hex: "FF453A")
+        static let accentCyan = Color(hex: "5AC8FA")
         
         static let textPrimary = Color.white
         static let textSecondary = Color(hex: "8E8E93")
