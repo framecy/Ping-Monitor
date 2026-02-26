@@ -1577,9 +1577,12 @@ struct RuleEditorRow: View {
     @ObservedObject private var languageManager = LanguageManager.shared
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
+            // Row 1: Enable toggle + Delete
             HStack {
                 Toggle(languageManager.t("editor.rule.enable"), isOn: $rule.enabled)
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
                 Spacer()
                 Button(role: .destructive, action: onDelete) {
                     Image(systemName: "trash")
@@ -1588,23 +1591,33 @@ struct RuleEditorRow: View {
                 .buttonStyle(.borderless)
             }
             
-            HStack {
-                Picker(languageManager.t("editor.rule.condition"), selection: $rule.condition) {
+            // Row 2: Condition + Threshold + Label (properly spaced)
+            HStack(spacing: 12) {
+                // Condition picker
+                Picker("", selection: $rule.condition) {
                     Text(languageManager.t("editor.rule.less")).tag("less")
                     Text(languageManager.t("editor.rule.greater")).tag("greater")
                 }
                 .pickerStyle(.segmented)
-                .frame(width: 120)
+                .frame(width: 140)
                 
-                TextField(languageManager.t("editor.rule.threshold"), value: $rule.threshold, format: .number)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 80)
+                // Threshold
+                HStack(spacing: 4) {
+                    TextField("ms", value: $rule.threshold, format: .number)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 60)
+                    Text("ms")
+                        .font(Theme.Fonts.body(10))
+                        .foregroundStyle(Theme.Colors.textSecondary)
+                }
                 
+                // Label
                 TextField(languageManager.t("editor.rule.label"), text: $rule.label)
                     .textFieldStyle(.roundedBorder)
+                    .frame(minWidth: 60)
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 6)
     }
 }
 

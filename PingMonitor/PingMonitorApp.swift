@@ -851,16 +851,24 @@ struct ServiceShortcut: Codable, Identifiable {
     // SSH-specific fields
     var sshUser: String = ""
     var sshPort: Int = 22
+    var sshAuthMode: SSHAuthMode = .key
     var sshKeyPath: String = ""   // e.g. "~/.ssh/id_rsa"
+    var sshPassword: String = ""  // stored for display only
 
     enum ServiceType: String, Codable, CaseIterable {
         case web = "web"
         case ssh = "ssh"
         case custom = "custom"
     }
+    
+    enum SSHAuthMode: String, Codable {
+        case password = "password"
+        case key = "key"
+    }
 
     init(name: String, url: String, icon: String = "globe", type: ServiceType = .web,
-         sshUser: String = "", sshPort: Int = 22, sshKeyPath: String = "") {
+         sshUser: String = "", sshPort: Int = 22, sshAuthMode: SSHAuthMode = .key,
+         sshKeyPath: String = "", sshPassword: String = "") {
         self.id = UUID()
         self.name = name
         self.url = url
@@ -868,7 +876,9 @@ struct ServiceShortcut: Codable, Identifiable {
         self.type = type
         self.sshUser = sshUser
         self.sshPort = sshPort
+        self.sshAuthMode = sshAuthMode
         self.sshKeyPath = sshKeyPath
+        self.sshPassword = sshPassword
     }
     
     /// Build the full SSH command string
@@ -877,7 +887,7 @@ struct ServiceShortcut: Codable, Identifiable {
         if sshPort != 22 {
             cmd += " -p \(sshPort)"
         }
-        if !sshKeyPath.isEmpty {
+        if sshAuthMode == .key && !sshKeyPath.isEmpty {
             cmd += " -i \(sshKeyPath)"
         }
         if !sshUser.isEmpty {

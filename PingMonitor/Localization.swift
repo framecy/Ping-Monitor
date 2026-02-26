@@ -316,8 +316,10 @@ public final class LanguageManager: ObservableObject {
             
             // Services
             "services.title": "Service Shortcuts",
+            "services.all": "All",
             "services.add": "Add",
             "services.edit": "Edit Shortcut",
+            "services.select_host": "Target Host",
             "services.empty": "No service shortcuts",
             "services.empty_hint": "Add shortcuts in host details",
             "services.name": "Name",
@@ -334,6 +336,12 @@ public final class LanguageManager: ObservableObject {
             "services.ssh.port": "Port",
             "services.ssh.key": "Key Path",
             "services.ssh.key_optional": "optional",
+            "services.ssh.auth_mode": "Auth Mode",
+            "services.ssh.auth_key": "🔑 Key",
+            "services.ssh.auth_password": "🔒 Password",
+            "services.ssh.password": "Password",
+            "services.ssh.password_hint": "Enter password",
+            "services.open": "Open",
             "services.ssh.preview": "Command Preview",
             
             // Logs (additions)
@@ -619,8 +627,10 @@ public final class LanguageManager: ObservableObject {
             
             // Services
             "services.title": "服务快捷方式",
+            "services.all": "全部",
             "services.add": "添加",
             "services.edit": "编辑快捷方式",
+            "services.select_host": "目标主机",
             "services.empty": "暂无服务快捷方式",
             "services.empty_hint": "在主机详情中添加快捷方式",
             "services.name": "名称",
@@ -637,6 +647,12 @@ public final class LanguageManager: ObservableObject {
             "services.ssh.port": "端口",
             "services.ssh.key": "密钥路径",
             "services.ssh.key_optional": "可选",
+            "services.ssh.auth_mode": "认证方式",
+            "services.ssh.auth_key": "🔑 密钥",
+            "services.ssh.auth_password": "🔒 密码",
+            "services.ssh.password": "密码",
+            "services.ssh.password_hint": "输入密码",
+            "services.open": "打开",
             "services.ssh.preview": "命令预览",
             
             // Logs (additions)
