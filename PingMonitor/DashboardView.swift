@@ -428,7 +428,7 @@ struct SummaryDonutCard: View {
                 HStack(spacing: 8) {
                     // 3D Pie Chart
                     ZStack {
-                        Donut3DView(slices: slices, hoveredSlice: $hoveredSlice)
+                        Pie3DView(slices: slices, hoveredSlice: $hoveredSlice)
                             .frame(width: 140, height: 140)
                         
                         // Center label
@@ -463,21 +463,22 @@ struct SummaryDonutCard: View {
                         }
                     }
                 }
+                Spacer(minLength: 0)
             }
+            .frame(maxHeight: .infinity)
         }
     }
 }
 
-// MARK: - 3D Donut Ring Chart
+// MARK: - 3D Pie Chart
 
-struct Donut3DView: View {
+struct Pie3DView: View {
     let slices: [(label: String, value: Double, color: Color)]
     @Binding var hoveredSlice: Int?
     
     // 3D projection parameters
-    private let outerRadius: CGFloat = 55
-    private let innerRadius: CGFloat = 30
-    private let yScale: CGFloat = 0.45      // elliptical squash for perspective
+    private let radius: CGFloat = 65
+    private let yScale: CGFloat = 0.5      // elliptical squash for perspective
     private let depth: CGFloat = 20          // thickness of the 3D extrusion
     private let gapAngle: Double = 0.04      // gap between slices in radians
     
@@ -498,30 +499,30 @@ struct Donut3DView: View {
             let cy = size.height / 2 - depth / 4
             let angles = sliceAngles
             
-            // ---- Draw order: back sides → bottom → back top → front sides → front top ----
+            // Draw order back to front
             
-            // 1) Outer side walls (only bottom-visible arcs: angles where sin > 0)
+            // 1) Outer side walls
             for (index, ang) in angles.enumerated() {
                 let isHov = hoveredSlice == index
                 let hoverOffset = isHov ? hoverOffsetFor(ang) : CGSize.zero
-                drawOuterSideWall(context: &context, cx: cx + hoverOffset.width, cy: cy + hoverOffset.height, startAngle: ang.start, endAngle: ang.end, color: slices[index].color, isHovered: isHov)
+                drawOuterSideWall(context: &context, cx: cx + hoverOffset.width, cy: cy + hoverOffset.height, startAngle: ang.start, endAngle: ang.end, color: slices[index].color)
             }
             
-            // 2) Inner side walls
+            // 2) Cut side walls (start and end cuts)
             for (index, ang) in angles.enumerated() {
                 let isHov = hoveredSlice == index
                 let hoverOffset = isHov ? hoverOffsetFor(ang) : CGSize.zero
-                drawInnerSideWall(context: &context, cx: cx + hoverOffset.width, cy: cy + hoverOffset.height, startAngle: ang.start, endAngle: ang.end, color: slices[index].color, isHovered: isHov)
+                drawCutWalls(context: &context, cx: cx + hoverOffset.width, cy: cy + hoverOffset.height, startAngle: ang.start, endAngle: ang.end, color: slices[index].color)
             }
             
-            // 3) Top face of each slice (donut ring shape)
+            // 3) Top face
             for (index, ang) in angles.enumerated() {
                 let isHov = hoveredSlice == index
                 let hoverOffset = isHov ? hoverOffsetFor(ang) : CGSize.zero
                 drawTopFace(context: &context, cx: cx + hoverOffset.width, cy: cy + hoverOffset.height, startAngle: ang.start, endAngle: ang.end, color: slices[index].color, isHovered: isHov)
             }
             
-            // 4) Highlight / reflection on top
+            // 4) Top highlight
             for (index, ang) in angles.enumerated() {
                 let isHov = hoveredSlice == index
                 let hoverOffset = isHov ? hoverOffsetFor(ang) : CGSize.zero
@@ -530,102 +531,93 @@ struct Donut3DView: View {
         }
     }
     
-    // MARK: - Hover offset calculation
     private func hoverOffsetFor(_ ang: (start: Double, end: Double)) -> CGSize {
         let mid = (ang.start + ang.end) / 2
-        return CGSize(width: cos(mid) * 6, height: sin(mid) * 6 * yScale)
+        return CGSize(width: cos(mid) * 8, height: sin(mid) * 8 * yScale)
     }
     
-    // MARK: - Ellipse point helpers
-    private func outerPoint(_ angle: Double, cx: CGFloat, cy: CGFloat, yOff: CGFloat = 0) -> CGPoint {
-        CGPoint(x: cx + cos(angle) * outerRadius, y: cy + sin(angle) * outerRadius * yScale + yOff)
-    }
-    private func innerPoint(_ angle: Double, cx: CGFloat, cy: CGFloat, yOff: CGFloat = 0) -> CGPoint {
-        CGPoint(x: cx + cos(angle) * innerRadius, y: cy + sin(angle) * innerRadius * yScale + yOff)
+    private func point(_ angle: Double, radius r: CGFloat, cx: CGFloat, cy: CGFloat, yOff: CGFloat = 0) -> CGPoint {
+        CGPoint(x: cx + cos(angle) * r, y: cy + sin(angle) * r * yScale + yOff)
     }
     
-    // MARK: - Draw outer side wall
-    private func drawOuterSideWall(context: inout GraphicsContext, cx: CGFloat, cy: CGFloat, startAngle: Double, endAngle: Double, color: Color, isHovered: Bool) {
+    private func drawOuterSideWall(context: inout GraphicsContext, cx: CGFloat, cy: CGFloat, startAngle: Double, endAngle: Double, color: Color) {
         let steps = 40
         let angleStep = (endAngle - startAngle) / Double(steps)
         
-        // Only draw segments where the wall is visible (facing viewer)
         for i in 0..<steps {
             let a1 = startAngle + Double(i) * angleStep
             let a2 = a1 + angleStep
-            // Wall is visible when facing the viewer (bottom half)
             let midA = (a1 + a2) / 2
             if sin(midA) <= -0.1 { continue } // skip back-facing walls
             
             var wallPath = Path()
-            let topLeft = outerPoint(a1, cx: cx, cy: cy)
-            let topRight = outerPoint(a2, cx: cx, cy: cy)
-            let botRight = outerPoint(a2, cx: cx, cy: cy, yOff: depth)
-            let botLeft = outerPoint(a1, cx: cx, cy: cy, yOff: depth)
+            let topLeft = point(a1, radius: radius, cx: cx, cy: cy)
+            let topRight = point(a2, radius: radius, cx: cx, cy: cy)
+            let botRight = point(a2, radius: radius, cx: cx, cy: cy, yOff: depth)
+            let botLeft = point(a1, radius: radius, cx: cx, cy: cy, yOff: depth)
             wallPath.move(to: topLeft)
             wallPath.addLine(to: topRight)
             wallPath.addLine(to: botRight)
             wallPath.addLine(to: botLeft)
             wallPath.closeSubpath()
             
-            // Shade based on angle — lighter on left, darker on right
             let shade = 0.35 + 0.25 * (1 + cos(midA - .pi / 3)) / 2
             context.fill(wallPath, with: .color(color.opacity(shade)))
         }
     }
     
-    // MARK: - Draw inner side wall
-    private func drawInnerSideWall(context: inout GraphicsContext, cx: CGFloat, cy: CGFloat, startAngle: Double, endAngle: Double, color: Color, isHovered: Bool) {
-        let steps = 30
-        let angleStep = (endAngle - startAngle) / Double(steps)
+    private func drawCutWalls(context: inout GraphicsContext, cx: CGFloat, cy: CGFloat, startAngle: Double, endAngle: Double, color: Color) {
+        // Start cut (facing viewer if its left side is exposed)
+        let startNormal = startAngle - .pi/2
+        if sin(startNormal) > 0 {
+            var path = Path()
+            let centerTop = CGPoint(x: cx, y: cy)
+            let centerBot = CGPoint(x: cx, y: cy + depth)
+            let outerTop = point(startAngle, radius: radius, cx: cx, cy: cy)
+            let outerBot = point(startAngle, radius: radius, cx: cx, cy: cy, yOff: depth)
+            path.move(to: centerTop)
+            path.addLine(to: outerTop)
+            path.addLine(to: outerBot)
+            path.addLine(to: centerBot)
+            path.closeSubpath()
+            let shade = 0.25 + 0.15 * (1 + cos(startNormal)) / 2
+            context.fill(path, with: .color(color.opacity(shade)))
+        }
         
-        for i in 0..<steps {
-            let a1 = startAngle + Double(i) * angleStep
-            let a2 = a1 + angleStep
-            let midA = (a1 + a2) / 2
-            if sin(midA) >= 0.1 { continue } // inner walls visible when facing away
-            
-            var wallPath = Path()
-            let topLeft = innerPoint(a1, cx: cx, cy: cy)
-            let topRight = innerPoint(a2, cx: cx, cy: cy)
-            let botRight = innerPoint(a2, cx: cx, cy: cy, yOff: depth)
-            let botLeft = innerPoint(a1, cx: cx, cy: cy, yOff: depth)
-            wallPath.move(to: topLeft)
-            wallPath.addLine(to: topRight)
-            wallPath.addLine(to: botRight)
-            wallPath.addLine(to: botLeft)
-            wallPath.closeSubpath()
-            
-            let shade = 0.25 + 0.15 * (1 + cos(midA + .pi)) / 2
-            context.fill(wallPath, with: .color(color.opacity(shade)))
+        // End cut (facing viewer if its right side is exposed)
+        let endNormal = endAngle + .pi/2
+        if sin(endNormal) > 0 {
+            var path = Path()
+            let centerTop = CGPoint(x: cx, y: cy)
+            let centerBot = CGPoint(x: cx, y: cy + depth)
+            let outerTop = point(endAngle, radius: radius, cx: cx, cy: cy)
+            let outerBot = point(endAngle, radius: radius, cx: cx, cy: cy, yOff: depth)
+            path.move(to: centerTop)
+            path.addLine(to: outerTop)
+            path.addLine(to: outerBot)
+            path.addLine(to: centerBot)
+            path.closeSubpath()
+            let shade = 0.25 + 0.15 * (1 + cos(endNormal)) / 2
+            context.fill(path, with: .color(color.opacity(shade)))
         }
     }
     
-    // MARK: - Draw top face (donut ring slice)
     private func drawTopFace(context: inout GraphicsContext, cx: CGFloat, cy: CGFloat, startAngle: Double, endAngle: Double, color: Color, isHovered: Bool) {
         let steps = 60
         let angleStep = (endAngle - startAngle) / Double(steps)
         
         var topPath = Path()
-        // Outer arc
+        topPath.move(to: CGPoint(x: cx, y: cy))
         for i in 0...steps {
             let a = startAngle + Double(i) * angleStep
-            let p = outerPoint(a, cx: cx, cy: cy)
-            if i == 0 { topPath.move(to: p) } else { topPath.addLine(to: p) }
-        }
-        // Inner arc (reverse)
-        for i in stride(from: steps, through: 0, by: -1) {
-            let a = startAngle + Double(i) * angleStep
-            let p = innerPoint(a, cx: cx, cy: cy)
-            topPath.addLine(to: p)
+            topPath.addLine(to: point(a, radius: radius, cx: cx, cy: cy))
         }
         topPath.closeSubpath()
         
-        // Gradient fill
         let brightness: CGFloat = isHovered ? 1.15 : 1.0
         let midAngle = (startAngle + endAngle) / 2
-        let gradStart = outerPoint(midAngle - 0.5, cx: cx, cy: cy)
-        let gradEnd = outerPoint(midAngle + 0.5, cx: cx, cy: cy)
+        let gradStart = point(midAngle - 0.5, radius: radius, cx: cx, cy: cy)
+        let gradEnd = point(midAngle + 0.5, radius: radius, cx: cx, cy: cy)
         
         context.fill(topPath, with: .linearGradient(
             Gradient(colors: [
@@ -636,15 +628,12 @@ struct Donut3DView: View {
             endPoint: gradEnd
         ))
         
-        // Subtle glow for hovered slice
         if isHovered {
             context.fill(topPath, with: .color(Color.white.opacity(0.12)))
         }
     }
     
-    // MARK: - Draw top highlight / reflection
     private func drawTopHighlight(context: inout GraphicsContext, cx: CGFloat, cy: CGFloat, startAngle: Double, endAngle: Double, isHovered: Bool) {
-        // Only draw highlight on upper-left portion for realism
         let highlightStart = max(startAngle, -.pi)
         let highlightEnd = min(endAngle, -0.1)
         guard highlightStart < highlightEnd else { return }
@@ -653,30 +642,20 @@ struct Donut3DView: View {
         let angleStep = (highlightEnd - highlightStart) / Double(steps)
         
         var hlPath = Path()
-        let hlInner = innerRadius + (outerRadius - innerRadius) * 0.3
-        let hlOuter = outerRadius - (outerRadius - innerRadius) * 0.1
+        let hlOuter = radius * 0.9
         
+        hlPath.move(to: CGPoint(x: cx, y: cy))
         for i in 0...steps {
             let a = highlightStart + Double(i) * angleStep
-            let p = CGPoint(x: cx + cos(a) * hlOuter, y: cy + sin(a) * hlOuter * yScale)
-            if i == 0 { hlPath.move(to: p) } else { hlPath.addLine(to: p) }
-        }
-        for i in stride(from: steps, through: 0, by: -1) {
-            let a = highlightStart + Double(i) * angleStep
-            let p = CGPoint(x: cx + cos(a) * hlInner, y: cy + sin(a) * hlInner * yScale)
-            hlPath.addLine(to: p)
+            hlPath.addLine(to: point(a, radius: hlOuter, cx: cx, cy: cy))
         }
         hlPath.closeSubpath()
         
         context.fill(hlPath, with: .color(Color.white.opacity(isHovered ? 0.22 : 0.12)))
     }
     
-    // MARK: - Color helper
     private func adjustBrightness(_ color: Color, by factor: CGFloat) -> Color {
-        // Convert factor to opacity modulation for simplicity
-        if factor > 1.0 {
-            return color.opacity(1.0)
-        }
+        if factor > 1.0 { return color.opacity(1.0) }
         return color.opacity(Double(factor))
     }
 }
@@ -735,53 +714,63 @@ struct RankingListCard: View {
                             .foregroundStyle(Theme.Colors.textSecondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     } else {
-                        ForEach(Array(sorted.enumerated()), id: \.element.id) { index, host in
-                            HStack {
-                                Text("\(index + 1)")
-                                    .font(Theme.Fonts.number(12))
-                                    .foregroundStyle(.white)
-                                    .frame(width: 16, height: 16)
-                                    .background(Theme.Colors.accentBlue)
-                                    .cornerRadius(4)
-                                
-                                Text(host.name)
-                                    .font(Theme.Fonts.body(12))
-                                    .foregroundStyle(Theme.Colors.textPrimary)
-                                    .lineLimit(1)
-                                
-                                Spacer()
-                                
-                                // Visualization Bar
-                                GeometryReader { geometry in
-                                    ZStack(alignment: .leading) {
-                                        RoundedRectangle(cornerRadius: 2)
-                                            .fill(Theme.Colors.cardBackground.opacity(0.5))
-                                        
-                                        if let latency = host.lastLatency {
+                        Grid(horizontalSpacing: 8, verticalSpacing: 12) {
+                            ForEach(Array(sorted.enumerated()), id: \.element.id) { index, host in
+                                GridRow {
+                                    Text("\(index + 1)")
+                                        .font(Theme.Fonts.number(12))
+                                        .foregroundStyle(.white)
+                                        .frame(width: 16, height: 16)
+                                        .background(Theme.Colors.accentBlue)
+                                        .cornerRadius(4)
+                                        .gridColumnAlignment(.leading)
+                                    
+                                    Text(host.name)
+                                        .font(Theme.Fonts.body(12))
+                                        .foregroundStyle(Theme.Colors.textPrimary)
+                                        .lineLimit(1)
+                                        .truncationMode(.tail)
+                                        .frame(maxWidth: 80, alignment: .leading)
+                                        .gridColumnAlignment(.leading)
+                                    
+                                    // Visualization Bar
+                                    GeometryReader { geometry in
+                                        ZStack(alignment: .leading) {
                                             RoundedRectangle(cornerRadius: 2)
-                                                .fill(
-                                                    LinearGradient(
-                                                        colors: [Theme.Colors.accentBlue, Theme.Colors.accentPurple],
-                                                        startPoint: .leading,
-                                                        endPoint: .trailing
+                                                .fill(Theme.Colors.cardBackground.opacity(0.5))
+                                            
+                                            if let latency = host.lastLatency {
+                                                RoundedRectangle(cornerRadius: 2)
+                                                    .fill(
+                                                        LinearGradient(
+                                                            colors: [Theme.Colors.accentBlue, Theme.Colors.accentPurple],
+                                                            startPoint: .leading,
+                                                            endPoint: .trailing
+                                                        )
                                                     )
-                                                )
-                                                 .frame(width: min(CGFloat(latency) / 200.0 * geometry.size.width, geometry.size.width))
+                                                     .frame(width: min(CGFloat(latency) / 200.0 * geometry.size.width, geometry.size.width))
+                                            }
                                         }
                                     }
+                                    .frame(height: 4)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.horizontal, 4)
+                                    
+                                    Text(String(format: "%.0f ms", host.lastLatency ?? 0))
+                                        .font(Theme.Fonts.number(12))
+                                        .foregroundStyle(Theme.Colors.textSecondary)
+                                        .lineLimit(1)
+                                        .truncationMode(.tail)
+                                        .frame(width: 50, alignment: .trailing)
+                                        .gridColumnAlignment(.trailing)
                                 }
-                                .frame(height: 4)
-                                .padding(.horizontal, 8)
-                                
-                                Text(String(format: "%.0f ms", host.lastLatency ?? 0))
-                                    .font(Theme.Fonts.number(12))
-                                    .foregroundStyle(Theme.Colors.textSecondary)
-                                    .frame(width: 40, alignment: .trailing)
                             }
                         }
                     }
                 }
+                Spacer(minLength: 0)
             }
+            .frame(maxHeight: .infinity)
         }
     }
 }

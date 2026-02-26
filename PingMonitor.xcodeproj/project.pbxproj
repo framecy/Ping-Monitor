@@ -20,6 +20,7 @@
 		ACAE48593119B446A7CAF1E8 /* EditableHostCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCE2F25F03FD5A086CB489B3 /* EditableHostCard.swift */; };
 		AE4DFB14EB5C0241FFF90C09 /* PingMonitorWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 019A9A5FF0AE2400BEA630D5 /* PingMonitorWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		BD48291C728E07252C391F44 /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5594A1194F05016AEA7F7897 /* Localization.swift */; };
+		C7D357498D29CDCDA5438B6C /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = 054C652334D83BFC7E046C1C /* AppIcon.icns */; };
 		CEB7B9C677A78A18AF0ED5DD /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E15E69887F7957EA47FA06D /* MainView.swift */; };
 		D51F554F7B9137143E3F303B /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7666F60CCBB8B7ADFCB51FB /* Components.swift */; };
 		EA5962C4457A4AAC9D4C60CA /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C04ACB73A62AC186335F394B /* Assets.xcassets */; };
@@ -54,6 +55,7 @@
 		019A9A5FF0AE2400BEA630D5 /* PingMonitorWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PingMonitorWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		042BBDE30A6C82BE3B5E0276 /* TracerouteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TracerouteView.swift; sourceTree = "<group>"; };
 		0474E749B23CD3D59A534A02 /* PingMonitorWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PingMonitorWidget.swift; sourceTree = "<group>"; };
+		054C652334D83BFC7E046C1C /* AppIcon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = AppIcon.icns; sourceTree = "<group>"; };
 		3E15E69887F7957EA47FA06D /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
 		491A22FB66A984CCBB76CACC /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		5594A1194F05016AEA7F7897 /* Localization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Localization.swift; sourceTree = "<group>"; };
@@ -78,6 +80,7 @@
 		1FCA1BC4AC7A8240D5F29364 /* PingMonitor */ = {
 			isa = PBXGroup;
 			children = (
+				054C652334D83BFC7E046C1C /* AppIcon.icns */,
 				EC930EE8636979AACD15BBB7 /* Assets.xcassets */,
 				A7666F60CCBB8B7ADFCB51FB /* Components.swift */,
 				9BEF6778E3667CA0C05B7AF6 /* DashboardView.swift */,
@@ -211,6 +214,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C7D357498D29CDCDA5438B6C /* AppIcon.icns in Resources */,
 				136DB684B38ECE24B8F16B29 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -321,7 +325,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 53;
+				CURRENT_PROJECT_VERSION = 62;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -340,7 +344,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 2.0.52;
+				MARKETING_VERSION = 2.0.53;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -427,7 +431,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 53;
+				CURRENT_PROJECT_VERSION = 62;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -440,7 +444,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 2.0.52;
+				MARKETING_VERSION = 2.0.53;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";

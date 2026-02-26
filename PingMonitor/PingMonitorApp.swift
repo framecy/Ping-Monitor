@@ -186,6 +186,28 @@ class LogManager: ObservableObject {
             return nil
         }
     }
+    
+    func exportHostLogs(for hostName: String) -> URL? {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd_HHmmss"
+        let filename = "\(hostName.replacingOccurrences(of: " ", with: "_"))_Logs_\(formatter.string(from: Date())).txt"
+        
+        let hostLogs = logs.filter { $0.host == hostName }
+        let content = hostLogs.map { entry in
+            "[\(entry.formattedTimestamp)] [\(entry.level.rawValue)] \(entry.message)"
+        }.joined(separator: "\n")
+        
+        let tempDir = FileManager.default.temporaryDirectory
+        let fileURL = tempDir.appendingPathComponent(filename)
+        
+        do {
+            try content.write(to: fileURL, atomically: true, encoding: .utf8)
+            return fileURL
+        } catch {
+            print("Failed to export host logs: \(error)")
+            return nil
+        }
+    }
 }
 
 @MainActor
@@ -597,7 +619,7 @@ class PingMonitorViewModel: ObservableObject {
                 return false // Keep user order if not running
             }
             
-            for host in sortedHosts.prefix(8) { // Increase prefix for larger layouts
+            for host in sortedHosts.prefix(5) {
                 widgetEntries.append(createWidgetStatus(for: host))
             }
         }
@@ -629,25 +651,12 @@ class PingMonitorViewModel: ObservableObject {
             color = "orange"
         }
         
-        var status = WidgetData.HostStatus(
+        return WidgetData.HostStatus(
             name: host.name,
             latency: latency,
             status: color,
             isRunning: isRunning
         )
-        
-        // Fill statistics from hostStats
-        if let stats = hostStats[host.id] {
-            status.minLatency = stats.minLatency
-            status.maxLatency = stats.maxLatency
-            status.avgLatency = stats.avgLatency
-            
-            if stats.totalPings > 0 {
-                status.packetLoss = Double(stats.failedPings) / Double(stats.totalPings) * 100
-            }
-        }
-        
-        return status
     }
 
     func getDisplayText(for host: HostConfig?) -> String {
@@ -877,7 +886,7 @@ enum StatusBarDisplayMode: String, Codable, CaseIterable {
 }
 
 @MainActor
-class StatusBarController: ObservableObject {
+class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
     private var statusItem: NSStatusItem?
     var viewModel: PingMonitorViewModel
     private var mainWindow: NSWindow?
@@ -886,8 +895,9 @@ class StatusBarController: ObservableObject {
     // 固定宽度：仅图标
     private let widthIconOnly: CGFloat = 32
 
-    init() {
+    override init() {
         viewModel = PingMonitorViewModel()
+        super.init()
         viewModel.statusBarController = self
         setupStatusBar()
 
@@ -947,6 +957,7 @@ class StatusBarController: ObservableObject {
         if let window = mainWindow {
             if window.isVisible {
                 window.orderOut(nil)
+                NSApp.setActivationPolicy(.accessory)
             } else {
                 showWindow()
             }
@@ -973,10 +984,13 @@ class StatusBarController: ObservableObject {
         
         // 设置窗口关闭时只是隐藏，不是销毁
         mainWindow?.isReleasedWhenClosed = false
+        mainWindow?.delegate = self
     }
     
     private func showWindow() {
         guard let window = mainWindow else { return }
+        
+        NSApp.setActivationPolicy(.regular)
         
         // 如果窗口被最小化了，先恢复
         if window.isMiniaturized {
@@ -985,6 +999,19 @@ class StatusBarController: ObservableObject {
         
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    // MARK: - NSWindowDelegate
+    func windowWillClose(_ notification: Notification) {
+        NSApp.setActivationPolicy(.accessory)
+    }
+
+    func windowDidMiniaturize(_ notification: Notification) {
+        NSApp.setActivationPolicy(.accessory)
+    }
+
+    func windowDidDeminiaturize(_ notification: Notification) {
+        NSApp.setActivationPolicy(.regular)
     }
 
     func updateStatusBar() {

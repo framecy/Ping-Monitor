@@ -6,6 +6,7 @@ struct HostDetailView: View {
     let host: HostConfig
     let onClose: () -> Void
     @ObservedObject private var languageManager = LanguageManager.shared
+    @ObservedObject private var logManager = LogManager.shared
     
     private var stats: HostStats? {
         viewModel.hostStats[host.id]
@@ -42,6 +43,9 @@ struct HostDetailView: View {
                     if !host.displayRules.isEmpty {
                         displayRulesCard
                     }
+                    
+                    // Row 5: Logs
+                    logsCard
                 }
                 .padding()
             }
@@ -518,6 +522,85 @@ struct HostDetailView: View {
         if latency < 100 { return .orange }
         return .red
     }
+    
+    // MARK: - Logs Card
+    
+    private var logsCard: some View {
+        ModernCard {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Image(systemName: "list.bullet.rectangle")
+                        .foregroundStyle(Theme.Colors.accentOrange)
+                    Text(languageManager.t("logs.title"))
+                        .font(Theme.Fonts.display(14))
+                        .foregroundStyle(Theme.Colors.textPrimary)
+                    Spacer()
+                    
+                    Button(action: {
+                        if let url = logManager.exportHostLogs(for: host.name) {
+                            NSWorkspace.shared.activateFileViewerSelecting([url])
+                        }
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "square.and.arrow.up")
+                                .font(.system(size: 10, weight: .semibold))
+                            Text(languageManager.t("logs.export"))
+                                .font(Theme.Fonts.body(11))
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Theme.Colors.cardBackground)
+                        .cornerRadius(6)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+                
+                let hostLogs = logManager.logs.filter { $0.host == host.name }.suffix(50).reversed()
+                
+                if hostLogs.isEmpty {
+                    Text(languageManager.t("logs.empty"))
+                        .font(Theme.Fonts.body(12))
+                        .foregroundStyle(Theme.Colors.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 20)
+                } else {
+                    VStack(alignment: .leading, spacing: 8) {
+                         ForEach(Array(hostLogs), id: \.id) { log in
+                             HStack(alignment: .top, spacing: 8) {
+                                 Text(log.formattedTimestamp)
+                                     .font(.system(size: 11, weight: .regular, design: .monospaced))
+                                     .foregroundStyle(Theme.Colors.textSecondary)
+                                     .frame(width: 140, alignment: .leading)
+                                 
+                                 Text(log.level.rawValue)
+                                     .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                     .foregroundStyle(logColor(for: log.level))
+                                     .frame(width: 45, alignment: .leading)
+                                 
+                                 Text(log.message)
+                                     .font(Theme.Fonts.body(12))
+                                     .foregroundStyle(Theme.Colors.textPrimary)
+                             }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    private func logColor(for level: LogManager.LogLevel) -> Color {
+        switch level {
+        case .debug: return Theme.Colors.textSecondary
+        case .info: return Theme.Colors.accentBlue
+        case .warning: return Theme.Colors.accentOrange
+        case .error: return Theme.Colors.accentRed
+        }
+    }
+
     
     private var successRateColor: Color {
         let rate = stats?.successRate ?? 0

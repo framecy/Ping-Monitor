@@ -1841,147 +1841,223 @@ struct SettingsTab: View {
     @ObservedObject private var languageManager = LanguageManager.shared
 
     var body: some View {
-        List {
-            Section {
-                Picker(languageManager.t("settings.display_mode"), selection: $viewModel.statusBarDisplayMode) {
-                    Text(languageManager.t("settings.display.average")).tag(StatusBarDisplayMode.average)
-                    Text(languageManager.t("settings.display.worst")).tag(StatusBarDisplayMode.worst)
-                    Text(languageManager.t("settings.display.best")).tag(StatusBarDisplayMode.best)
-                    Text(languageManager.t("settings.display.first")).tag(StatusBarDisplayMode.first)
-                }
-                .pickerStyle(.segmented)
-                .onChange(of: viewModel.statusBarDisplayMode) { _, _ in
-                    viewModel.saveSettings()
-                }
-                
-                Text(statusBarDescription)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                
-                Toggle(languageManager.t("settings.show_latency"), isOn: $viewModel.showLatencyInMenu)
-                    .onChange(of: viewModel.showLatencyInMenu) { _, _ in
-                        viewModel.saveSettings()
-                    }
-
-                Toggle(languageManager.t("settings.show_labels"), isOn: $viewModel.showLabelsInMenu)
-                    .onChange(of: viewModel.showLabelsInMenu) { _, _ in
-                        viewModel.saveSettings()
-                    }
-            } header: {
-                Label(languageManager.t("settings.section.status_bar"), systemImage: "menubar.rectangle")
-            }
-
-            Section {
-
-                HStack {
-                    Text(languageManager.t("settings.interval"))
-                    Spacer()
-                    Picker("", selection: $viewModel.pingInterval) {
-                        Text(languageManager.t("settings.interval.3s")).tag(3.0)
-                        Text(languageManager.t("settings.interval.5s")).tag(5.0)
-                        Text(languageManager.t("settings.interval.10s")).tag(10.0)
-                        Text(languageManager.t("settings.interval.30s")).tag(30.0)
-                    }
-                    .pickerStyle(.segmented)
-                    .frame(width: 200)
-                }
-                .onChange(of: viewModel.pingInterval) { _, _ in
-                    viewModel.saveSettings()
-                    if viewModel.isRunning {
-                        viewModel.stopAll()
-                        viewModel.startAll()
-                    }
-                }
-                
-                Picker(languageManager.t("logs.level"), selection: $viewModel.logLevel) {
-                    ForEach(LogManager.LogLevel.allCases, id: \.self) { level in
-                        Text(languageManager.t("logs.level.\(level.rawValue.lowercased())")).tag(level)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .onChange(of: viewModel.logLevel) { _, _ in
-                    viewModel.saveSettings()
-                }
-            } header: {
-                Label(languageManager.t("settings.section.monitor"), systemImage: "waveform.path.ecg")
-            }
-
-            Section {
-
-                Toggle(languageManager.t("settings.notify.enable"), isOn: $viewModel.notificationEnabled)
-                    .onChange(of: viewModel.notificationEnabled) { _, _ in
-                        viewModel.saveSettings()
-                    }
-
-                Picker(languageManager.t("settings.notify.type"), selection: $viewModel.notificationType) {
-                    Text(languageManager.t("settings.notify.system")).tag("system")
-                    Text(languageManager.t("settings.notify.bark")).tag("bark")
-                }
-                .pickerStyle(.segmented)
-                .onChange(of: viewModel.notificationType) { _, _ in
-                        viewModel.saveSettings()
-                    }
-
-                if viewModel.notificationType == "bark" {
-                    TextField("Bark URL", text: $viewModel.barkURL)
-                        .onChange(of: viewModel.barkURL) { _, _ in
-                            viewModel.saveSettings()
+        ScrollView {
+            VStack(spacing: 20) {
+                // MARK: - General
+                ModernCard {
+                    VStack(alignment: .leading, spacing: 16) {
+                        SectionHeader(title: languageManager.t("settings.section.system"), icon: "gear")
+                        
+                        HStack {
+                            Text(languageManager.t("settings.language"))
+                            Spacer()
+                            Picker("", selection: $languageManager.currentLanguage) {
+                                Text("中文").tag(Language.zh)
+                                Text("English").tag(Language.en)
+                            }
+                            .pickerStyle(.segmented)
+                            .frame(width: 200)
+                            .onChange(of: languageManager.currentLanguage) { _, newValue in
+                                LogManager.shared.info("Language changed to \(newValue.rawValue)")
+                                languageManager.languageString = newValue.rawValue
+                            }
                         }
-                }
-            } header: {
-                Label(languageManager.t("settings.section.notify"), systemImage: "bell.badge.fill")
-            }
-
-            Section {
-                 Picker(languageManager.t("settings.language"), selection: $languageManager.currentLanguage) {
-                     Text("中文").tag(Language.zh)
-                     Text("English").tag(Language.en)
-                 }
-                 .pickerStyle(.segmented)
-                 .onChange(of: languageManager.currentLanguage) { _, newValue in
-                     languageManager.languageString = newValue.rawValue
-                 }
-
-                Toggle(languageManager.t("settings.auto_start"), isOn: $viewModel.autoStart)
-                    .onChange(of: viewModel.autoStart) { _, newValue in
-                        viewModel.toggleAutoStart(newValue)
-                    }
-                
-                HStack {
-                    Text(languageManager.t("settings.version"))
-                    Spacer()
-                    Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "2.0") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"))")
-                        .foregroundStyle(.secondary)
-                }
-            } header: {
-                Label(languageManager.t("settings.section.system"), systemImage: "gear")
-            }
-            
-            Section {
-                Picker(languageManager.t("settings.widget.mode"), selection: $viewModel.widgetDisplayMode) {
-                    Text(languageManager.t("settings.widget.auto")).tag("auto")
-                    Text(languageManager.t("settings.widget.specific")).tag("specific")
-                }
-                .pickerStyle(.segmented)
-                .onChange(of: viewModel.widgetDisplayMode) { _, _ in
-                    viewModel.syncToWidget()
-                }
-                
-                if viewModel.widgetDisplayMode == "specific" {
-                    Picker(languageManager.t("settings.widget.select_host"), selection: $viewModel.widgetSelectedHostId) {
-                        Text(languageManager.t("settings.widget.none")).tag("")
-                        ForEach(viewModel.hosts) { host in
-                            Text(host.name).tag(host.id.uuidString)
+                        
+                        Divider()
+                        
+                        Toggle(languageManager.t("settings.auto_start"), isOn: $viewModel.autoStart)
+                            .onChange(of: viewModel.autoStart) { _, newValue in
+                                viewModel.toggleAutoStart(newValue)
+                            }
+                        
+                        Divider()
+                        
+                        HStack {
+                            Text(languageManager.t("settings.version"))
+                            Spacer()
+                            Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "2.0") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"))")
+                                .foregroundStyle(.secondary)
                         }
                     }
-                    .onChange(of: viewModel.widgetSelectedHostId) { _, _ in
-                        viewModel.syncToWidget()
+                }
+                
+                // MARK: - Display (Status Bar & Widget)
+                ModernCard {
+                    VStack(alignment: .leading, spacing: 16) {
+                        SectionHeader(title: languageManager.t("settings.section.status_bar"), icon: "menubar.rectangle")
+                        
+                        HStack {
+                            Text(languageManager.t("settings.display_mode"))
+                            Spacer()
+                            Picker("", selection: $viewModel.statusBarDisplayMode) {
+                                Text(languageManager.t("settings.display.average")).tag(StatusBarDisplayMode.average)
+                                Text(languageManager.t("settings.display.worst")).tag(StatusBarDisplayMode.worst)
+                                Text(languageManager.t("settings.display.best")).tag(StatusBarDisplayMode.best)
+                                Text(languageManager.t("settings.display.first")).tag(StatusBarDisplayMode.first)
+                            }
+                            .pickerStyle(.segmented)
+                            .frame(width: 250)
+                            .onChange(of: viewModel.statusBarDisplayMode) { _, newValue in
+                                LogManager.shared.info("Display mode changed to \(newValue.rawValue)")
+                                viewModel.saveSettings()
+                            }
+                        }
+                        
+                        Text(statusBarDescription)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.top, -8)
+                        
+                        Divider()
+                        
+                        Toggle(languageManager.t("settings.show_latency"), isOn: $viewModel.showLatencyInMenu)
+                            .onChange(of: viewModel.showLatencyInMenu) { _, newValue in
+                                LogManager.shared.info("Show latency in menu toggled to \(newValue)")
+                                viewModel.saveSettings()
+                            }
+
+                        Divider()
+
+                        Toggle(languageManager.t("settings.show_labels"), isOn: $viewModel.showLabelsInMenu)
+                            .onChange(of: viewModel.showLabelsInMenu) { _, newValue in
+                                LogManager.shared.info("Show labels in menu toggled to \(newValue)")
+                                viewModel.saveSettings()
+                            }
+                        
+                        Divider()
+                        
+                        HStack {
+                            Text(languageManager.t("settings.widget.mode"))
+                            Spacer()
+                            Picker("", selection: $viewModel.widgetDisplayMode) {
+                                Text(languageManager.t("settings.widget.auto")).tag("auto")
+                                Text(languageManager.t("settings.widget.specific")).tag("specific")
+                            }
+                            .pickerStyle(.segmented)
+                            .frame(width: 200)
+                            .onChange(of: viewModel.widgetDisplayMode) { _, newValue in
+                                LogManager.shared.info("Widget display mode changed to \(newValue)")
+                                viewModel.syncToWidget()
+                            }
+                        }
+                        
+                        if viewModel.widgetDisplayMode == "specific" {
+                            Divider()
+                            HStack {
+                                Text(languageManager.t("settings.widget.select_host"))
+                                Spacer()
+                                Picker("", selection: $viewModel.widgetSelectedHostId) {
+                                    Text(languageManager.t("settings.widget.none")).tag("")
+                                    ForEach(viewModel.hosts) { host in
+                                        Text(host.name).tag(host.id.uuidString)
+                                    }
+                                }
+                                .pickerStyle(.menu)
+                                .frame(width: 200)
+                                .onChange(of: viewModel.widgetSelectedHostId) { _, newValue in
+                                    LogManager.shared.info("Widget host changed to \(newValue)")
+                                    viewModel.syncToWidget()
+                                }
+                            }
+                        }
                     }
                 }
-            } header: {
-                Label(languageManager.t("settings.section.widget"), systemImage: "rectangle.3.group")
+                
+                // MARK: - Monitor & Logs
+                ModernCard {
+                    VStack(alignment: .leading, spacing: 16) {
+                        SectionHeader(title: languageManager.t("settings.section.monitor"), icon: "waveform.path.ecg")
+                        
+                        HStack {
+                            Text(languageManager.t("settings.interval"))
+                            Spacer()
+                            Picker("", selection: $viewModel.pingInterval) {
+                                Text(languageManager.t("settings.interval.3s")).tag(3.0)
+                                Text(languageManager.t("settings.interval.5s")).tag(5.0)
+                                Text(languageManager.t("settings.interval.10s")).tag(10.0)
+                                Text(languageManager.t("settings.interval.30s")).tag(30.0)
+                            }
+                            .pickerStyle(.segmented)
+                            .frame(width: 200)
+                            .onChange(of: viewModel.pingInterval) { _, newValue in
+                                LogManager.shared.info("Ping interval changed to \(Int(newValue))s")
+                                viewModel.saveSettings()
+                                if viewModel.isRunning {
+                                    viewModel.stopAll()
+                                    viewModel.startAll()
+                                }
+                            }
+                        }
+                        
+                        Divider()
+                        
+                        HStack {
+                            Text(languageManager.t("logs.level"))
+                            Spacer()
+                            Picker("", selection: $viewModel.logLevel) {
+                                ForEach(LogManager.LogLevel.allCases, id: \.self) { level in
+                                    Text(languageManager.t("logs.level.\(level.rawValue.lowercased())")).tag(level)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                            .frame(width: 200)
+                            .onChange(of: viewModel.logLevel) { _, newValue in
+                                LogManager.shared.info("Log level changed to \(newValue.rawValue)")
+                                viewModel.saveSettings()
+                            }
+                        }
+                    }
+                }
+                
+                // MARK: - Notifications
+                ModernCard {
+                    VStack(alignment: .leading, spacing: 16) {
+                        SectionHeader(title: languageManager.t("settings.section.notify"), icon: "bell.badge.fill")
+                        
+                        Toggle(languageManager.t("settings.notify.enable"), isOn: $viewModel.notificationEnabled)
+                            .onChange(of: viewModel.notificationEnabled) { _, newValue in
+                                LogManager.shared.info("Notifications enabled: \(newValue)")
+                                viewModel.saveSettings()
+                            }
+                        
+                        if viewModel.notificationEnabled {
+                            Divider()
+                            
+                            HStack {
+                                Text(languageManager.t("settings.notify.type"))
+                                Spacer()
+                                Picker("", selection: $viewModel.notificationType) {
+                                    Text(languageManager.t("settings.notify.system")).tag("system")
+                                    Text(languageManager.t("settings.notify.bark")).tag("bark")
+                                }
+                                .pickerStyle(.segmented)
+                                .frame(width: 200)
+                                .onChange(of: viewModel.notificationType) { _, newValue in
+                                    LogManager.shared.info("Notification type changed to \(newValue)")
+                                    viewModel.saveSettings()
+                                }
+                            }
+                            
+                            if viewModel.notificationType == "bark" {
+                                Divider()
+                                HStack {
+                                    Text("Bark URL")
+                                    Spacer()
+                                    TextField("https://api.day.app/...", text: $viewModel.barkURL)
+                                        .textFieldStyle(.roundedBorder)
+                                        .frame(width: 200)
+                                        .onChange(of: viewModel.barkURL) { _, _ in
+                                            viewModel.saveSettings()
+                                        }
+                                }
+                            }
+                        }
+                    }
+                }
             }
+            .padding(Theme.Layout.cardPadding)
         }
+        .background(Theme.Colors.background)
         .padding()
     }
     
