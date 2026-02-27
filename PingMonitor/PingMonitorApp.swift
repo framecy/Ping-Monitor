@@ -234,6 +234,7 @@ class PingMonitorViewModel: ObservableObject {
     @Published var statusBarWidth: Int = 160    // total status bar item width in pt
     @Published var statusBarFontSize: Int = 9
     @Published var statusBarFontWeight: String = "medium" // "regular", "medium", "bold"
+    @Published var showIconInMenu: Bool = true
     
     var statusBarController: StatusBarController?
     private var pingProcesses: [UUID: Process] = [:]
@@ -305,6 +306,13 @@ class PingMonitorViewModel: ObservableObject {
         statusBarFontSize = savedSize == 0 ? 9 : savedSize
         statusBarFontWeight = defaults.string(forKey: "statusBarFontWeight") ?? "medium"
         
+        // Use object for boolean to handle missing key as default true
+        if let iconSaved = defaults.object(forKey: "showIconInMenu") as? Bool {
+            showIconInMenu = iconSaved
+        } else {
+            showIconInMenu = true
+        }
+        
         LogManager.shared.info("Settings loaded: \(hosts.count) hosts, \(presets.count) presets")
     }
 
@@ -340,6 +348,7 @@ class PingMonitorViewModel: ObservableObject {
         defaults.set(statusBarWidth, forKey: "statusBarWidth")
         defaults.set(statusBarFontSize, forKey: "statusBarFontSize")
         defaults.set(statusBarFontWeight, forKey: "statusBarFontWeight")
+        defaults.set(showIconInMenu, forKey: "showIconInMenu")
     }
 
     func setupAutoStart() {
@@ -1167,17 +1176,23 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
         let displayText = viewModel.getStatusBarDisplayText()
         let font = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium)
         button.font = font
+        button.imagePosition = .imageLeft
+        button.alignment = .left
 
-        if viewModel.isRunning {
-            button.image = NSImage(systemSymbolName: "network.badge.shield.half.filled", accessibilityDescription: nil)
+        if viewModel.showIconInMenu {
+            if viewModel.isRunning {
+                button.image = NSImage(systemSymbolName: "network.badge.shield.half.filled", accessibilityDescription: nil)
+            } else {
+                button.image = NSImage(systemSymbolName: "network", accessibilityDescription: nil)
+            }
         } else {
-            button.image = NSImage(systemSymbolName: "network", accessibilityDescription: nil)
+            button.image = nil
         }
 
         let showingText = viewModel.showLatencyInMenu || viewModel.showLabelsInMenu
         var latencyStr = ""
         if viewModel.isRunning && showingText && !displayText.isEmpty && displayText != "●" {
-            latencyStr = " \(displayText)"
+            latencyStr = viewModel.showIconInMenu ? " \(displayText)" : displayText
         }
 
         if viewModel.showSpeedInMenu {
@@ -1195,48 +1210,46 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
                 ]))
             }
             
-            // Calculate exact padding needed to push speed to the right. 
-            // We subtract ~16pt for standard NSStatusBarButton internal margins/image spacings.
+            let iconWidth: CGFloat = viewModel.showIconInMenu ? widthIconOnly : 8
             let textWidth = measureWidth(text: latencyStr, font: font)
-            let currentWidth = textWidth + widthIconOnly
+            let currentWidth = textWidth + iconWidth
             let targetWidth = CGFloat(viewModel.statusBarWidth)
             let speedWidth = speedImage.size.width
-            let availableSpace = targetWidth - currentWidth - speedWidth - 16
+            let availableSpace = targetWidth - currentWidth - speedWidth - 10 // Adjusted margin
             
             if availableSpace > 0 {
-                // Use .kern on a single space character to pad exactly the remaining float pixels
                 fullAttr.append(NSAttributedString(string: " ", attributes: [
                     .font: font,
                     .kern: availableSpace,
                     .paragraphStyle: paragraphStyle
                 ]))
             } else {
-                // If it doesn't fit, just put a natural space (will likely be clipped by the button bounds)
+                // Keep it exactly clipping without breaking
                 fullAttr.append(NSAttributedString(string: " ", attributes: [
                     .font: font,
                     .paragraphStyle: paragraphStyle
                 ]))
             }
             
-            // Append speed image via NSTextAttachment
             let attachment = NSTextAttachment()
             attachment.image = speedImage
-            attachment.bounds = CGRect(x: 0, y: -4, width: speedImage.size.width, height: speedImage.size.height)
+            // Vertically center with the text (font cap height center)
+            let yOffset = (font.capHeight - speedImage.size.height) / 2.0
+            attachment.bounds = CGRect(x: 0, y: yOffset, width: speedImage.size.width, height: speedImage.size.height)
             let attachStr = NSAttributedString(attachment: attachment)
             fullAttr.append(attachStr)
             
-            // Apply paragraph style to the whole string just in case
             fullAttr.addAttributes([.paragraphStyle: paragraphStyle], range: NSRange(location: 0, length: fullAttr.length))
             
             button.attributedTitle = fullAttr
-            statusItem?.length = CGFloat(viewModel.statusBarWidth)
+            statusItem?.length = targetWidth
         } else {
             button.attributedTitle = NSAttributedString()
             button.title = latencyStr
             if !latencyStr.isEmpty {
-                statusItem?.length = measureWidth(text: latencyStr, font: font) + widthIconOnly
+                statusItem?.length = measureWidth(text: latencyStr, font: font) + (viewModel.showIconInMenu ? widthIconOnly : 16)
             } else {
-                statusItem?.length = widthIconOnly
+                statusItem?.length = viewModel.showIconInMenu ? widthIconOnly : 0
             }
         }
     }

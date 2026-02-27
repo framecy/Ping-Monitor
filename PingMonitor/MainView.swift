@@ -1943,9 +1943,21 @@ struct SettingsTab: View {
                             .foregroundStyle(.secondary)
                             .padding(.top, -8)
                         
+                        let activeMenuCount = [viewModel.showIconInMenu, viewModel.showLatencyInMenu, viewModel.showLabelsInMenu, viewModel.showSpeedInMenu].filter { $0 }.count
+                        
+                        Divider()
+                        
+                        Toggle(languageManager.t("settings.show_icon"), isOn: $viewModel.showIconInMenu)
+                            .disabled((viewModel.showIconInMenu && activeMenuCount <= 1) || (!viewModel.showIconInMenu && activeMenuCount >= 3))
+                            .onChange(of: viewModel.showIconInMenu) { _, newValue in
+                                LogManager.shared.info("Show icon in menu toggled to \(newValue)")
+                                viewModel.saveSettings()
+                            }
+                        
                         Divider()
                         
                         Toggle(languageManager.t("settings.show_latency"), isOn: $viewModel.showLatencyInMenu)
+                            .disabled((viewModel.showLatencyInMenu && activeMenuCount <= 1) || (!viewModel.showLatencyInMenu && activeMenuCount >= 3))
                             .onChange(of: viewModel.showLatencyInMenu) { _, newValue in
                                 LogManager.shared.info("Show latency in menu toggled to \(newValue)")
                                 viewModel.saveSettings()
@@ -1954,6 +1966,7 @@ struct SettingsTab: View {
                         Divider()
 
                         Toggle(languageManager.t("settings.show_labels"), isOn: $viewModel.showLabelsInMenu)
+                            .disabled((viewModel.showLabelsInMenu && activeMenuCount <= 1) || (!viewModel.showLabelsInMenu && activeMenuCount >= 3))
                             .onChange(of: viewModel.showLabelsInMenu) { _, newValue in
                                 LogManager.shared.info("Show labels in menu toggled to \(newValue)")
                                 viewModel.saveSettings()
@@ -1962,6 +1975,7 @@ struct SettingsTab: View {
                         Divider()
                         
                         Toggle(languageManager.t("settings.show_speed"), isOn: $viewModel.showSpeedInMenu)
+                            .disabled((viewModel.showSpeedInMenu && activeMenuCount <= 1) || (!viewModel.showSpeedInMenu && activeMenuCount >= 3))
                             .onChange(of: viewModel.showSpeedInMenu) { _, newValue in
                                 LogManager.shared.info("Show speed in menu toggled to \(newValue)")
                                 viewModel.saveSettings()
