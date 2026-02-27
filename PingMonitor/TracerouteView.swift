@@ -257,7 +257,7 @@ struct TracerouteView: View {
     
     private var statusBar: some View {
         HStack(spacing: 10) {
-            if manager.isRunning {
+            if manager.isRunning || manager.isDownloading {
                 ProgressView()
                     .controlSize(.small)
                     .scaleEffect(0.8)
@@ -267,7 +267,7 @@ struct TracerouteView: View {
                     .font(.system(size: 14))
             }
             
-            Text(manager.progress)
+            Text(manager.isDownloading ? manager.downloadProgress : manager.progress)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(Theme.Colors.textSecondary)
             
@@ -279,6 +279,20 @@ struct TracerouteView: View {
                 let timeoutHops = manager.hops.filter { $0.isTimeout }
                 
                 HStack(spacing: 12) {
+                    if let mapUrl = manager.mapUrl, let url = URL(string: mapUrl) {
+                        Link(destination: url) {
+                            HopSummaryBadge(
+                                icon: "map.fill",
+                                value: "Map",
+                                label: "trace.ac",
+                                color: Theme.Colors.accentPurple
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        
+                        Divider().frame(height: 12).opacity(0.3)
+                    }
+                    
                     HopSummaryBadge(
                         icon: "arrow.triangle.branch",
                         value: "\(manager.hops.count)",
@@ -420,10 +434,30 @@ struct HopRowView: View {
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(Theme.Colors.textPrimary)
                         .lineLimit(1)
-                    if hop.hostName != hop.ip {
-                        Text(hop.ip)
-                            .font(.system(size: 10, design: .monospaced))
-                            .foregroundStyle(Theme.Colors.textTertiary)
+                    
+                    HStack(spacing: 4) {
+                        if hop.hostName != hop.ip {
+                            Text(hop.ip)
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundStyle(Theme.Colors.textTertiary)
+                                .lineLimit(1)
+                        }
+                        
+                        if let asn = hop.asn, !asn.isEmpty {
+                            Text(asn)
+                                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 1)
+                                .background(Theme.Colors.accentPurple.opacity(0.15))
+                                .foregroundStyle(Theme.Colors.accentPurple)
+                                .cornerRadius(4)
+                        }
+                    }
+                    
+                    if let location = hop.location, !location.isEmpty {
+                        Text(location)
+                            .font(.system(size: 10))
+                            .foregroundStyle(Theme.Colors.textSecondary)
                             .lineLimit(1)
                     }
                 }

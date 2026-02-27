@@ -1320,7 +1320,10 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
         let downValSize = (downValStr as NSString).size(withAttributes: downAttrs)
         
         let arrowWidth = max(upArrowSize.width, downArrowSize.width)
-        let valWidth = max(upValSize.width, downValSize.width)
+        
+        // Use a fixed width based on user requested 6 digits format to stop jitter
+        let templateStr = "9999.99 MB/s"
+        let valWidth = (templateStr as NSString).size(withAttributes: upAttrs).width
         
         // Fixed gap between arrow and value
         let gap: CGFloat = 4.0
@@ -1340,11 +1343,13 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
         
         // Draw top row (Up)
         (upArrowStr as NSString).draw(at: NSPoint(x: 0, y: topY), withAttributes: arrowAttrs)
-        (upValStr as NSString).draw(at: NSPoint(x: valX, y: topY), withAttributes: upAttrs)
+        let upX = valX + (valWidth - upValSize.width)
+        (upValStr as NSString).draw(at: NSPoint(x: upX, y: topY), withAttributes: upAttrs)
         
         // Draw bottom row (Down)
         (downArrowStr as NSString).draw(at: NSPoint(x: 0, y: bottomY), withAttributes: arrowAttrs)
-        (downValStr as NSString).draw(at: NSPoint(x: valX, y: bottomY), withAttributes: downAttrs)
+        let downX = valX + (valWidth - downValSize.width)
+        (downValStr as NSString).draw(at: NSPoint(x: downX, y: bottomY), withAttributes: downAttrs)
         
         image.unlockFocus()
         image.isTemplate = false

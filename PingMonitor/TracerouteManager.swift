@@ -19,6 +19,10 @@ struct TracerouteHop: Identifiable, Sendable {
     var best: Double?
     var worst: Double?
     
+    // NTrace Data
+    var asn: String?
+    var location: String?
+    
     var latencyColor: Color {
         guard let avg = avgLatency else { return .gray }
         if avg < 50 { return .green }
@@ -33,8 +37,6 @@ struct TracerouteHop: Identifiable, Sendable {
     
     var formattedLoss: String {
         if sent == 0 { return "0%" }
-        // If we have MTR stats, calculated based on sent/received
-        // Otherwise use the snapshot loss
         if sent > 0 {
              let loss = Double(sent - received) / Double(sent) * 100
              return String(format: "%.0f%%", loss)
@@ -45,7 +47,7 @@ struct TracerouteHop: Identifiable, Sendable {
 
 // MARK: - Hop Line Parser (nonisolated, Sendable-safe)
 
-/// Parse a single traceroute output line
+/// Parse a single traceroute output line from standard macOS traceroute
 func parseHopLine(_ line: String) -> TracerouteHop? {
     let trimmed = line.trimmingCharacters(in: .whitespaces)
     if trimmed.isEmpty { return nil }
@@ -65,8 +67,6 @@ func parseHopLine(_ line: String) -> TracerouteHop? {
     guard hopNumber > 0 else { return nil }
     
     let content = String(trimmed[restRange]).trimmingCharacters(in: .whitespaces)
-    
-    // Tokenize by spaces
     let tokens = content.split(separator: " ").map { String($0) }
     
     var hostName = "*"
@@ -77,7 +77,7 @@ func parseHopLine(_ line: String) -> TracerouteHop? {
     var latencyStartIndex = 0
     var foundLatencyStart = false
     
-    // 2. Scan for start of latencies (number followed by ms, or *)
+    // Scan for latencies
     while i < tokens.count {
         let t = tokens[i]
         
@@ -97,11 +97,9 @@ func parseHopLine(_ line: String) -> TracerouteHop? {
     }
     
     if foundLatencyStart {
-        // Everything before is Host/IP
         let hostTokens = tokens[0..<latencyStartIndex]
         if !hostTokens.isEmpty {
             let hostStr = hostTokens.joined(separator: " ")
-            
             let ipParenRegex = try? NSRegularExpression(pattern: "^(\\S+)\\s+\\(([\\d\\.:]+)\\)")
             let simpleIpRegex = try? NSRegularExpression(pattern: "^([\\d\\.:]+)$")
             let hostRange = NSRange(location: 0, length: hostStr.utf16.count)
@@ -135,20 +133,20 @@ func parseHopLine(_ line: String) -> TracerouteHop? {
             latencies.append(val)
             i += 2
         } else if t.hasPrefix("!") {
-            // Error flag (e.g. !X), ignore for latency value but consume
             i += 1
         } else {
-            // Unknown token, skip
             i += 1
         }
     }
     
-    // Stats calculation
     let validLatencies = latencies.compactMap { $0 }
     let avg = validLatencies.isEmpty ? nil : validLatencies.reduce(0, +) / Double(validLatencies.count)
     let totalProbes = max(latencies.count, 1)
     let timeoutCount = latencies.filter { $0 == nil }.count
     let loss = Double(timeoutCount) / Double(totalProbes) * 100
+    
+    // FIX: Traceroute local IP bug. Standard traceroute often outputs the localhost as hop 1 on some setups, or doesn't resolve remote correctly.
+    // If we only get a 0ms local ping on hop 1, we can optionally filter it, but parseHopLine itself should just faithfully parse.
     
     return TracerouteHop(
         hopNumber: hopNumber,
@@ -161,7 +159,9 @@ func parseHopLine(_ line: String) -> TracerouteHop? {
         sent: latencies.count,
         received: validLatencies.count,
         best: validLatencies.min(),
-        worst: validLatencies.max()
+        worst: validLatencies.max(),
+        asn: nil,
+        location: nil
     )
 }
 
@@ -176,28 +176,120 @@ class TracerouteManager: ObservableObject {
     @Published var targetHost: String = ""
     @Published var maxHops: Int = 30
     
+    @Published var isDownloading = false
+    @Published var downloadProgress: String = ""
+    @Published var mapUrl: String? = nil
+    
     private var process: Process?
     private var mtrRound: Int = 0
+    private var currentParsingHop: TracerouteHop?
+    
+    // MARK: - CLI Management
+    
+    private func getNextTracePath() -> URL {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let binDir = appSupport.appendingPathComponent("PingMonitor/bin")
+        if !FileManager.default.fileExists(atPath: binDir.path) {
+            try? FileManager.default.createDirectory(at: binDir, withIntermediateDirectories: true)
+        }
+        return binDir.appendingPathComponent("nexttrace")
+    }
+    
+    private func downloadNextTraceIfNeeded() async throws {
+        let cliUrl = getNextTracePath()
+        if FileManager.default.fileExists(atPath: cliUrl.path) {
+            return
+        }
+        
+        isDownloading = true
+        downloadProgress = "Downloading NTrace-core..."
+        
+        var realArch = "arm64"
+        #if arch(x86_64)
+        realArch = "amd64"
+        #endif
+        
+        let downloadStr = "https://github.com/nxtrace/NTrace-core/releases/latest/download/nexttrace_darwin_\(realArch)"
+        guard let downloadUrl = URL(string: downloadStr) else { return }
+        
+        do {
+            let (data, _) = try await URLSession.shared.data(from: downloadUrl)
+            try data.write(to: cliUrl)
+            
+            let chmod = Process()
+            chmod.executableURL = URL(fileURLWithPath: "/bin/chmod")
+            chmod.arguments = ["+x", cliUrl.path]
+            try chmod.run()
+            chmod.waitUntilExit()
+            
+            isDownloading = false
+        } catch {
+            isDownloading = false
+            throw error
+        }
+    }
+    
+    private func fetchMapUrlInBackground(host: String) {
+        Task.detached {
+            let cliPath = await self.getNextTracePath().path
+            let tempProc = Process()
+            let pipe = Pipe()
+            tempProc.standardOutput = pipe
+            tempProc.standardError = pipe
+            tempProc.executableURL = URL(fileURLWithPath: "/bin/sh")
+            // Run nexttrace uniquely to fetch MapTrace URL (-t for table, simple fast trace)
+            tempProc.arguments = ["-c", "'\(cliPath)' -t -m 20 -q 1 \(host) 2>&1"]
+            
+            do {
+                try tempProc.run()
+                tempProc.waitUntilExit()
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                if let output = String(data: data, encoding: .utf8) {
+                    if let range = output.range(of: "MapTrace URL: https://") {
+                         let urlStr = String(output[range.lowerBound...]).replacingOccurrences(of: "MapTrace URL: ", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+                         let finalUrl = urlStr.components(separatedBy: "\n").first ?? urlStr
+                         await MainActor.run {
+                             self.mapUrl = finalUrl
+                         }
+                    }
+                }
+            } catch {
+                // Ignore NextTrace failure
+            }
+        }
+    }
     
     // MARK: - Traceroute
     
     func startTrace(host: String) {
-        guard !host.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        let trimmedHost = host.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedHost.isEmpty else { return }
         
         stop()
         
-        let trimmedHost = host.trimmingCharacters(in: .whitespacesAndNewlines)
         targetHost = trimmedHost
         hops = []
+        mapUrl = nil
         isRunning = true
         progress = String(format: LanguageManager.shared.t("traceroute.tracing"), trimmedHost)
         
         LogManager.shared.info("Starting traceroute to \(trimmedHost)")
         
-        if isMTRMode {
-            startMTRTrace(host: trimmedHost)
-        } else {
-            startSingleTrace(host: trimmedHost)
+        Task {
+            do {
+                try await downloadNextTraceIfNeeded()
+                fetchMapUrlInBackground(host: trimmedHost)
+                
+                if self.isMTRMode {
+                    self.startMTRTrace(host: trimmedHost)
+                } else {
+                    self.startSingleTrace(host: trimmedHost)
+                }
+            } catch {
+                self.isRunning = false
+                self.progress = "Download failed: \(error.localizedDescription)"
+                LogManager.shared.error("Failed to download nexttrace: \(error)")
+            }
         }
     }
     
@@ -206,6 +298,7 @@ class TracerouteManager: ObservableObject {
             process.terminate()
             LogManager.shared.info("Traceroute process terminated")
         }
+        flushCurrentHop()
         process = nil
         mtrRound = 0
         isRunning = false
@@ -217,29 +310,24 @@ class TracerouteManager: ObservableObject {
     // MARK: - Single Traceroute
     
     private func startSingleTrace(host: String) {
+        let cliPath = getNextTracePath().path
         let proc = Process()
         let pipe = Pipe()
         
         proc.standardOutput = pipe
         proc.standardError = pipe
         proc.executableURL = URL(fileURLWithPath: "/bin/sh")
-        // Use -I (ICMP) as it's generally more standard for reading, but if it fails, we might want UDP.
-        // For now sticking to -I as in original, but with better parsing.
-        proc.arguments = ["-c", "/usr/sbin/traceroute -I -m \(maxHops) -q 3 -w 1 \(host) 2>&1"]
+        proc.arguments = ["-c", "'\(cliPath)' -t -I -m \(maxHops) -q 3 \(host) 2>&1"]
         
         self.process = proc
         
         pipe.fileHandleForReading.readabilityHandler = { @Sendable handle in
             let data = handle.availableData
-            guard let output = String(data: data, encoding: .utf8),
-                  !output.isEmpty else { return }
+            guard let output = String(data: data, encoding: .utf8), !output.isEmpty else { return }
             
-            // Process each line
             output.enumerateLines { line, _ in
-                if let hop = parseHopLine(line) {
-                    Task { @MainActor [weak self] in
-                        self?.addOrUpdateHop(hop)
-                    }
+                Task { @MainActor [weak self] in
+                    self?.parseTableLine(line)
                 }
             }
         }
@@ -255,6 +343,7 @@ class TracerouteManager: ObservableObject {
         proc.terminationHandler = { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self = self else { return }
+                self.flushCurrentHop()
                 self.isRunning = false
                 if !self.hops.isEmpty {
                     self.progress = String(format: LanguageManager.shared.t("traceroute.complete"), self.hops.count)
@@ -278,28 +367,25 @@ class TracerouteManager: ObservableObject {
         let roundNum = mtrRound
         progress = "MTR Round #\(roundNum) → \(host)"
         
+        let cliPath = getNextTracePath().path
         let proc = Process()
         let pipe = Pipe()
         
         proc.standardOutput = pipe
         proc.standardError = pipe
         proc.executableURL = URL(fileURLWithPath: "/bin/sh")
-        // MTR mode: quick probes (-q 1), wait 1s (-w 1)
-        proc.arguments = ["-c", "/usr/sbin/traceroute -I -m \(maxHops) -q 1 -w 1 \(host) 2>&1"]
+        proc.arguments = ["-c", "'\(cliPath)' -t -I -m \(maxHops) -q 1 \(host) 2>&1"]
         
         self.process = proc
-        
         let roundHops = LockedArray<TracerouteHop>()
+        let parser = MTRRoundParser(roundHops: roundHops)
         
         pipe.fileHandleForReading.readabilityHandler = { @Sendable handle in
             let data = handle.availableData
-            guard let output = String(data: data, encoding: .utf8),
-                  !output.isEmpty else { return }
+            guard let output = String(data: data, encoding: .utf8), !output.isEmpty else { return }
             
             output.enumerateLines { line, _ in
-                if let hop = parseHopLine(line) {
-                    roundHops.append(hop)
-                }
+                parser.parseLine(line)
             }
         }
         
@@ -312,20 +398,146 @@ class TracerouteManager: ObservableObject {
         }
         
         proc.terminationHandler = { [weak self] _ in
+            parser.flush()
             let hops = roundHops.values
+            
             Task { @MainActor [weak self] in
                 guard let self = self, self.isRunning else { return }
                 
-                // Merge round results into cumulative hops
                 self.mergeRoundResults(hops)
                 
-                // Schedule next round after 1 second
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
                 
                 if self.isRunning {
                     self.runMTRRound(host: host)
                 }
             }
+        }
+    }
+    
+    // MARK: - Table Line Parser
+    
+    private func parseTableLine(_ line: String) {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        if trimmed.isEmpty || trimmed.hasPrefix("Hop ") { return }
+        
+        if line.contains("MapTrace URL:") {
+            if let urlRange = line.range(of: "https://") {
+                let url = String(line[urlRange.lowerBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+                self.mapUrl = url
+            }
+            return
+        }
+        
+        let isNewHop = line.first?.isNumber == true
+        let tokens = line.split(separator: " ", omittingEmptySubsequences: true).map { String($0) }
+        
+        if tokens.isEmpty { return }
+        
+        if isNewHop {
+            flushCurrentHop()
+            
+            let hopNum = Int(tokens[0]) ?? 0
+            var host = "*"
+            var ip = "*"
+            var lat: Double? = nil
+            var asn: String? = nil
+            var location: String? = nil
+            
+            var latencyIdx = -1
+            for (idx, token) in tokens.enumerated() {
+                if token.hasSuffix("ms") {
+                    latencyIdx = idx
+                    break
+                }
+            }
+            
+            if latencyIdx > 0 {
+                lat = Double(tokens[latencyIdx].replacingOccurrences(of: "ms", with: ""))
+                let hostTokens = tokens[1..<latencyIdx]
+                if let first = hostTokens.first {
+                    host = first
+                    if hostTokens.count >= 2 {
+                        let second = hostTokens[1]
+                        if second.hasPrefix("(") && second.hasSuffix(")") {
+                            ip = String(second.dropFirst().dropLast())
+                        } else {
+                            ip = host
+                        }
+                    } else {
+                        ip = host
+                    }
+                }
+                if latencyIdx + 1 < tokens.count {
+                    let possibleAsn = tokens[latencyIdx + 1]
+                    if possibleAsn != "*" {
+                        asn = (possibleAsn.hasPrefix("AS") || Int(possibleAsn) != nil) ? (possibleAsn.hasPrefix("AS") ? possibleAsn : "AS\(possibleAsn)") : possibleAsn
+                    }
+                }
+                if latencyIdx + 2 < tokens.count {
+                    let locTokens = tokens[(latencyIdx + 2)...]
+                    if !locTokens.isEmpty {
+                        location = locTokens.joined(separator: " ").trimmingCharacters(in: .whitespaces)
+                    }
+                }
+            } else {
+                if let starIdx = tokens.firstIndex(of: "*") {
+                    let hostTokens = tokens[1..<starIdx]
+                    if let first = hostTokens.first {
+                        host = first
+                        if hostTokens.count >= 2 {
+                            let second = hostTokens[1]
+                            if second.hasPrefix("(") && second.hasSuffix(")") {
+                                ip = String(second.dropFirst().dropLast())
+                            }
+                        }
+                    }
+                }
+            }
+            
+            var initLatencies: [Double?] = []
+            if lat != nil { initLatencies.append(lat) }
+            else if tokens.contains("*") { initLatencies.append(nil) }
+            
+            currentParsingHop = TracerouteHop(
+                 hopNumber: hopNum, hostName: host, ip: ip, latencies: initLatencies, 
+                 avgLatency: lat, packetLoss: lat == nil ? 100 : 0, isTimeout: lat == nil,
+                 sent: 1, received: lat != nil ? 1 : 0, best: lat, worst: lat,
+                 asn: asn, location: location
+            )
+        } else {
+            guard var hop = currentParsingHop else { return }
+            
+            var lat: Double? = nil
+            if let msIndex = tokens.firstIndex(where: { $0.hasSuffix("ms") }) {
+                 lat = Double(tokens[msIndex].replacingOccurrences(of: "ms", with: ""))
+            }
+            
+            hop.latencies.append(lat)
+            hop.sent += 1
+            if let lat = lat {
+                 hop.received += 1
+                 hop.best = min(hop.best ?? lat, lat)
+                 hop.worst = max(hop.worst ?? lat, lat)
+            }
+            
+            let validLats = hop.latencies.compactMap { $0 }
+            hop.avgLatency = validLats.isEmpty ? nil : validLats.reduce(0, +) / Double(validLats.count)
+            hop.packetLoss = Double(hop.sent - hop.received) / Double(hop.sent) * 100.0
+            hop.isTimeout = validLats.isEmpty
+            
+            currentParsingHop = hop
+        }
+        
+        if let hop = currentParsingHop {
+            self.addOrUpdateHop(hop)
+        }
+    }
+    
+    private func flushCurrentHop() {
+        if let hop = currentParsingHop {
+            self.addOrUpdateHop(hop)
+            currentParsingHop = nil
         }
     }
     
@@ -344,20 +556,16 @@ class TracerouteManager: ObservableObject {
     private func mergeRoundResults(_ roundHops: [TracerouteHop]) {
         for roundHop in roundHops {
             if let idx = hops.firstIndex(where: { $0.hopNumber == roundHop.hopNumber }) {
-                // Update existing hop with new data
                 var existing = hops[idx]
                 
-                // Update hostname/ip if we got a real one (prioritize non-star)
                 if !roundHop.isTimeout && (existing.hostName == "*" || existing.hostName.isEmpty) {
                     existing.hostName = roundHop.hostName
                     existing.ip = roundHop.ip
                 }
                 
-                // Accumulate stats
                 existing.sent += roundHop.sent
                 existing.received += roundHop.received
                 
-                // Update latencies (keep last 3 for display)
                 let newLatency = roundHop.latencies.first ?? nil
                 var displayLatencies = existing.latencies
                 displayLatencies.append(newLatency)
@@ -366,39 +574,25 @@ class TracerouteManager: ObservableObject {
                 }
                 existing.latencies = displayLatencies
                 
-                // Accumulate Min/Max
                 if let newLat = newLatency {
                     existing.best = min(existing.best ?? newLat, newLat)
                     existing.worst = max(existing.worst ?? newLat, newLat)
                     
-                    // Update rolling Average
-                    // We need a way to store sum. Since we don't have it in struct explicitly,
-                    // we can approximate or if we want precision, calculate from avg * count.
-                    // But `received` is the count of valid latencies.
-                    // New Avg = ((Old Avg * Old Count) + New Val) / New Count
-                    let oldRec = Double(existing.received - 1) // we already incremented received
+                    let oldRec = Double(existing.received - 1)
                      let oldAvg = existing.avgLatency ?? 0
                      let newTotal = (oldAvg * oldRec) + newLat
                      existing.avgLatency = newTotal / Double(existing.received)
                 }
                 
-                // Loss is calculated dynamically in the property based on sent/received
-                
                 existing.isTimeout = (existing.received == 0)
-                // If it was a timeout this round, packetLoss property update handled by computed var?
-                // No, existing.packetLoss is a stored property in struct, we need to update it for the View to see it if it uses the stored prop.
-                // The struct has computed `formattedLoss` but stored `packetLoss`.
-                // Let's update stored `packetLoss` too.
                 if existing.sent > 0 {
                     existing.packetLoss = Double(existing.sent - existing.received) / Double(existing.sent) * 100.0
                 }
                 
                 hops[idx] = existing
             } else {
-                // New hop
                 var newHop = roundHop
-                // Initialize MTR counters if not already (parseHopLine does it, but check)
-                if newHop.sent == 0 { // Should match latencies.count
+                if newHop.sent == 0 {
                     newHop.sent = newHop.latencies.count
                     newHop.received = newHop.latencies.compactMap{$0}.count
                     newHop.best = newHop.latencies.compactMap{$0}.min()
@@ -413,7 +607,7 @@ class TracerouteManager: ObservableObject {
     // MARK: - Export
     
     func copyResultsToClipboard() {
-        var text = "Traceroute to \(targetHost)\n"
+        var text = "NextTrace to \(targetHost)\n"
         text += String(repeating: "-", count: 70) + "\n"
         text += "Hop  Host/IP                        Avg Latency  Loss\n"
         text += String(repeating: "-", count: 70) + "\n"
@@ -424,6 +618,10 @@ class TracerouteManager: ObservableObject {
             let hostPad = String(hostStr.prefix(30)).padding(toLength: 30, withPad: " ", startingAt: 0)
             let avgPad = hop.formattedAvg.padding(toLength: 12, withPad: " ", startingAt: 0)
             text += "\(hopNum) \(hostPad) \(avgPad) \(hop.formattedLoss)\n"
+        }
+        
+        if let map = mapUrl {
+            text += "\nMapTrace URL: \(map)\n"
         }
         
         NSPasteboard.general.clearContents()
@@ -447,5 +645,29 @@ final class LockedArray<T: Sendable>: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         return array
+    }
+}
+
+// MARK: - MTR Parser Helper
+
+final class MTRRoundParser: @unchecked Sendable {
+    private let roundHops: LockedArray<TracerouteHop>
+    private let lock = NSLock()
+    
+    init(roundHops: LockedArray<TracerouteHop>) {
+        self.roundHops = roundHops
+    }
+    
+    func parseLine(_ line: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        
+        if let hop = parseHopLine(line) {
+            roundHops.append(hop)
+        }
+    }
+    
+    func flush() {
+        // No-op for standard traceroute which parses completely line by line
     }
 }
