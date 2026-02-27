@@ -1,31 +1,18 @@
 # PingMonitor Changelog
 
-## [2.1.0r11] - 2026-02-27
-### Fixed
-- Fixed SSH shortcuts not auto-connecting: now writes command to temp script and executes in Terminal
-- SSH password auth auto-connects using `expect` script to send password automatically
-
-## [2.1.0r9] - 2026-02-27
-### Fixed
-- Fixed status bar speed: horizontal left-right layout (↑xx ↓xx) with configurable spacing (-/+ stepper in settings)
-- Fixed widget not appearing in system widgets list (build.sh now signs widget extension separately)
-
-## [2.1.0r7] - 2026-02-27
-### Improved
-- Rewrote status bar speed display using custom NSView for stacked vertical layout (↑ green / ↓ blue)
-
-## [2.1.0r6] - 2026-02-27
-### Fixed
-- Fixed status bar network speed not displaying (replaced broken multi-line layout with horizontal ↓/↑ text)
-
-## [2.1.0r5] - 2026-02-27
-### Improved
-- Fixed empty state UI centering on Monitor & Host Management pages
-- Replaced 3D pie chart with flat donut chart (SectorMark), moved text stats below chart
-- Added status bar network speed display (↑/↓ stacked) with toggle and unit selector (Auto/KB/MB) in Settings
-
-## [2.1.0] - 2026-02-26
+## [2.1.0] - 2026-02-27
 ### Added
+- **Status Bar Customization**: Real-time network speed monitor (↑/↓) in the status bar with toggle icon, configurable total width, font size, and text weight.
+- **Advanced Network Speed Page**: Added refresh interval picker (1s-10s) and traffic history trend charts (30m / 1h / 24h / 7d) with total Traffic up/down statistics.
+- **SSH Connectivity**: Re-engineered SSH shortcut connections to bypass AppleScript permission dialogs using `.command` files and `expect` scripts for auto-password auth.
+- **UI Grid Consistency**: Fixed empty state UI centering and enforced uniform card heights across Monitor and Host Management grids.
+- **Charts**: Replaced legacy 3D Pie Chart with natively sleek `SectorMark` donut charts in the Dashboard.
+
+### Fixed
+- Fixed status bar severe misalignment and center-offsetting when content width text overflows.
+- Fixed widget not appearing in system lists (improved build script code signing for widget extensions).
+- Fixed network interface sorting (active/traffic interfaces now float to top).
+
 - Real-time Network Speed Monitoring (Upload/Download, interface selection)
 - Unified Service Shortcuts Panel (Web/SSH/Custom)
 - SSH customized port & password/key authentication support
