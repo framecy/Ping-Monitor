@@ -43,6 +43,15 @@ struct SpeedSample: Identifiable {
     let speedOut: Double   // bytes per second
 }
 
+struct TrafficSnapshot: Codable, Identifiable {
+    var id: String { String(timestamp) }
+    let timestamp: TimeInterval  // Date().timeIntervalSince1970
+    let bytesIn: UInt64
+    let bytesOut: UInt64
+    let speedIn: Double
+    let speedOut: Double
+}
+
 // MARK: - Network Speed Manager
 
 @MainActor
@@ -57,14 +66,25 @@ class NetworkSpeedManager: ObservableObject {
     @Published var totalBytesOut: UInt64 = 0
     @Published var speedHistory: [SpeedSample] = []
     @Published var isMonitoring = false
-    @Published var refreshInterval: TimeInterval = 1.0  // seconds
+    @Published var refreshInterval: TimeInterval = 1.0
+    @Published var trafficHistory: [TrafficSnapshot] = []
     
     private var timer: Timer?
+    private var snapshotTimer: Timer?
     private var previousStats: [String: (bytesIn: UInt64, bytesOut: UInt64)] = [:]
     private var previousTimestamp: Date?
     private let maxHistoryCount = 60
     
-    private init() {}
+    private var trafficFilePath: URL {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let dir = appSupport.appendingPathComponent("PingMonitor")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir.appendingPathComponent("traffic_history.json")
+    }
+    
+    private init() {
+        loadTrafficHistory()
+    }
     
     func startMonitoring() {
         guard !isMonitoring else { return }
@@ -77,6 +97,12 @@ class NetworkSpeedManager: ObservableObject {
         timer = Timer.scheduledTimer(withTimeInterval: refreshInterval, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.fetchStats()
+            }
+        }
+        // Snapshot every 60 seconds for traffic history
+        snapshotTimer = Timer.scheduledTimer(withTimeInterval: 60.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.saveTrafficSnapshot()
             }
         }
     }
@@ -96,7 +122,10 @@ class NetworkSpeedManager: ObservableObject {
     func stopMonitoring() {
         timer?.invalidate()
         timer = nil
+        snapshotTimer?.invalidate()
+        snapshotTimer = nil
         isMonitoring = false
+        saveTrafficSnapshot() // Save final snapshot
     }
     
     private func fetchStats() {
@@ -247,6 +276,82 @@ class NetworkSpeedManager: ObservableObject {
             return String(format: "%.1f MB", b / (1024 * 1024))
         } else {
             return String(format: "%.2f GB", b / (1024 * 1024 * 1024))
+        }
+    }
+    
+    // MARK: - Traffic History
+    
+    private func saveTrafficSnapshot() {
+        guard totalBytesIn > 0 || totalBytesOut > 0 else { return }
+        let snapshot = TrafficSnapshot(
+            timestamp: Date().timeIntervalSince1970,
+            bytesIn: totalBytesIn,
+            bytesOut: totalBytesOut,
+            speedIn: totalSpeedIn,
+            speedOut: totalSpeedOut
+        )
+        trafficHistory.append(snapshot)
+        pruneTrafficHistory()
+        persistTrafficHistory()
+    }
+    
+    private func pruneTrafficHistory() {
+        let cutoff = Date().timeIntervalSince1970 - 7 * 24 * 3600 // 7 days
+        trafficHistory.removeAll { $0.timestamp < cutoff }
+    }
+    
+    private func persistTrafficHistory() {
+        do {
+            let data = try JSONEncoder().encode(trafficHistory)
+            try data.write(to: trafficFilePath)
+        } catch {
+            // Silent fail
+        }
+    }
+    
+    private func loadTrafficHistory() {
+        guard let data = try? Data(contentsOf: trafficFilePath),
+              let history = try? JSONDecoder().decode([TrafficSnapshot].self, from: data) else { return }
+        trafficHistory = history
+        pruneTrafficHistory()
+    }
+    
+    func trafficSnapshots(for range: TrafficTimeRange) -> [TrafficSnapshot] {
+        let cutoff = Date().timeIntervalSince1970 - range.seconds
+        return trafficHistory.filter { $0.timestamp >= cutoff }
+    }
+    
+    func trafficTotals(for range: TrafficTimeRange) -> (bytesIn: UInt64, bytesOut: UInt64) {
+        // Use the latest snapshot's cumulative bytes vs the earliest in range
+        let snapshots = trafficSnapshots(for: range)
+        guard let first = snapshots.first, let last = snapshots.last else { return (0, 0) }
+        let deltaIn = last.bytesIn >= first.bytesIn ? last.bytesIn - first.bytesIn : last.bytesIn
+        let deltaOut = last.bytesOut >= first.bytesOut ? last.bytesOut - first.bytesOut : last.bytesOut
+        return (deltaIn, deltaOut)
+    }
+}
+
+enum TrafficTimeRange: String, CaseIterable {
+    case thirtyMin = "30m"
+    case oneHour = "1h"
+    case twentyFourHours = "24h"
+    case sevenDays = "7d"
+    
+    var seconds: TimeInterval {
+        switch self {
+        case .thirtyMin: return 30 * 60
+        case .oneHour: return 60 * 60
+        case .twentyFourHours: return 24 * 3600
+        case .sevenDays: return 7 * 24 * 3600
+        }
+    }
+    
+    var displayName: String {
+        switch self {
+        case .thirtyMin: return "30min"
+        case .oneHour: return "1h"
+        case .twentyFourHours: return "24h"
+        case .sevenDays: return "7d"
         }
     }
 }

@@ -6,6 +6,7 @@ struct NetworkSpeedTab: View {
     @ObservedObject var viewModel: PingMonitorViewModel
     @StateObject private var speedManager = NetworkSpeedManager.shared
     @ObservedObject private var languageManager = LanguageManager.shared
+    @State private var trafficRange: TrafficTimeRange = .oneHour
     
     var body: some View {
         ScrollView {
@@ -15,6 +16,12 @@ struct NetworkSpeedTab: View {
                 
                 // Speed chart
                 speedChartCard
+                
+                // Traffic stats summary
+                trafficStatsCard
+                
+                // Traffic trend chart
+                trafficTrendCard
                 
                 // Interface details
                 interfaceDetailsCard
@@ -364,5 +371,225 @@ struct NetworkSpeedTab: View {
         if count < 1000 { return "\(count)" }
         if count < 1_000_000 { return String(format: "%.1fK", Double(count) / 1000) }
         return String(format: "%.1fM", Double(count) / 1_000_000)
+    }
+    
+    // MARK: - Traffic Stats Card
+    
+    private var trafficStatsCard: some View {
+        let totals = speedManager.trafficTotals(for: trafficRange)
+        let totalBytes = totals.bytesIn + totals.bytesOut
+        
+        return ModernCard {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    SectionHeader(title: languageManager.t("netspeed.traffic_stats"), icon: "chart.bar.fill")
+                    Spacer()
+                    Picker("", selection: $trafficRange) {
+                        ForEach(TrafficTimeRange.allCases, id: \.self) { range in
+                            Text(range.displayName).tag(range)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 220)
+                }
+                
+                Divider().opacity(0.15)
+                
+                HStack(spacing: 12) {
+                    trafficStatItem(
+                        icon: "arrow.down.circle.fill",
+                        color: Theme.Colors.accentCyan,
+                        label: languageManager.t("netspeed.total_download"),
+                        value: NetworkSpeedManager.formatBytes(totals.bytesIn)
+                    )
+                    
+                    trafficStatItem(
+                        icon: "arrow.up.circle.fill",
+                        color: Theme.Colors.accentPurple,
+                        label: languageManager.t("netspeed.total_upload"),
+                        value: NetworkSpeedManager.formatBytes(totals.bytesOut)
+                    )
+                    
+                    trafficStatItem(
+                        icon: "arrow.up.arrow.down.circle.fill",
+                        color: Theme.Colors.accentOrange,
+                        label: languageManager.t("netspeed.total_traffic"),
+                        value: NetworkSpeedManager.formatBytes(totalBytes)
+                    )
+                }
+            }
+        }
+    }
+    
+    private func trafficStatItem(icon: String, color: Color, label: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 20))
+                .foregroundStyle(color)
+            Text(label)
+                .font(Theme.Fonts.body(10))
+                .foregroundStyle(Theme.Colors.textSecondary)
+            Text(value)
+                .font(.system(size: 18, weight: .bold, design: .rounded))
+                .foregroundStyle(Theme.Colors.textPrimary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(color.opacity(0.06))
+        )
+    }
+    
+    // MARK: - Traffic Trend Card
+    
+    private var trafficTrendCard: some View {
+        let snapshots = speedManager.trafficSnapshots(for: trafficRange)
+        let totals = speedManager.trafficTotals(for: trafficRange)
+        
+        return ModernCard {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    SectionHeader(title: languageManager.t("netspeed.traffic_trend"), icon: "waveform.path.ecg.rectangle")
+                    Spacer()
+                    
+                    HStack(spacing: 12) {
+                        HStack(spacing: 4) {
+                            Circle().fill(Theme.Colors.accentPurple).frame(width: 6, height: 6)
+                            Text(languageManager.t("netspeed.upload"))
+                                .font(Theme.Fonts.body(10))
+                                .foregroundStyle(Theme.Colors.textSecondary)
+                            Text(NetworkSpeedManager.formatBytes(totals.bytesOut))
+                                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                                .foregroundStyle(Theme.Colors.accentPurple)
+                        }
+                        HStack(spacing: 4) {
+                            Circle().fill(Theme.Colors.accentCyan).frame(width: 6, height: 6)
+                            Text(languageManager.t("netspeed.download"))
+                                .font(Theme.Fonts.body(10))
+                                .foregroundStyle(Theme.Colors.textSecondary)
+                            Text(NetworkSpeedManager.formatBytes(totals.bytesIn))
+                                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                                .foregroundStyle(Theme.Colors.accentCyan)
+                        }
+                    }
+                }
+                
+                Divider().opacity(0.15)
+                
+                if snapshots.count < 2 {
+                    Text(languageManager.t("netspeed.collecting"))
+                        .font(Theme.Fonts.body(12))
+                        .foregroundStyle(Theme.Colors.textTertiary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 30)
+                } else {
+                    GeometryReader { geo in
+                        let width = geo.size.width
+                        let height: CGFloat = 140
+                        let maxSpeed = max(
+                            snapshots.map(\.speedIn).max() ?? 1,
+                            snapshots.map(\.speedOut).max() ?? 1,
+                            1024
+                        ) * 1.2
+                        
+                        ZStack(alignment: .topLeading) {
+                            // Grid lines
+                            ForEach(0..<4, id: \.self) { i in
+                                let y = height * CGFloat(i) / 3
+                                Path { path in
+                                    path.move(to: CGPoint(x: 0, y: y))
+                                    path.addLine(to: CGPoint(x: width, y: y))
+                                }
+                                .stroke(Color.white.opacity(0.05), lineWidth: 0.5)
+                            }
+                            
+                            // Upload line (purple)
+                            trafficLine(snapshots: snapshots, keyPath: \.speedOut, maxSpeed: maxSpeed,
+                                        width: width, height: height, color: Theme.Colors.accentPurple)
+                            
+                            // Download line (cyan)
+                            trafficLine(snapshots: snapshots, keyPath: \.speedIn, maxSpeed: maxSpeed,
+                                        width: width, height: height, color: Theme.Colors.accentCyan)
+                            
+                            // Scale labels
+                            VStack {
+                                Text(NetworkSpeedManager.formatSpeed(maxSpeed))
+                                    .font(.system(size: 8, design: .monospaced))
+                                    .foregroundStyle(Theme.Colors.textTertiary)
+                                Spacer()
+                                Text("0")
+                                    .font(.system(size: 8, design: .monospaced))
+                                    .foregroundStyle(Theme.Colors.textTertiary)
+                            }
+                            .frame(height: height)
+                        }
+                        .frame(height: height)
+                    }
+                    .frame(height: 140)
+                    
+                    // Time axis labels
+                    HStack {
+                        if let first = snapshots.first {
+                            Text(formatTime(first.timestamp))
+                                .font(.system(size: 8, design: .monospaced))
+                                .foregroundStyle(Theme.Colors.textTertiary)
+                        }
+                        Spacer()
+                        if let last = snapshots.last {
+                            Text(formatTime(last.timestamp))
+                                .font(.system(size: 8, design: .monospaced))
+                                .foregroundStyle(Theme.Colors.textTertiary)
+                        }
+                    }
+                }
+                
+                // Total summary
+                HStack {
+                    Text(languageManager.t("netspeed.total_traffic"))
+                        .font(Theme.Fonts.body(10))
+                        .foregroundStyle(Theme.Colors.textTertiary)
+                    Text(NetworkSpeedManager.formatBytes(totals.bytesIn + totals.bytesOut))
+                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .foregroundStyle(Theme.Colors.accentOrange)
+                }
+            }
+        }
+    }
+    
+    private func trafficLine(snapshots: [TrafficSnapshot], keyPath: KeyPath<TrafficSnapshot, Double>,
+                             maxSpeed: Double, width: CGFloat, height: CGFloat, color: Color) -> some View {
+        let points: [CGPoint] = snapshots.enumerated().map { idx, snap in
+            let x = width * CGFloat(idx) / CGFloat(max(snapshots.count - 1, 1))
+            let y = height - (height * CGFloat(snap[keyPath: keyPath]) / CGFloat(maxSpeed))
+            return CGPoint(x: x, y: max(0, min(height, y)))
+        }
+        
+        return ZStack {
+            Path { path in
+                guard let first = points.first else { return }
+                path.move(to: CGPoint(x: first.x, y: height))
+                path.addLine(to: first)
+                for point in points.dropFirst() { path.addLine(to: point) }
+                path.addLine(to: CGPoint(x: points.last?.x ?? 0, y: height))
+                path.closeSubpath()
+            }
+            .fill(LinearGradient(colors: [color.opacity(0.15), color.opacity(0.02)],
+                                 startPoint: .top, endPoint: .bottom))
+            
+            Path { path in
+                guard let first = points.first else { return }
+                path.move(to: first)
+                for point in points.dropFirst() { path.addLine(to: point) }
+            }
+            .stroke(color, lineWidth: 1.5)
+        }
+    }
+    
+    private func formatTime(_ timestamp: TimeInterval) -> String {
+        let date = Date(timeIntervalSince1970: timestamp)
+        let formatter = DateFormatter()
+        formatter.dateFormat = trafficRange == .sevenDays ? "MM/dd" : "HH:mm"
+        return formatter.string(from: date)
     }
 }

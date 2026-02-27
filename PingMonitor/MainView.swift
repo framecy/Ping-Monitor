@@ -2020,6 +2020,53 @@ struct SettingsTab: View {
                                     .disabled(viewModel.statusBarWidth >= 250)
                                 }
                             }
+                            Divider()
+                            
+                            HStack {
+                                Text(languageManager.t("settings.font_size"))
+                                Spacer()
+                                HStack(spacing: 8) {
+                                    Button {
+                                        if viewModel.statusBarFontSize > 6 {
+                                            viewModel.statusBarFontSize -= 1
+                                            viewModel.saveSettings()
+                                        }
+                                    } label: { Image(systemName: "minus.circle").font(.system(size: 16)) }
+                                    .buttonStyle(.borderless)
+                                    .disabled(viewModel.statusBarFontSize <= 6)
+                                    
+                                    Text("\(viewModel.statusBarFontSize)")
+                                        .font(.system(.body, design: .monospaced))
+                                        .frame(width: 36, alignment: .center)
+                                    
+                                    Button {
+                                        if viewModel.statusBarFontSize < 18 {
+                                            viewModel.statusBarFontSize += 1
+                                            viewModel.saveSettings()
+                                        }
+                                    } label: { Image(systemName: "plus.circle").font(.system(size: 16)) }
+                                    .buttonStyle(.borderless)
+                                    .disabled(viewModel.statusBarFontSize >= 18)
+                                }
+                            }
+                            
+                            Divider()
+                            
+                            HStack {
+                                Text(languageManager.t("settings.font_weight"))
+                                Spacer()
+                                Picker("", selection: $viewModel.statusBarFontWeight) {
+                                    Text(languageManager.t("settings.font_weight.regular")).tag("regular")
+                                    Text(languageManager.t("settings.font_weight.medium")).tag("medium")
+                                    Text(languageManager.t("settings.font_weight.bold")).tag("bold")
+                                }
+                                .pickerStyle(.segmented)
+                                .frame(width: 200)
+                                .onChange(of: viewModel.statusBarFontWeight) { _, newValue in
+                                    LogManager.shared.info("Status bar font weight changed to \(newValue)")
+                                    viewModel.saveSettings()
+                                }
+                            }
                         }
                         
                         Divider()

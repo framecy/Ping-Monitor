@@ -232,6 +232,8 @@ class PingMonitorViewModel: ObservableObject {
     @Published var showSpeedInMenu: Bool = false
     @Published var speedUnit: String = "auto"  // "auto", "KB", "MB"
     @Published var statusBarWidth: Int = 160    // total status bar item width in pt
+    @Published var statusBarFontSize: Int = 9
+    @Published var statusBarFontWeight: String = "medium" // "regular", "medium", "bold"
     
     var statusBarController: StatusBarController?
     private var pingProcesses: [UUID: Process] = [:]
@@ -299,6 +301,9 @@ class PingMonitorViewModel: ObservableObject {
         speedUnit = defaults.string(forKey: "speedUnit") ?? "auto"
         let savedWidth = defaults.integer(forKey: "statusBarWidth")
         statusBarWidth = savedWidth == 0 ? 160 : savedWidth
+        let savedSize = defaults.integer(forKey: "statusBarFontSize")
+        statusBarFontSize = savedSize == 0 ? 9 : savedSize
+        statusBarFontWeight = defaults.string(forKey: "statusBarFontWeight") ?? "medium"
         
         LogManager.shared.info("Settings loaded: \(hosts.count) hosts, \(presets.count) presets")
     }
@@ -333,6 +338,8 @@ class PingMonitorViewModel: ObservableObject {
         defaults.set(showSpeedInMenu, forKey: "showSpeedInMenu")
         defaults.set(speedUnit, forKey: "speedUnit")
         defaults.set(statusBarWidth, forKey: "statusBarWidth")
+        defaults.set(statusBarFontSize, forKey: "statusBarFontSize")
+        defaults.set(statusBarFontWeight, forKey: "statusBarFontWeight")
     }
 
     func setupAutoStart() {
@@ -1177,17 +1184,26 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
             let speedImage = renderSpeedImage()
             let fullAttr = NSMutableAttributedString()
             
+            // Paragraph style with a right-aligned tab stop
+            let paragraphStyle = NSMutableParagraphStyle()
+            let tabLocation = CGFloat(viewModel.statusBarWidth) - widthIconOnly + 25 
+            paragraphStyle.tabStops = [NSTextTab(textAlignment: .right, location: tabLocation, options: [:])]
+            
             if !latencyStr.isEmpty {
-                fullAttr.append(NSAttributedString(string: latencyStr + " ", attributes: [.font: font]))
+                fullAttr.append(NSAttributedString(string: latencyStr + "\t", attributes: [.font: font, .paragraphStyle: paragraphStyle]))
             } else {
-                fullAttr.append(NSAttributedString(string: " ", attributes: [.font: font]))
+                fullAttr.append(NSAttributedString(string: "\t", attributes: [.font: font, .paragraphStyle: paragraphStyle]))
             }
             
             // Append speed image via NSTextAttachment
             let attachment = NSTextAttachment()
             attachment.image = speedImage
+            attachment.bounds = CGRect(x: 0, y: -4, width: speedImage.size.width, height: speedImage.size.height)
             let attachStr = NSAttributedString(attachment: attachment)
-            fullAttr.append(attachStr)
+            
+            let finalStr = NSMutableAttributedString(attributedString: attachStr)
+            finalStr.addAttributes([.paragraphStyle: paragraphStyle], range: NSRange(location: 0, length: finalStr.length))
+            fullAttr.append(finalStr)
             
             button.attributedTitle = fullAttr
             statusItem?.length = CGFloat(viewModel.statusBarWidth)
@@ -1207,14 +1223,21 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
         let upStr = "↑ \(formatSpeed(mgr.totalSpeedOut))"
         let downStr = "↓ \(formatSpeed(mgr.totalSpeedIn))"
         
-        let smallFont = NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .medium)
+        let weight: NSFont.Weight
+        switch viewModel.statusBarFontWeight {
+        case "bold": weight = .bold
+        case "regular": weight = .regular
+        default: weight = .medium
+        }
+        
+        let smallFont = NSFont.monospacedDigitSystemFont(ofSize: CGFloat(viewModel.statusBarFontSize), weight: weight)
         let upAttrs: [NSAttributedString.Key: Any] = [.font: smallFont, .foregroundColor: NSColor.systemGreen]
         let downAttrs: [NSAttributedString.Key: Any] = [.font: smallFont, .foregroundColor: NSColor.systemBlue]
         
         let upSize = (upStr as NSString).size(withAttributes: upAttrs)
         let downSize = (downStr as NSString).size(withAttributes: downAttrs)
         let width = max(upSize.width, downSize.width) + 2
-        let height: CGFloat = 18
+        let height = upSize.height + downSize.height
         
         let image = NSImage(size: NSSize(width: width, height: height))
         image.lockFocus()
