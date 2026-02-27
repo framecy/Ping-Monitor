@@ -1184,15 +1184,38 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
             let speedImage = renderSpeedImage()
             let fullAttr = NSMutableAttributedString()
             
-            // Paragraph style with a right-aligned tab stop
             let paragraphStyle = NSMutableParagraphStyle()
-            let tabLocation = CGFloat(viewModel.statusBarWidth) - widthIconOnly + 25 
-            paragraphStyle.tabStops = [NSTextTab(textAlignment: .right, location: tabLocation, options: [:])]
+            paragraphStyle.alignment = .left
+            paragraphStyle.lineBreakMode = .byClipping
             
             if !latencyStr.isEmpty {
-                fullAttr.append(NSAttributedString(string: latencyStr + "\t", attributes: [.font: font, .paragraphStyle: paragraphStyle]))
+                fullAttr.append(NSAttributedString(string: latencyStr, attributes: [
+                    .font: font,
+                    .paragraphStyle: paragraphStyle
+                ]))
+            }
+            
+            // Calculate exact padding needed to push speed to the right. 
+            // We subtract ~16pt for standard NSStatusBarButton internal margins/image spacings.
+            let textWidth = measureWidth(text: latencyStr, font: font)
+            let currentWidth = textWidth + widthIconOnly
+            let targetWidth = CGFloat(viewModel.statusBarWidth)
+            let speedWidth = speedImage.size.width
+            let availableSpace = targetWidth - currentWidth - speedWidth - 16
+            
+            if availableSpace > 0 {
+                // Use .kern on a single space character to pad exactly the remaining float pixels
+                fullAttr.append(NSAttributedString(string: " ", attributes: [
+                    .font: font,
+                    .kern: availableSpace,
+                    .paragraphStyle: paragraphStyle
+                ]))
             } else {
-                fullAttr.append(NSAttributedString(string: "\t", attributes: [.font: font, .paragraphStyle: paragraphStyle]))
+                // If it doesn't fit, just put a natural space (will likely be clipped by the button bounds)
+                fullAttr.append(NSAttributedString(string: " ", attributes: [
+                    .font: font,
+                    .paragraphStyle: paragraphStyle
+                ]))
             }
             
             // Append speed image via NSTextAttachment
@@ -1200,10 +1223,10 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
             attachment.image = speedImage
             attachment.bounds = CGRect(x: 0, y: -4, width: speedImage.size.width, height: speedImage.size.height)
             let attachStr = NSAttributedString(attachment: attachment)
+            fullAttr.append(attachStr)
             
-            let finalStr = NSMutableAttributedString(attributedString: attachStr)
-            finalStr.addAttributes([.paragraphStyle: paragraphStyle], range: NSRange(location: 0, length: finalStr.length))
-            fullAttr.append(finalStr)
+            // Apply paragraph style to the whole string just in case
+            fullAttr.addAttributes([.paragraphStyle: paragraphStyle], range: NSRange(location: 0, length: fullAttr.length))
             
             button.attributedTitle = fullAttr
             statusItem?.length = CGFloat(viewModel.statusBarWidth)
@@ -1211,7 +1234,7 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
             button.attributedTitle = NSAttributedString()
             button.title = latencyStr
             if !latencyStr.isEmpty {
-                statusItem?.length = measureWidth(text: latencyStr, font: font)
+                statusItem?.length = measureWidth(text: latencyStr, font: font) + widthIconOnly
             } else {
                 statusItem?.length = widthIconOnly
             }
