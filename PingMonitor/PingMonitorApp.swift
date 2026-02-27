@@ -1134,6 +1134,8 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
         NSApp.setActivationPolicy(.regular)
     }
 
+    private var speedView: SpeedStatusView?
+    
     func updateStatusBar() {
         guard let button = statusItem?.button else { return }
 
@@ -1142,47 +1144,67 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
         button.font = font
         button.attributedTitle = NSAttributedString()
 
+        // Remove old speed view
+        speedView?.removeFromSuperview()
+        speedView = nil
+
         if viewModel.isRunning {
             button.image = NSImage(systemSymbolName: "network.badge.shield.half.filled", accessibilityDescription: nil)
             
             let showingText = viewModel.showLatencyInMenu || viewModel.showLabelsInMenu
-            var parts: [String] = []
-            
+            var latencyTitle = ""
             if showingText && !displayText.isEmpty && displayText != "●" {
-                parts.append(displayText)
+                latencyTitle = " \(displayText)"
             }
+            
+            button.title = latencyTitle
             
             if viewModel.showSpeedInMenu {
-                parts.append(buildSpeedText())
-            }
-            
-            if !parts.isEmpty {
-                let title = " " + parts.joined(separator: "  ")
-                button.title = title
-                statusItem?.length = measureWidth(text: title, font: font)
+                let textWidth = latencyTitle.isEmpty ? 0 : measureTextWidth(text: latencyTitle, font: font)
+                let speedW: CGFloat = 90
+                let totalWidth = widthIconOnly + textWidth + (latencyTitle.isEmpty ? 4 : 8) + speedW + 4
+                statusItem?.length = ceil(totalWidth)
+                
+                let sv = SpeedStatusView(frame: NSRect(
+                    x: widthIconOnly + textWidth + (latencyTitle.isEmpty ? 4 : 8),
+                    y: 0,
+                    width: speedW,
+                    height: 22 // status bar height
+                ))
+                sv.upSpeed = formatSpeedForBar(NetworkSpeedManager.shared.totalSpeedOut)
+                sv.downSpeed = formatSpeedForBar(NetworkSpeedManager.shared.totalSpeedIn)
+                button.addSubview(sv)
+                speedView = sv
             } else {
-                button.title = ""
-                statusItem?.length = widthIconOnly
+                if !latencyTitle.isEmpty {
+                    statusItem?.length = measureWidth(text: latencyTitle, font: font)
+                } else {
+                    statusItem?.length = widthIconOnly
+                }
             }
         } else {
             button.image = NSImage(systemSymbolName: "network", accessibilityDescription: nil)
+            button.title = ""
             
             if viewModel.showSpeedInMenu {
-                let title = " " + buildSpeedText()
-                button.title = title
-                statusItem?.length = measureWidth(text: title, font: font)
+                let speedW: CGFloat = 90
+                let totalWidth = widthIconOnly + 4 + speedW + 4
+                statusItem?.length = ceil(totalWidth)
+                
+                let sv = SpeedStatusView(frame: NSRect(
+                    x: widthIconOnly + 4,
+                    y: 0,
+                    width: speedW,
+                    height: 22
+                ))
+                sv.upSpeed = formatSpeedForBar(NetworkSpeedManager.shared.totalSpeedOut)
+                sv.downSpeed = formatSpeedForBar(NetworkSpeedManager.shared.totalSpeedIn)
+                button.addSubview(sv)
+                speedView = sv
             } else {
-                button.title = ""
                 statusItem?.length = widthIconOnly
             }
         }
-    }
-    
-    private func buildSpeedText() -> String {
-        let mgr = NetworkSpeedManager.shared
-        let downStr = formatSpeedForBar(mgr.totalSpeedIn)
-        let upStr = formatSpeedForBar(mgr.totalSpeedOut)
-        return "↓\(downStr) ↑\(upStr)"
     }
     
     private func formatSpeedForBar(_ bytesPerSec: Double) -> String {
@@ -1203,6 +1225,11 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
         }
     }
     
+    private func measureTextWidth(text: String, font: NSFont) -> CGFloat {
+        let attributes: [NSAttributedString.Key: Any] = [.font: font]
+        return ceil((text as NSString).size(withAttributes: attributes).width)
+    }
+    
     /// 根据实际文本内容动态计算状态栏宽度
     private func measureWidth(text: String, font: NSFont) -> CGFloat {
         let iconBase: CGFloat = 28  // 图标基础宽度
@@ -1212,6 +1239,36 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
         let textSize = (text as NSString).size(withAttributes: attributes)
         
         return ceil(iconBase + textSize.width + padding)
+    }
+}
+
+// MARK: - Speed Status Bar View (stacked ↑/↓)
+class SpeedStatusView: NSView {
+    var upSpeed: String = "0 B/s"
+    var downSpeed: String = "0 B/s"
+    
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        
+        let font = NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .medium)
+        let lineHeight: CGFloat = 10
+        let midY = bounds.height / 2
+        
+        // ↑ upload (green) - top line
+        let upAttrs: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: NSColor.systemGreen
+        ]
+        let upText = "↑ \(upSpeed)" as NSString
+        upText.draw(at: NSPoint(x: 0, y: midY), withAttributes: upAttrs)
+        
+        // ↓ download (blue) — bottom line
+        let downAttrs: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: NSColor.systemBlue
+        ]
+        let downText = "↓ \(downSpeed)" as NSString
+        downText.draw(at: NSPoint(x: 0, y: midY - lineHeight - 1), withAttributes: downAttrs)
     }
 }
 

@@ -1,5 +1,9 @@
 # PingMonitor Changelog
 
+## [2.1.0r7] - 2026-02-27
+### Improved
+- Rewrote status bar speed display using custom NSView for stacked vertical layout (↑ green / ↓ blue)
+
 ## [2.1.0r6] - 2026-02-27
 ### Fixed
 - Fixed status bar network speed not displaying (replaced broken multi-line layout with horizontal ↓/↑ text)
