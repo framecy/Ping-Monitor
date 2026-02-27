@@ -232,6 +232,7 @@ class PingMonitorViewModel: ObservableObject {
     @Published var showSpeedInMenu: Bool = false
     @Published var speedUnit: String = "auto"  // "auto", "KB", "MB"
     @Published var statusBarWidth: Int = 160    // total status bar item width in pt
+    @Published var statusBarSpeedGap: Int = 4   // gap between arrow and speed text
     @Published var statusBarFontSize: Int = 9
     @Published var statusBarFontWeight: String = "medium" // "regular", "medium", "bold"
     @Published var showIconInMenu: Bool = true
@@ -302,6 +303,8 @@ class PingMonitorViewModel: ObservableObject {
         speedUnit = defaults.string(forKey: "speedUnit") ?? "auto"
         let savedWidth = defaults.integer(forKey: "statusBarWidth")
         statusBarWidth = savedWidth == 0 ? 160 : savedWidth
+        let savedGap = defaults.integer(forKey: "statusBarSpeedGap")
+        statusBarSpeedGap = savedGap == 0 ? 4 : savedGap
         let savedSize = defaults.integer(forKey: "statusBarFontSize")
         statusBarFontSize = savedSize == 0 ? 9 : savedSize
         statusBarFontWeight = defaults.string(forKey: "statusBarFontWeight") ?? "medium"
@@ -346,6 +349,7 @@ class PingMonitorViewModel: ObservableObject {
         defaults.set(showSpeedInMenu, forKey: "showSpeedInMenu")
         defaults.set(speedUnit, forKey: "speedUnit")
         defaults.set(statusBarWidth, forKey: "statusBarWidth")
+        defaults.set(statusBarSpeedGap, forKey: "statusBarSpeedGap")
         defaults.set(statusBarFontSize, forKey: "statusBarFontSize")
         defaults.set(statusBarFontWeight, forKey: "statusBarFontWeight")
         defaults.set(showIconInMenu, forKey: "showIconInMenu")
@@ -1075,6 +1079,13 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
                 self?.updateStatusBar()
             }
             .store(in: &cancellables)
+
+        viewModel.$statusBarSpeedGap
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.updateStatusBar()
+            }
+            .store(in: &cancellables)
     }
     
     private var speedTimer: Timer?
@@ -1325,8 +1336,8 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
         let templateStr = "9999.99 MB/s"
         let valWidth = (templateStr as NSString).size(withAttributes: upAttrs).width
         
-        // Fixed gap between arrow and value
-        let gap: CGFloat = 4.0
+        // Configurable gap between arrow and value
+        let gap: CGFloat = CGFloat(viewModel.statusBarSpeedGap)
         
         let width = arrowWidth + gap + valWidth + 2
         let height = max(upArrowSize.height, upValSize.height) + max(downArrowSize.height, downValSize.height)
@@ -1335,21 +1346,23 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
         let topY = height - max(upArrowSize.height, upValSize.height)
         let bottomY: CGFloat = 0
         
-        // The X position for the value text (left-aligned)
-        let valX = arrowWidth + gap
+        // Ensure right margin of 2 pts for the text within the fixed width
+        let rightMargin: CGFloat = 2.0
         
         let image = NSImage(size: NSSize(width: width, height: height))
         image.lockFocus()
         
         // Draw top row (Up)
-        (upArrowStr as NSString).draw(at: NSPoint(x: 0, y: topY), withAttributes: arrowAttrs)
-        let upX = valX + (valWidth - upValSize.width)
-        (upValStr as NSString).draw(at: NSPoint(x: upX, y: topY), withAttributes: upAttrs)
+        let upValX = width - rightMargin - upValSize.width
+        let upArrowX = upValX - gap - upArrowSize.width
+        (upArrowStr as NSString).draw(at: NSPoint(x: upArrowX, y: topY), withAttributes: arrowAttrs)
+        (upValStr as NSString).draw(at: NSPoint(x: upValX, y: topY), withAttributes: upAttrs)
         
         // Draw bottom row (Down)
-        (downArrowStr as NSString).draw(at: NSPoint(x: 0, y: bottomY), withAttributes: arrowAttrs)
-        let downX = valX + (valWidth - downValSize.width)
-        (downValStr as NSString).draw(at: NSPoint(x: downX, y: bottomY), withAttributes: downAttrs)
+        let downValX = width - rightMargin - downValSize.width
+        let downArrowX = downValX - gap - downArrowSize.width
+        (downArrowStr as NSString).draw(at: NSPoint(x: downArrowX, y: bottomY), withAttributes: arrowAttrs)
+        (downValStr as NSString).draw(at: NSPoint(x: downValX, y: bottomY), withAttributes: downAttrs)
         
         image.unlockFocus()
         image.isTemplate = false

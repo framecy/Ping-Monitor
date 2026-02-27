@@ -2037,6 +2037,41 @@ struct SettingsTab: View {
                             Divider()
                             
                             HStack {
+                                Text(languageManager.t("settings.speed_gap"))
+                                Spacer()
+                                HStack(spacing: 8) {
+                                    Button {
+                                        if viewModel.statusBarSpeedGap > 0 {
+                                            viewModel.statusBarSpeedGap -= 1
+                                            viewModel.saveSettings()
+                                        }
+                                    } label: {
+                                        Image(systemName: "minus.circle")
+                                            .font(.system(size: 16))
+                                    }
+                                    .buttonStyle(.borderless)
+                                    .disabled(viewModel.statusBarSpeedGap <= 0)
+                                    
+                                    Text("\(viewModel.statusBarSpeedGap)")
+                                        .font(.system(.body, design: .monospaced))
+                                        .frame(width: 36, alignment: .center)
+                                    
+                                    Button {
+                                        if viewModel.statusBarSpeedGap < 20 {
+                                            viewModel.statusBarSpeedGap += 1
+                                            viewModel.saveSettings()
+                                        }
+                                    } label: {
+                                        Image(systemName: "plus.circle")
+                                            .font(.system(size: 16))
+                                    }
+                                    .buttonStyle(.borderless)
+                                    .disabled(viewModel.statusBarSpeedGap >= 20)
+                                }
+                            }
+                            Divider()
+                            
+                            HStack {
                                 Text(languageManager.t("settings.font_size"))
                                 Spacer()
                                 HStack(spacing: 8) {

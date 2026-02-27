@@ -13,7 +13,7 @@
   <img src="https://img.shields.io/badge/platform-macOS%2014.0+-blue" alt="Platform">
   <img src="https://img.shields.io/badge/SwiftUI-6.0-orange" alt="SwiftUI">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/version-2.1.0-brightgreen" alt="Version">
+  <img src="https://img.shields.io/badge/version-2.1.0r23-brightgreen" alt="Version">
 </p>
 
 ---
@@ -58,10 +58,11 @@
 
 ### 🛣 路由追踪 (Traceroute)
 
-- **可视化追踪** — 输入目标地址，直观展示每一跳的 IP、延迟与丢包率
-- **MTR 模式** — 持续追踪模式，像 MTR 工具一样实时更新每一跳的统计数据
-- **地图集成** — (未来计划) 在地图上显示节点位置
-- **快速复制** — 一键复制追踪结果到剪贴板
+- **NextTrace 集成** — 深度集成 `NTrace-core` 引擎，支持极速多并发探测
+- **ASN & 地理位置** — 自动解析并显现每一跳的 ASN 自治系统编号与物理地理位置
+- **可视化轨迹地图** — 一键跳转网页版可视化路由拓扑地图
+- **MTR 持续模式** — 像命令行 MTR 工具一样实时刷新每一跳的丢包与延迟统计
+- **结果导出** — 一键复制完整链路追踪摘要到剪贴板
 
 ### 🏷 自定义显示规则
 
@@ -128,6 +129,7 @@
 - **主机预设库** — 内置常用 DNS 和服务器，快速添加
 - **自定义 Ping 命令** — 使用 `{host}` 占位符自定义命令
 - **开机自启动** — 基于 ServiceManagement 框架
+- **菜单栏图标** — 等宽数字字体，支持调整“网速图标间距”并采用固定宽度右对齐布局，彻底解决 UI 跳动
 - **菜单栏图标** — 等宽数字字体，运行时实时更新延迟数值
 
 ---
@@ -236,6 +238,7 @@ AUTO_VERSION=false
 
 | 版本 | 构建 | 更新内容 |
 |------|------|---------|
+| v2.1.0 | r23 | **NextTrace 引擎集成**：内置 NTrace-core，支持 ASN 与地理位置显示及可视化地图跳转；**UI 稳定性升级**：引入网速右对齐布局并支持手动调整图标间距；并进行了 Git 仓库日志清理 |
 | v2.1.0 | r19 | **全新状态栏监控**：支持图标开关、多级间距与字体高度定制、网速流量仪表盘全集成；**SSH 安全连接**：基于 expect 脚本绕过 AppleScript 授权限制直接进行密钥/密码认证；**数据聚合**：图表升级并修复了网格组件对齐；重构了界面排版引擎 |
 | v2.0.55 | r64 | **SSH 快捷方式增强**：支持配置用户名/端口/密钥路径，实时命令预览；**NAT 检测**：集成 `tailscale netcheck`，显示 NAT 类型/UDP/IPv4/IPv6/全局 IP/DERP 区域延迟图表；**小组件修复**：重构 `WidgetDataManager` 三级回退策略，禁用小组件沙箱确保数据同步 |
 | v2.0.54 | r63 | **Tailscale 集成**：自动发现私有网络节点并一键导入监控；**服务快捷方式**：为每个主机配置 Web/SSH/自定义快捷入口，全局服务面板汇总展示；**新增侧边栏模块**：Tailscale 面板与服务面板；完善中英文本地化 |
