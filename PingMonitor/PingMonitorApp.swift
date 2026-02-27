@@ -231,7 +231,7 @@ class PingMonitorViewModel: ObservableObject {
     @Published var widgetSelectedHostId: String = ""
     @Published var showSpeedInMenu: Bool = false
     @Published var speedUnit: String = "auto"  // "auto", "KB", "MB"
-    @Published var statusBarSpacing: Int = 4    // spacing in pt between sections
+    @Published var statusBarWidth: Int = 160    // total status bar item width in pt
     
     var statusBarController: StatusBarController?
     private var pingProcesses: [UUID: Process] = [:]
@@ -297,8 +297,8 @@ class PingMonitorViewModel: ObservableObject {
         widgetSelectedHostId = defaults.string(forKey: "widgetSelectedHostId") ?? ""
         showSpeedInMenu = defaults.bool(forKey: "showSpeedInMenu")
         speedUnit = defaults.string(forKey: "speedUnit") ?? "auto"
-        let savedSpacing = defaults.integer(forKey: "statusBarSpacing")
-        statusBarSpacing = savedSpacing == 0 ? 4 : savedSpacing
+        let savedWidth = defaults.integer(forKey: "statusBarWidth")
+        statusBarWidth = savedWidth == 0 ? 160 : savedWidth
         
         LogManager.shared.info("Settings loaded: \(hosts.count) hosts, \(presets.count) presets")
     }
@@ -332,7 +332,7 @@ class PingMonitorViewModel: ObservableObject {
         defaults.set(widgetSelectedHostId, forKey: "widgetSelectedHostId")
         defaults.set(showSpeedInMenu, forKey: "showSpeedInMenu")
         defaults.set(speedUnit, forKey: "speedUnit")
-        defaults.set(statusBarSpacing, forKey: "statusBarSpacing")
+        defaults.set(statusBarWidth, forKey: "statusBarWidth")
     }
 
     func setupAutoStart() {
@@ -1053,7 +1053,7 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
             }
             .store(in: &cancellables)
         
-        viewModel.$statusBarSpacing
+        viewModel.$statusBarWidth
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 self?.updateStatusBar()
@@ -1161,73 +1161,93 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
         let font = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium)
         button.font = font
 
-        let spacing = String(repeating: " ", count: max(1, viewModel.statusBarSpacing))
-
         if viewModel.isRunning {
             button.image = NSImage(systemSymbolName: "network.badge.shield.half.filled", accessibilityDescription: nil)
-            
-            let showingText = viewModel.showLatencyInMenu || viewModel.showLabelsInMenu
-            var parts: [String] = []
-            
-            if showingText && !displayText.isEmpty && displayText != "●" {
-                parts.append(displayText)
-            }
-            
-            if viewModel.showSpeedInMenu {
-                let mgr = NetworkSpeedManager.shared
-                let speedStr = "↑\(formatSpeed(mgr.totalSpeedOut))\(spacing)↓\(formatSpeed(mgr.totalSpeedIn))"
-                parts.append(speedStr)
-            }
-            
-            if !parts.isEmpty {
-                let title = " " + parts.joined(separator: spacing)
-                button.title = title
-                statusItem?.length = measureWidth(text: title, font: font)
-            } else {
-                button.title = ""
-                statusItem?.length = widthIconOnly
-            }
         } else {
             button.image = NSImage(systemSymbolName: "network", accessibilityDescription: nil)
+        }
+
+        let showingText = viewModel.showLatencyInMenu || viewModel.showLabelsInMenu
+        var latencyStr = ""
+        if viewModel.isRunning && showingText && !displayText.isEmpty && displayText != "●" {
+            latencyStr = " \(displayText)"
+        }
+
+        if viewModel.showSpeedInMenu {
+            let speedImage = renderSpeedImage()
+            let fullAttr = NSMutableAttributedString()
             
-            if viewModel.showSpeedInMenu {
-                let mgr = NetworkSpeedManager.shared
-                let title = " ↑\(formatSpeed(mgr.totalSpeedOut))\(spacing)↓\(formatSpeed(mgr.totalSpeedIn))"
-                button.title = title
-                statusItem?.length = measureWidth(text: title, font: font)
+            if !latencyStr.isEmpty {
+                fullAttr.append(NSAttributedString(string: latencyStr + " ", attributes: [.font: font]))
             } else {
-                button.title = ""
+                fullAttr.append(NSAttributedString(string: " ", attributes: [.font: font]))
+            }
+            
+            // Append speed image via NSTextAttachment
+            let attachment = NSTextAttachment()
+            attachment.image = speedImage
+            let attachStr = NSAttributedString(attachment: attachment)
+            fullAttr.append(attachStr)
+            
+            button.attributedTitle = fullAttr
+            statusItem?.length = CGFloat(viewModel.statusBarWidth)
+        } else {
+            button.attributedTitle = NSAttributedString()
+            button.title = latencyStr
+            if !latencyStr.isEmpty {
+                statusItem?.length = measureWidth(text: latencyStr, font: font)
+            } else {
                 statusItem?.length = widthIconOnly
             }
         }
+    }
+    
+    private func renderSpeedImage() -> NSImage {
+        let mgr = NetworkSpeedManager.shared
+        let upStr = "↑ \(formatSpeed(mgr.totalSpeedOut))"
+        let downStr = "↓ \(formatSpeed(mgr.totalSpeedIn))"
+        
+        let smallFont = NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .medium)
+        let upAttrs: [NSAttributedString.Key: Any] = [.font: smallFont, .foregroundColor: NSColor.systemGreen]
+        let downAttrs: [NSAttributedString.Key: Any] = [.font: smallFont, .foregroundColor: NSColor.systemBlue]
+        
+        let upSize = (upStr as NSString).size(withAttributes: upAttrs)
+        let downSize = (downStr as NSString).size(withAttributes: downAttrs)
+        let width = max(upSize.width, downSize.width) + 2
+        let height: CGFloat = 18
+        
+        let image = NSImage(size: NSSize(width: width, height: height))
+        image.lockFocus()
+        (upStr as NSString).draw(at: NSPoint(x: 0, y: height - upSize.height), withAttributes: upAttrs)
+        (downStr as NSString).draw(at: NSPoint(x: 0, y: 0), withAttributes: downAttrs)
+        image.unlockFocus()
+        image.isTemplate = false
+        return image
     }
     
     private func formatSpeed(_ bytesPerSec: Double) -> String {
         let unit = viewModel.speedUnit
         switch unit {
         case "KB":
-            return String(format: "%.0fKB/s", bytesPerSec / 1024)
+            return String(format: "%.0f KB/s", bytesPerSec / 1024)
         case "MB":
-            return String(format: "%.1fMB/s", bytesPerSec / (1024 * 1024))
+            return String(format: "%.1f MB/s", bytesPerSec / (1024 * 1024))
         default: // auto
             if bytesPerSec < 1024 {
-                return String(format: "%.0fB/s", bytesPerSec)
+                return String(format: "%.0f B/s", bytesPerSec)
             } else if bytesPerSec < 1024 * 1024 {
-                return String(format: "%.1fKB/s", bytesPerSec / 1024)
+                return String(format: "%.1f KB/s", bytesPerSec / 1024)
             } else {
-                return String(format: "%.1fMB/s", bytesPerSec / (1024 * 1024))
+                return String(format: "%.1f MB/s", bytesPerSec / (1024 * 1024))
             }
         }
     }
     
-    /// 根据实际文本内容动态计算状态栏宽度
     private func measureWidth(text: String, font: NSFont) -> CGFloat {
         let iconBase: CGFloat = 28
         let padding: CGFloat = 4
-        
         let attributes: [NSAttributedString.Key: Any] = [.font: font]
         let textSize = (text as NSString).size(withAttributes: attributes)
-        
         return ceil(iconBase + textSize.width + padding)
     }
 }

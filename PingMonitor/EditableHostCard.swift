@@ -138,6 +138,7 @@ struct EditableHostCard: View {
                 }
             }
         }
+        .frame(maxHeight: .infinity, alignment: .top)
         .padding(Theme.Layout.cardPadding)
         .background(Theme.Colors.cardBackground)
         .cornerRadius(Theme.Layout.cardCornerRadius)

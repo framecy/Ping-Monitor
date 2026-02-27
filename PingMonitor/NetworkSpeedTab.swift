@@ -23,7 +23,12 @@ struct NetworkSpeedTab: View {
         }
         .background(Theme.Colors.background)
         .onAppear { speedManager.startMonitoring() }
-        .onDisappear { speedManager.stopMonitoring() }
+        .onDisappear {
+            // Don't stop if status bar still needs speed data
+            if !viewModel.showSpeedInMenu {
+                speedManager.stopMonitoring()
+            }
+        }
     }
     
     // MARK: - Speed Overview Card
@@ -34,6 +39,20 @@ struct NetworkSpeedTab: View {
                 HStack {
                     SectionHeader(title: languageManager.t("netspeed.title"), icon: "chart.line.uptrend.xyaxis")
                     Spacer()
+                    
+                    // Refresh interval selector
+                    Picker("", selection: Binding(
+                        get: { speedManager.refreshInterval },
+                        set: { speedManager.setRefreshInterval($0) }
+                    )) {
+                        Text("1s").tag(1.0 as TimeInterval)
+                        Text("2s").tag(2.0 as TimeInterval)
+                        Text("3s").tag(3.0 as TimeInterval)
+                        Text("5s").tag(5.0 as TimeInterval)
+                        Text("10s").tag(10.0 as TimeInterval)
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 200)
                     
                     // Interface selector
                     Picker("", selection: $speedManager.selectedInterface) {

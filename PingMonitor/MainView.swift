@@ -1288,6 +1288,7 @@ struct HostManagementCard: View {
                 }
             }
         }
+        .frame(maxHeight: .infinity, alignment: .top)
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 14)
@@ -1987,12 +1988,12 @@ struct SettingsTab: View {
                             Divider()
                             
                             HStack {
-                                Text(languageManager.t("settings.spacing"))
+                                Text(languageManager.t("settings.bar_width"))
                                 Spacer()
                                 HStack(spacing: 8) {
                                     Button {
-                                        if viewModel.statusBarSpacing > 1 {
-                                            viewModel.statusBarSpacing -= 1
+                                        if viewModel.statusBarWidth > 80 {
+                                            viewModel.statusBarWidth -= 10
                                             viewModel.saveSettings()
                                         }
                                     } label: {
@@ -2000,15 +2001,15 @@ struct SettingsTab: View {
                                             .font(.system(size: 16))
                                     }
                                     .buttonStyle(.borderless)
-                                    .disabled(viewModel.statusBarSpacing <= 1)
+                                    .disabled(viewModel.statusBarWidth <= 80)
                                     
-                                    Text("\(viewModel.statusBarSpacing)")
+                                    Text("\(viewModel.statusBarWidth)")
                                         .font(.system(.body, design: .monospaced))
-                                        .frame(width: 24, alignment: .center)
+                                        .frame(width: 36, alignment: .center)
                                     
                                     Button {
-                                        if viewModel.statusBarSpacing < 10 {
-                                            viewModel.statusBarSpacing += 1
+                                        if viewModel.statusBarWidth < 250 {
+                                            viewModel.statusBarWidth += 10
                                             viewModel.saveSettings()
                                         }
                                     } label: {
@@ -2016,7 +2017,7 @@ struct SettingsTab: View {
                                             .font(.system(size: 16))
                                     }
                                     .buttonStyle(.borderless)
-                                    .disabled(viewModel.statusBarSpacing >= 10)
+                                    .disabled(viewModel.statusBarWidth >= 250)
                                 }
                             }
                         }

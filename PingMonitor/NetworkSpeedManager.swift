@@ -57,11 +57,12 @@ class NetworkSpeedManager: ObservableObject {
     @Published var totalBytesOut: UInt64 = 0
     @Published var speedHistory: [SpeedSample] = []
     @Published var isMonitoring = false
+    @Published var refreshInterval: TimeInterval = 1.0  // seconds
     
     private var timer: Timer?
     private var previousStats: [String: (bytesIn: UInt64, bytesOut: UInt64)] = [:]
     private var previousTimestamp: Date?
-    private let maxHistoryCount = 60  // 60 samples = 1 minute at 1s interval
+    private let maxHistoryCount = 60
     
     private init() {}
     
@@ -72,10 +73,22 @@ class NetworkSpeedManager: ObservableObject {
         // Initial fetch
         fetchStats()
         
-        // Update every 1 second
-        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+        // Update at configured interval
+        timer = Timer.scheduledTimer(withTimeInterval: refreshInterval, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.fetchStats()
+            }
+        }
+    }
+    
+    func setRefreshInterval(_ interval: TimeInterval) {
+        refreshInterval = interval
+        if isMonitoring {
+            timer?.invalidate()
+            timer = Timer.scheduledTimer(withTimeInterval: refreshInterval, repeats: true) { [weak self] _ in
+                Task { @MainActor in
+                    self?.fetchStats()
+                }
             }
         }
     }
@@ -107,8 +120,15 @@ class NetworkSpeedManager: ObservableObject {
             }
             
             interfaces = updatedInterfaces.sorted { a, b in
+                // Priority: active with traffic > active no traffic > loopback > inactive
+                let aIsLo = a.name.starts(with: "lo")
+                let bIsLo = b.name.starts(with: "lo")
                 if a.isActive != b.isActive { return a.isActive }
-                return (a.speedIn + a.speedOut) > (b.speedIn + b.speedOut)
+                if aIsLo != bIsLo { return !aIsLo }
+                let aTraffic = a.speedIn + a.speedOut
+                let bTraffic = b.speedIn + b.speedOut
+                if aTraffic != bTraffic { return aTraffic > bTraffic }
+                return a.displayName < b.displayName
             }
             
             // Calculate totals based on selection

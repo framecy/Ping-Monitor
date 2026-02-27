@@ -665,26 +665,16 @@ struct HostDetailView: View {
             }
         case .ssh:
             let sshCmd = shortcut.sshCommand
-            let scriptPath = "/tmp/pm_ssh_\(UUID().uuidString.prefix(8)).sh"
-            let scriptContent = "#!/bin/bash\n\(sshCmd)\n"
+            let cmdFile = "/tmp/pm_ssh_\(UUID().uuidString.prefix(8)).command"
+            let scriptContent = "#!/bin/bash\nrm -f \"\(cmdFile)\"\n\(sshCmd)\n"
             do {
-                try scriptContent.write(toFile: scriptPath, atomically: true, encoding: .utf8)
+                try scriptContent.write(toFile: cmdFile, atomically: true, encoding: .utf8)
                 let chmod = Process()
                 chmod.executableURL = URL(fileURLWithPath: "/bin/chmod")
-                chmod.arguments = ["+x", scriptPath]
+                chmod.arguments = ["+x", cmdFile]
                 try chmod.run()
                 chmod.waitUntilExit()
-                let appleScript = NSAppleScript(source: """
-                    tell application "Terminal"
-                        activate
-                        do script "\(scriptPath); rm -f \(scriptPath)"
-                    end tell
-                    """)
-                var error: NSDictionary?
-                appleScript?.executeAndReturnError(&error)
-                if let error = error {
-                    LogManager.shared.error("AppleScript error: \(error)")
-                }
+                NSWorkspace.shared.open(URL(fileURLWithPath: cmdFile))
             } catch {
                 LogManager.shared.error("Failed to create SSH script: \(error)")
             }
