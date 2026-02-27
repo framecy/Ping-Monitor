@@ -388,7 +388,6 @@ struct TrafficTrendCard: View {
 struct SummaryDonutCard: View {
      @ObservedObject var viewModel: PingMonitorViewModel
      @ObservedObject private var languageManager = LanguageManager.shared
-     @State private var hoveredSlice: Int? = nil
     
     // Compute real stats
     private var totalPings: Int {
@@ -404,12 +403,12 @@ struct SummaryDonutCard: View {
         max(0, totalPings - successPings - failedPings)
     }
     
-    private var slices: [(label: String, value: Double, color: Color)] {
+    private var slices: [(label: String, count: Int, value: Double, color: Color)] {
         let total = Double(max(totalPings, 1))
         return [
-            (languageManager.t("dashboard.success"), Double(successPings) / total, Theme.Colors.accentGreen),
-            (languageManager.t("dashboard.failed"), Double(failedPings) / total, Theme.Colors.accentRed),
-            (languageManager.t("dashboard.timeout"), Double(timeoutPings) / total, Theme.Colors.accentOrange),
+            (languageManager.t("dashboard.success"), successPings, Double(successPings) / total, Theme.Colors.accentGreen),
+            (languageManager.t("dashboard.failed"), failedPings, Double(failedPings) / total, Theme.Colors.accentRed),
+            (languageManager.t("dashboard.timeout"), timeoutPings, Double(timeoutPings) / total, Theme.Colors.accentOrange),
         ]
     }
     
@@ -425,238 +424,62 @@ struct SummaryDonutCard: View {
                     Spacer()
                 }
                 
-                HStack(spacing: 8) {
-                    // 3D Pie Chart
-                    ZStack {
-                        Pie3DView(slices: slices, hoveredSlice: $hoveredSlice)
-                            .frame(width: 140, height: 140)
-                        
-                        // Center label
-                        VStack(spacing: 2) {
-                            Text(languageManager.t("dashboard.total"))
-                                .font(Theme.Fonts.body(9))
-                                .foregroundStyle(Theme.Colors.textSecondary)
-                            Text("\(totalPings)")
-                                .font(Theme.Fonts.display(14))
-                                .foregroundStyle(Theme.Colors.textPrimary)
-                        }
-                        .offset(y: -10)
+                // Flat Donut Chart
+                ZStack {
+                    Chart(Array(slices.enumerated()), id: \.offset) { index, slice in
+                        SectorMark(
+                            angle: .value(slice.label, slice.value),
+                            innerRadius: .ratio(0.6),
+                            angularInset: 1.5
+                        )
+                        .foregroundStyle(slice.color)
+                        .cornerRadius(3)
                     }
-                    .padding(.vertical, 4)
+                    .chartLegend(.hidden)
+                    .frame(height: 120)
                     
-                    Spacer(minLength: 0)
-                    
-                    // Legend
-                    VStack(alignment: .leading, spacing: 8) {
-                        ForEach(Array(slices.enumerated()), id: \.offset) { index, slice in
-                            LegendItem(
-                                color: slice.color,
-                                label: slice.label,
-                                value: String(format: "%.1f%%", slice.value * 100),
-                                isHovered: hoveredSlice == index
-                            )
-                            .onHover { isHovering in
-                                withAnimation(.easeInOut(duration: 0.2)) {
-                                    hoveredSlice = isHovering ? index : nil
-                                }
-                            }
-                        }
+                    // Center label
+                    VStack(spacing: 2) {
+                        Text(languageManager.t("dashboard.total"))
+                            .font(Theme.Fonts.body(9))
+                            .foregroundStyle(Theme.Colors.textSecondary)
+                        Text("\(totalPings)")
+                            .font(Theme.Fonts.display(16))
+                            .foregroundStyle(Theme.Colors.textPrimary)
                     }
                 }
+                .frame(maxWidth: .infinity)
+                
+                // Stats below chart
+                HStack(spacing: 0) {
+                    ForEach(Array(slices.enumerated()), id: \.offset) { index, slice in
+                        if index > 0 {
+                            Divider().frame(height: 28).padding(.horizontal, 8).opacity(0.3)
+                        }
+                        VStack(spacing: 4) {
+                            HStack(spacing: 4) {
+                                Circle()
+                                    .fill(slice.color)
+                                    .frame(width: 6, height: 6)
+                                Text(slice.label)
+                                    .font(Theme.Fonts.body(10))
+                                    .foregroundStyle(Theme.Colors.textSecondary)
+                            }
+                            Text("\(slice.count)")
+                                .font(Theme.Fonts.display(13))
+                                .foregroundStyle(Theme.Colors.textPrimary)
+                            Text(String(format: "%.1f%%", slice.value * 100))
+                                .font(Theme.Fonts.body(9))
+                                .foregroundStyle(Theme.Colors.textSecondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                }
+                
                 Spacer(minLength: 0)
             }
             .frame(maxHeight: .infinity)
         }
-    }
-}
-
-// MARK: - 3D Pie Chart
-
-struct Pie3DView: View {
-    let slices: [(label: String, value: Double, color: Color)]
-    @Binding var hoveredSlice: Int?
-    
-    // 3D projection parameters
-    private let radius: CGFloat = 65
-    private let yScale: CGFloat = 0.5      // elliptical squash for perspective
-    private let depth: CGFloat = 20          // thickness of the 3D extrusion
-    private let gapAngle: Double = 0.04      // gap between slices in radians
-    
-    private var sliceAngles: [(start: Double, end: Double)] {
-        var angles: [(start: Double, end: Double)] = []
-        var current: Double = -.pi / 2
-        for slice in slices {
-            let sliceAngle = max(0, slice.value * 2 * .pi - gapAngle)
-            angles.append((start: current + gapAngle / 2, end: current + gapAngle / 2 + sliceAngle))
-            current += slice.value * 2 * .pi
-        }
-        return angles
-    }
-    
-    var body: some View {
-        Canvas { context, size in
-            let cx = size.width / 2
-            let cy = size.height / 2 - depth / 4
-            let angles = sliceAngles
-            
-            // Draw order back to front
-            
-            // 1) Outer side walls
-            for (index, ang) in angles.enumerated() {
-                let isHov = hoveredSlice == index
-                let hoverOffset = isHov ? hoverOffsetFor(ang) : CGSize.zero
-                drawOuterSideWall(context: &context, cx: cx + hoverOffset.width, cy: cy + hoverOffset.height, startAngle: ang.start, endAngle: ang.end, color: slices[index].color)
-            }
-            
-            // 2) Cut side walls (start and end cuts)
-            for (index, ang) in angles.enumerated() {
-                let isHov = hoveredSlice == index
-                let hoverOffset = isHov ? hoverOffsetFor(ang) : CGSize.zero
-                drawCutWalls(context: &context, cx: cx + hoverOffset.width, cy: cy + hoverOffset.height, startAngle: ang.start, endAngle: ang.end, color: slices[index].color)
-            }
-            
-            // 3) Top face
-            for (index, ang) in angles.enumerated() {
-                let isHov = hoveredSlice == index
-                let hoverOffset = isHov ? hoverOffsetFor(ang) : CGSize.zero
-                drawTopFace(context: &context, cx: cx + hoverOffset.width, cy: cy + hoverOffset.height, startAngle: ang.start, endAngle: ang.end, color: slices[index].color, isHovered: isHov)
-            }
-            
-            // 4) Top highlight
-            for (index, ang) in angles.enumerated() {
-                let isHov = hoveredSlice == index
-                let hoverOffset = isHov ? hoverOffsetFor(ang) : CGSize.zero
-                drawTopHighlight(context: &context, cx: cx + hoverOffset.width, cy: cy + hoverOffset.height, startAngle: ang.start, endAngle: ang.end, isHovered: isHov)
-            }
-        }
-    }
-    
-    private func hoverOffsetFor(_ ang: (start: Double, end: Double)) -> CGSize {
-        let mid = (ang.start + ang.end) / 2
-        return CGSize(width: cos(mid) * 8, height: sin(mid) * 8 * yScale)
-    }
-    
-    private func point(_ angle: Double, radius r: CGFloat, cx: CGFloat, cy: CGFloat, yOff: CGFloat = 0) -> CGPoint {
-        CGPoint(x: cx + cos(angle) * r, y: cy + sin(angle) * r * yScale + yOff)
-    }
-    
-    private func drawOuterSideWall(context: inout GraphicsContext, cx: CGFloat, cy: CGFloat, startAngle: Double, endAngle: Double, color: Color) {
-        let steps = 40
-        let angleStep = (endAngle - startAngle) / Double(steps)
-        
-        for i in 0..<steps {
-            let a1 = startAngle + Double(i) * angleStep
-            let a2 = a1 + angleStep
-            let midA = (a1 + a2) / 2
-            if sin(midA) <= -0.1 { continue } // skip back-facing walls
-            
-            var wallPath = Path()
-            let topLeft = point(a1, radius: radius, cx: cx, cy: cy)
-            let topRight = point(a2, radius: radius, cx: cx, cy: cy)
-            let botRight = point(a2, radius: radius, cx: cx, cy: cy, yOff: depth)
-            let botLeft = point(a1, radius: radius, cx: cx, cy: cy, yOff: depth)
-            wallPath.move(to: topLeft)
-            wallPath.addLine(to: topRight)
-            wallPath.addLine(to: botRight)
-            wallPath.addLine(to: botLeft)
-            wallPath.closeSubpath()
-            
-            let shade = 0.35 + 0.25 * (1 + cos(midA - .pi / 3)) / 2
-            context.fill(wallPath, with: .color(color.opacity(shade)))
-        }
-    }
-    
-    private func drawCutWalls(context: inout GraphicsContext, cx: CGFloat, cy: CGFloat, startAngle: Double, endAngle: Double, color: Color) {
-        // Start cut (facing viewer if its left side is exposed)
-        let startNormal = startAngle - .pi/2
-        if sin(startNormal) > 0 {
-            var path = Path()
-            let centerTop = CGPoint(x: cx, y: cy)
-            let centerBot = CGPoint(x: cx, y: cy + depth)
-            let outerTop = point(startAngle, radius: radius, cx: cx, cy: cy)
-            let outerBot = point(startAngle, radius: radius, cx: cx, cy: cy, yOff: depth)
-            path.move(to: centerTop)
-            path.addLine(to: outerTop)
-            path.addLine(to: outerBot)
-            path.addLine(to: centerBot)
-            path.closeSubpath()
-            let shade = 0.25 + 0.15 * (1 + cos(startNormal)) / 2
-            context.fill(path, with: .color(color.opacity(shade)))
-        }
-        
-        // End cut (facing viewer if its right side is exposed)
-        let endNormal = endAngle + .pi/2
-        if sin(endNormal) > 0 {
-            var path = Path()
-            let centerTop = CGPoint(x: cx, y: cy)
-            let centerBot = CGPoint(x: cx, y: cy + depth)
-            let outerTop = point(endAngle, radius: radius, cx: cx, cy: cy)
-            let outerBot = point(endAngle, radius: radius, cx: cx, cy: cy, yOff: depth)
-            path.move(to: centerTop)
-            path.addLine(to: outerTop)
-            path.addLine(to: outerBot)
-            path.addLine(to: centerBot)
-            path.closeSubpath()
-            let shade = 0.25 + 0.15 * (1 + cos(endNormal)) / 2
-            context.fill(path, with: .color(color.opacity(shade)))
-        }
-    }
-    
-    private func drawTopFace(context: inout GraphicsContext, cx: CGFloat, cy: CGFloat, startAngle: Double, endAngle: Double, color: Color, isHovered: Bool) {
-        let steps = 60
-        let angleStep = (endAngle - startAngle) / Double(steps)
-        
-        var topPath = Path()
-        topPath.move(to: CGPoint(x: cx, y: cy))
-        for i in 0...steps {
-            let a = startAngle + Double(i) * angleStep
-            topPath.addLine(to: point(a, radius: radius, cx: cx, cy: cy))
-        }
-        topPath.closeSubpath()
-        
-        let brightness: CGFloat = isHovered ? 1.15 : 1.0
-        let midAngle = (startAngle + endAngle) / 2
-        let gradStart = point(midAngle - 0.5, radius: radius, cx: cx, cy: cy)
-        let gradEnd = point(midAngle + 0.5, radius: radius, cx: cx, cy: cy)
-        
-        context.fill(topPath, with: .linearGradient(
-            Gradient(colors: [
-                adjustBrightness(color, by: brightness * 1.1),
-                adjustBrightness(color, by: brightness * 0.85)
-            ]),
-            startPoint: gradStart,
-            endPoint: gradEnd
-        ))
-        
-        if isHovered {
-            context.fill(topPath, with: .color(Color.white.opacity(0.12)))
-        }
-    }
-    
-    private func drawTopHighlight(context: inout GraphicsContext, cx: CGFloat, cy: CGFloat, startAngle: Double, endAngle: Double, isHovered: Bool) {
-        let highlightStart = max(startAngle, -.pi)
-        let highlightEnd = min(endAngle, -0.1)
-        guard highlightStart < highlightEnd else { return }
-        
-        let steps = 30
-        let angleStep = (highlightEnd - highlightStart) / Double(steps)
-        
-        var hlPath = Path()
-        let hlOuter = radius * 0.9
-        
-        hlPath.move(to: CGPoint(x: cx, y: cy))
-        for i in 0...steps {
-            let a = highlightStart + Double(i) * angleStep
-            hlPath.addLine(to: point(a, radius: hlOuter, cx: cx, cy: cy))
-        }
-        hlPath.closeSubpath()
-        
-        context.fill(hlPath, with: .color(Color.white.opacity(isHovered ? 0.22 : 0.12)))
-    }
-    
-    private func adjustBrightness(_ color: Color, by factor: CGFloat) -> Color {
-        if factor > 1.0 { return color.opacity(1.0) }
-        return color.opacity(Double(factor))
     }
 }
 

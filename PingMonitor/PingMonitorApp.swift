@@ -229,6 +229,8 @@ class PingMonitorViewModel: ObservableObject {
     @Published var selectedStatHost: HostConfig?
     @Published var widgetDisplayMode: String = "auto"
     @Published var widgetSelectedHostId: String = ""
+    @Published var showSpeedInMenu: Bool = false
+    @Published var speedUnit: String = "auto"  // "auto", "KB", "MB"
     
     var statusBarController: StatusBarController?
     private var pingProcesses: [UUID: Process] = [:]
@@ -292,6 +294,8 @@ class PingMonitorViewModel: ObservableObject {
         
         widgetDisplayMode = defaults.string(forKey: "widgetDisplayMode") ?? "auto"
         widgetSelectedHostId = defaults.string(forKey: "widgetSelectedHostId") ?? ""
+        showSpeedInMenu = defaults.bool(forKey: "showSpeedInMenu")
+        speedUnit = defaults.string(forKey: "speedUnit") ?? "auto"
         
         LogManager.shared.info("Settings loaded: \(hosts.count) hosts, \(presets.count) presets")
     }
@@ -323,6 +327,8 @@ class PingMonitorViewModel: ObservableObject {
         defaults.set(statusBarDisplayMode.rawValue, forKey: "statusBarDisplayMode")
         defaults.set(widgetDisplayMode, forKey: "widgetDisplayMode")
         defaults.set(widgetSelectedHostId, forKey: "widgetSelectedHostId")
+        defaults.set(showSpeedInMenu, forKey: "showSpeedInMenu")
+        defaults.set(speedUnit, forKey: "speedUnit")
     }
 
     func setupAutoStart() {
@@ -1018,6 +1024,38 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
                 self?.updateStatusBar()
             }
             .store(in: &cancellables)
+        
+        viewModel.$showSpeedInMenu
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.updateSpeedMonitoring()
+                self?.updateStatusBar()
+            }
+            .store(in: &cancellables)
+        
+        viewModel.$speedUnit
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.updateStatusBar()
+            }
+            .store(in: &cancellables)
+    }
+    
+    private var speedTimer: Timer?
+    
+    private func updateSpeedMonitoring() {
+        speedTimer?.invalidate()
+        speedTimer = nil
+        if viewModel.showSpeedInMenu {
+            NetworkSpeedManager.shared.startMonitoring()
+            speedTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+                Task { @MainActor in
+                    self?.updateStatusBar()
+                }
+            }
+        } else {
+            // Don't stop the global manager, other views may use it
+        }
     }
 
     func setupStatusBar() {
@@ -1107,17 +1145,102 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
             button.image = NSImage(systemSymbolName: "network.badge.shield.half.filled", accessibilityDescription: nil)
             
             let showingText = viewModel.showLatencyInMenu || viewModel.showLabelsInMenu
+            var latencyPart = ""
             if showingText && !displayText.isEmpty && displayText != "●" {
-                button.title = " \(displayText)"
-                statusItem?.length = measureWidth(text: " \(displayText)", font: font)
+                latencyPart = " \(displayText)"
+            }
+            
+            if viewModel.showSpeedInMenu {
+                let speedAttr = buildSpeedAttributedString()
+                let fullAttr = NSMutableAttributedString()
+                if !latencyPart.isEmpty {
+                    fullAttr.append(NSAttributedString(string: latencyPart, attributes: [.font: font]))
+                    fullAttr.append(NSAttributedString(string: "  ", attributes: [.font: font]))
+                }
+                fullAttr.append(speedAttr)
+                button.attributedTitle = fullAttr
+                button.title = ""
+                let totalWidth = widthIconOnly + fullAttr.size().width + 8
+                statusItem?.length = ceil(totalWidth)
+            } else if !latencyPart.isEmpty {
+                button.attributedTitle = NSAttributedString()
+                button.title = latencyPart
+                statusItem?.length = measureWidth(text: latencyPart, font: font)
             } else {
+                button.attributedTitle = NSAttributedString()
                 button.title = ""
                 statusItem?.length = widthIconOnly
             }
         } else {
             button.image = NSImage(systemSymbolName: "network", accessibilityDescription: nil)
-            button.title = ""
-            statusItem?.length = widthIconOnly
+            
+            if viewModel.showSpeedInMenu {
+                let speedAttr = buildSpeedAttributedString()
+                button.attributedTitle = speedAttr
+                button.title = ""
+                statusItem?.length = ceil(widthIconOnly + speedAttr.size().width + 8)
+            } else {
+                button.attributedTitle = NSAttributedString()
+                button.title = ""
+                statusItem?.length = widthIconOnly
+            }
+        }
+    }
+    
+    private func buildSpeedAttributedString() -> NSAttributedString {
+        let mgr = NetworkSpeedManager.shared
+        let upSpeed = mgr.totalSpeedOut
+        let downSpeed = mgr.totalSpeedIn
+        
+        let upStr = formatSpeedForBar(upSpeed)
+        let downStr = formatSpeedForBar(downSpeed)
+        
+        let smallFont = NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .medium)
+        let upColor = NSColor.systemOrange
+        let downColor = NSColor.systemGreen
+        
+        let fullStr = NSMutableAttributedString()
+        
+        // Down arrow + speed
+        let downPart = NSAttributedString(string: "↓\(downStr)\n", attributes: [
+            .font: smallFont,
+            .foregroundColor: downColor
+        ])
+        fullStr.append(downPart)
+        
+        // Up arrow + speed
+        let upPart = NSAttributedString(string: "↑\(upStr)", attributes: [
+            .font: smallFont,
+            .foregroundColor: upColor
+        ])
+        fullStr.append(upPart)
+        
+        // Tight line spacing
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.lineSpacing = 0
+        paragraphStyle.paragraphSpacing = 0
+        paragraphStyle.minimumLineHeight = 10
+        paragraphStyle.maximumLineHeight = 10
+        fullStr.addAttribute(.paragraphStyle, value: paragraphStyle, range: NSRange(location: 0, length: fullStr.length))
+        
+        return fullStr
+    }
+    
+    private func formatSpeedForBar(_ bytesPerSec: Double) -> String {
+        let unit = viewModel.speedUnit
+        switch unit {
+        case "KB":
+            return String(format: "%5.0f KB/s", bytesPerSec / 1024)
+        case "MB":
+            return String(format: "%5.1f MB/s", bytesPerSec / (1024 * 1024))
+        default: // auto
+            if bytesPerSec < 1024 {
+                return String(format: "%4.0f B/s", bytesPerSec)
+            } else if bytesPerSec < 1024 * 1024 {
+                return String(format: "%5.1f KB/s", bytesPerSec / 1024)
+            } else {
+                return String(format: "%5.1f MB/s", bytesPerSec / (1024 * 1024))
+            }
         }
     }
     

@@ -1,5 +1,11 @@
 # PingMonitor Changelog
 
+## [2.1.0r5] - 2026-02-27
+### Improved
+- Fixed empty state UI centering on Monitor & Host Management pages
+- Replaced 3D pie chart with flat donut chart (SectorMark), moved text stats below chart
+- Added status bar network speed display (↑/↓ stacked) with toggle and unit selector (Auto/KB/MB) in Settings
+
 ## [2.1.0] - 2026-02-26
 ### Added
 - Real-time Network Speed Monitoring (Upload/Download, interface selection)

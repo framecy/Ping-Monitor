@@ -903,6 +903,7 @@ struct MonitorTab: View {
                 
                 if viewModel.hosts.isEmpty {
                     ContentUnavailableView(languageManager.t("monitor.no_hosts"), systemImage: "network", description: Text(languageManager.t("monitor.add_host_hint")))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     ScrollView {
                         LazyVGrid(columns: [
@@ -1116,6 +1117,7 @@ struct HostsManagementView: View {
             
             if viewModel.hosts.isEmpty {
                 ContentUnavailableView(languageManager.t("host.manage.no_hosts"), systemImage: "server.rack", description: Text(languageManager.t("host.manage.add_hint")))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
                     LazyVGrid(columns: [
@@ -1336,6 +1338,7 @@ struct PresetsManagementView: View {
             
             if viewModel.presets.isEmpty {
                 ContentUnavailableView(languageManager.t("host.manage.no_presets"), systemImage: "bookmark", description: Text(languageManager.t("host.manage.add_preset_hint")))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
                     LazyVGrid(columns: [
@@ -1954,6 +1957,33 @@ struct SettingsTab: View {
                                 LogManager.shared.info("Show labels in menu toggled to \(newValue)")
                                 viewModel.saveSettings()
                             }
+                        
+                        Divider()
+                        
+                        Toggle(languageManager.t("settings.show_speed"), isOn: $viewModel.showSpeedInMenu)
+                            .onChange(of: viewModel.showSpeedInMenu) { _, newValue in
+                                LogManager.shared.info("Show speed in menu toggled to \(newValue)")
+                                viewModel.saveSettings()
+                            }
+                        
+                        if viewModel.showSpeedInMenu {
+                            Divider()
+                            HStack {
+                                Text(languageManager.t("settings.speed_unit"))
+                                Spacer()
+                                Picker("", selection: $viewModel.speedUnit) {
+                                    Text(languageManager.t("settings.speed_unit.auto")).tag("auto")
+                                    Text("KB/s").tag("KB")
+                                    Text("MB/s").tag("MB")
+                                }
+                                .pickerStyle(.segmented)
+                                .frame(width: 200)
+                                .onChange(of: viewModel.speedUnit) { _, newValue in
+                                    LogManager.shared.info("Speed unit changed to \(newValue)")
+                                    viewModel.saveSettings()
+                                }
+                            }
+                        }
                         
                         Divider()
                         
