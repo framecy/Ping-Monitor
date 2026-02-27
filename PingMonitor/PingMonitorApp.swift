@@ -925,6 +925,15 @@ struct ServiceShortcut: Codable, Identifiable {
         } else {
             cmd += " \(url)"
         }
+        
+        // If password auth with password configured, wrap in expect script
+        if sshAuthMode == .password && !sshPassword.isEmpty {
+            let escapedPwd = sshPassword.replacingOccurrences(of: "\\", with: "\\\\")
+                .replacingOccurrences(of: "\"", with: "\\\"")
+                .replacingOccurrences(of: "'", with: "'\\''")
+            return "expect -c 'spawn \(cmd); expect \"*assword*\"; send \"\(escapedPwd)\\r\"; interact'"
+        }
+        
         return cmd
     }
 }

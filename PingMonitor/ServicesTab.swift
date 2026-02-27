@@ -373,12 +373,32 @@ struct ServicesTab: View {
             }
         case .ssh:
             let sshCmd = shortcut.sshCommand
-            let script = "tell application \"Terminal\" to do script \"\(sshCmd)\""
-            if let appleScript = NSAppleScript(source: script) {
+            // Write command to temp script to avoid AppleScript quoting issues
+            let scriptPath = "/tmp/pm_ssh_\(UUID().uuidString.prefix(8)).sh"
+            let scriptContent = "#!/bin/bash\n\(sshCmd)\n"
+            do {
+                try scriptContent.write(toFile: scriptPath, atomically: true, encoding: .utf8)
+                // Make executable
+                let chmod = Process()
+                chmod.executableURL = URL(fileURLWithPath: "/bin/chmod")
+                chmod.arguments = ["+x", scriptPath]
+                try chmod.run()
+                chmod.waitUntilExit()
+                // Tell Terminal to run the script
+                let appleScript = NSAppleScript(source: """
+                    tell application "Terminal"
+                        activate
+                        do script "\(scriptPath); rm -f \(scriptPath)"
+                    end tell
+                    """)
                 var error: NSDictionary?
-                appleScript.executeAndReturnError(&error)
+                appleScript?.executeAndReturnError(&error)
+                if let error = error {
+                    LogManager.shared.error("AppleScript error: \(error)")
+                }
+            } catch {
+                LogManager.shared.error("Failed to create SSH script: \(error)")
             }
-            NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app"))
         case .custom:
             if let url = URL(string: shortcut.url) {
                 NSWorkspace.shared.open(url)

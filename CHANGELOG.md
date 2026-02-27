@@ -1,5 +1,10 @@
 # PingMonitor Changelog
 
+## [2.1.0r11] - 2026-02-27
+### Fixed
+- Fixed SSH shortcuts not auto-connecting: now writes command to temp script and executes in Terminal
+- SSH password auth auto-connects using `expect` script to send password automatically
+
 ## [2.1.0r9] - 2026-02-27
 ### Fixed
 - Fixed status bar speed: horizontal left-right layout (↑xx ↓xx) with configurable spacing (-/+ stepper in settings)
