@@ -1,5 +1,9 @@
 # PingMonitor Changelog
 
+## [2.1.0r6] - 2026-02-27
+### Fixed
+- Fixed status bar network speed not displaying (replaced broken multi-line layout with horizontal ↓/↑ text)
+
 ## [2.1.0r5] - 2026-02-27
 ### Improved
 - Fixed empty state UI centering on Monitor & Host Management pages

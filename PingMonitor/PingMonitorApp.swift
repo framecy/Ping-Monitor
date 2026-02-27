@@ -1140,34 +1140,27 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
         let displayText = viewModel.getStatusBarDisplayText()
         let font = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium)
         button.font = font
+        button.attributedTitle = NSAttributedString()
 
         if viewModel.isRunning {
             button.image = NSImage(systemSymbolName: "network.badge.shield.half.filled", accessibilityDescription: nil)
             
             let showingText = viewModel.showLatencyInMenu || viewModel.showLabelsInMenu
-            var latencyPart = ""
+            var parts: [String] = []
+            
             if showingText && !displayText.isEmpty && displayText != "●" {
-                latencyPart = " \(displayText)"
+                parts.append(displayText)
             }
             
             if viewModel.showSpeedInMenu {
-                let speedAttr = buildSpeedAttributedString()
-                let fullAttr = NSMutableAttributedString()
-                if !latencyPart.isEmpty {
-                    fullAttr.append(NSAttributedString(string: latencyPart, attributes: [.font: font]))
-                    fullAttr.append(NSAttributedString(string: "  ", attributes: [.font: font]))
-                }
-                fullAttr.append(speedAttr)
-                button.attributedTitle = fullAttr
-                button.title = ""
-                let totalWidth = widthIconOnly + fullAttr.size().width + 8
-                statusItem?.length = ceil(totalWidth)
-            } else if !latencyPart.isEmpty {
-                button.attributedTitle = NSAttributedString()
-                button.title = latencyPart
-                statusItem?.length = measureWidth(text: latencyPart, font: font)
+                parts.append(buildSpeedText())
+            }
+            
+            if !parts.isEmpty {
+                let title = " " + parts.joined(separator: "  ")
+                button.title = title
+                statusItem?.length = measureWidth(text: title, font: font)
             } else {
-                button.attributedTitle = NSAttributedString()
                 button.title = ""
                 statusItem?.length = widthIconOnly
             }
@@ -1175,71 +1168,37 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
             button.image = NSImage(systemSymbolName: "network", accessibilityDescription: nil)
             
             if viewModel.showSpeedInMenu {
-                let speedAttr = buildSpeedAttributedString()
-                button.attributedTitle = speedAttr
-                button.title = ""
-                statusItem?.length = ceil(widthIconOnly + speedAttr.size().width + 8)
+                let title = " " + buildSpeedText()
+                button.title = title
+                statusItem?.length = measureWidth(text: title, font: font)
             } else {
-                button.attributedTitle = NSAttributedString()
                 button.title = ""
                 statusItem?.length = widthIconOnly
             }
         }
     }
     
-    private func buildSpeedAttributedString() -> NSAttributedString {
+    private func buildSpeedText() -> String {
         let mgr = NetworkSpeedManager.shared
-        let upSpeed = mgr.totalSpeedOut
-        let downSpeed = mgr.totalSpeedIn
-        
-        let upStr = formatSpeedForBar(upSpeed)
-        let downStr = formatSpeedForBar(downSpeed)
-        
-        let smallFont = NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .medium)
-        let upColor = NSColor.systemOrange
-        let downColor = NSColor.systemGreen
-        
-        let fullStr = NSMutableAttributedString()
-        
-        // Down arrow + speed
-        let downPart = NSAttributedString(string: "↓\(downStr)\n", attributes: [
-            .font: smallFont,
-            .foregroundColor: downColor
-        ])
-        fullStr.append(downPart)
-        
-        // Up arrow + speed
-        let upPart = NSAttributedString(string: "↑\(upStr)", attributes: [
-            .font: smallFont,
-            .foregroundColor: upColor
-        ])
-        fullStr.append(upPart)
-        
-        // Tight line spacing
-        let paragraphStyle = NSMutableParagraphStyle()
-        paragraphStyle.lineSpacing = 0
-        paragraphStyle.paragraphSpacing = 0
-        paragraphStyle.minimumLineHeight = 10
-        paragraphStyle.maximumLineHeight = 10
-        fullStr.addAttribute(.paragraphStyle, value: paragraphStyle, range: NSRange(location: 0, length: fullStr.length))
-        
-        return fullStr
+        let downStr = formatSpeedForBar(mgr.totalSpeedIn)
+        let upStr = formatSpeedForBar(mgr.totalSpeedOut)
+        return "↓\(downStr) ↑\(upStr)"
     }
     
     private func formatSpeedForBar(_ bytesPerSec: Double) -> String {
         let unit = viewModel.speedUnit
         switch unit {
         case "KB":
-            return String(format: "%5.0f KB/s", bytesPerSec / 1024)
+            return String(format: "%.0f KB/s", bytesPerSec / 1024)
         case "MB":
-            return String(format: "%5.1f MB/s", bytesPerSec / (1024 * 1024))
+            return String(format: "%.1f MB/s", bytesPerSec / (1024 * 1024))
         default: // auto
             if bytesPerSec < 1024 {
-                return String(format: "%4.0f B/s", bytesPerSec)
+                return String(format: "%.0f B/s", bytesPerSec)
             } else if bytesPerSec < 1024 * 1024 {
-                return String(format: "%5.1f KB/s", bytesPerSec / 1024)
+                return String(format: "%.1f KB/s", bytesPerSec / 1024)
             } else {
-                return String(format: "%5.1f MB/s", bytesPerSec / (1024 * 1024))
+                return String(format: "%.1f MB/s", bytesPerSec / (1024 * 1024))
             }
         }
     }
