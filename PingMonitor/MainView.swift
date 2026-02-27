@@ -1983,6 +1983,42 @@ struct SettingsTab: View {
                                     viewModel.saveSettings()
                                 }
                             }
+                            
+                            Divider()
+                            
+                            HStack {
+                                Text(languageManager.t("settings.spacing"))
+                                Spacer()
+                                HStack(spacing: 8) {
+                                    Button {
+                                        if viewModel.statusBarSpacing > 1 {
+                                            viewModel.statusBarSpacing -= 1
+                                            viewModel.saveSettings()
+                                        }
+                                    } label: {
+                                        Image(systemName: "minus.circle")
+                                            .font(.system(size: 16))
+                                    }
+                                    .buttonStyle(.borderless)
+                                    .disabled(viewModel.statusBarSpacing <= 1)
+                                    
+                                    Text("\(viewModel.statusBarSpacing)")
+                                        .font(.system(.body, design: .monospaced))
+                                        .frame(width: 24, alignment: .center)
+                                    
+                                    Button {
+                                        if viewModel.statusBarSpacing < 10 {
+                                            viewModel.statusBarSpacing += 1
+                                            viewModel.saveSettings()
+                                        }
+                                    } label: {
+                                        Image(systemName: "plus.circle")
+                                            .font(.system(size: 16))
+                                    }
+                                    .buttonStyle(.borderless)
+                                    .disabled(viewModel.statusBarSpacing >= 10)
+                                }
+                            }
                         }
                         
                         Divider()

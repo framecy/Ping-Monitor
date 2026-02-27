@@ -66,9 +66,13 @@ xcodebuild -scheme PingMonitor -configuration Release \
 
 APP_PATH="$HOME/Library/Developer/Xcode/DerivedData/PingMonitor/Build/Products/Release/PingMonitor.app"
 
-# 重新签名以满足 Gatekeeper 的要求 (Apple Silicon 必须严格 Ad-hoc 签名)
+# 重新签名：先签 widget 扩展（保留其 entitlements），再签主应用
 echo "🔐 修复签名..."
-codesign --force --deep -s - -o runtime "$APP_PATH"
+WIDGET_PATH="$APP_PATH/Contents/PlugIns/PingMonitorWidget.appex"
+if [ -d "$WIDGET_PATH" ]; then
+    codesign --force -s - --entitlements PingMonitorWidget/PingMonitorWidget.entitlements "$WIDGET_PATH"
+fi
+codesign --force -s - --entitlements PingMonitor/PingMonitor.entitlements "$APP_PATH"
 
 # 验证构建
 if [ ! -d "$APP_PATH" ]; then

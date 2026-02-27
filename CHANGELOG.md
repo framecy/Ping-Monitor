@@ -1,5 +1,10 @@
 # PingMonitor Changelog
 
+## [2.1.0r9] - 2026-02-27
+### Fixed
+- Fixed status bar speed: horizontal left-right layout (↑xx ↓xx) with configurable spacing (-/+ stepper in settings)
+- Fixed widget not appearing in system widgets list (build.sh now signs widget extension separately)
+
 ## [2.1.0r7] - 2026-02-27
 ### Improved
 - Rewrote status bar speed display using custom NSView for stacked vertical layout (↑ green / ↓ blue)
