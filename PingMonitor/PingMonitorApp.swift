@@ -1292,8 +1292,9 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
     
     private func renderSpeedImage() -> NSImage {
         let mgr = NetworkSpeedManager.shared
-        let upStr = "↑ \(formatSpeed(mgr.totalSpeedOut))"
-        let downStr = "↓ \(formatSpeed(mgr.totalSpeedIn))"
+        // Separate the arrow from the value
+        let upValStr = "\(formatSpeed(mgr.totalSpeedOut))"
+        let downValStr = "\(formatSpeed(mgr.totalSpeedIn))"
         
         let weight: NSFont.Weight
         switch viewModel.statusBarFontWeight {
@@ -1306,15 +1307,45 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
         let upAttrs: [NSAttributedString.Key: Any] = [.font: smallFont, .foregroundColor: NSColor.systemGreen]
         let downAttrs: [NSAttributedString.Key: Any] = [.font: smallFont, .foregroundColor: NSColor.systemBlue]
         
-        let upSize = (upStr as NSString).size(withAttributes: upAttrs)
-        let downSize = (downStr as NSString).size(withAttributes: downAttrs)
-        let width = max(upSize.width, downSize.width) + 2
-        let height = upSize.height + downSize.height
+        let arrowAttrs: [NSAttributedString.Key: Any] = [.font: smallFont, .foregroundColor: NSColor.labelColor]
+        
+        // Measure the arrows
+        let upArrowStr = "↑"
+        let downArrowStr = "↓"
+        let upArrowSize = (upArrowStr as NSString).size(withAttributes: arrowAttrs)
+        let downArrowSize = (downArrowStr as NSString).size(withAttributes: arrowAttrs)
+        
+        // Measure the values
+        let upValSize = (upValStr as NSString).size(withAttributes: upAttrs)
+        let downValSize = (downValStr as NSString).size(withAttributes: downAttrs)
+        
+        let arrowWidth = max(upArrowSize.width, downArrowSize.width)
+        let valWidth = max(upValSize.width, downValSize.width)
+        
+        // Fixed gap between arrow and value
+        let gap: CGFloat = 4.0
+        
+        let width = arrowWidth + gap + valWidth + 2
+        let height = max(upArrowSize.height, upValSize.height) + max(downArrowSize.height, downValSize.height)
+        
+        // The Y position for top and bottom row
+        let topY = height - max(upArrowSize.height, upValSize.height)
+        let bottomY: CGFloat = 0
+        
+        // The X position for the value text (left-aligned)
+        let valX = arrowWidth + gap
         
         let image = NSImage(size: NSSize(width: width, height: height))
         image.lockFocus()
-        (upStr as NSString).draw(at: NSPoint(x: 0, y: height - upSize.height), withAttributes: upAttrs)
-        (downStr as NSString).draw(at: NSPoint(x: 0, y: 0), withAttributes: downAttrs)
+        
+        // Draw top row (Up)
+        (upArrowStr as NSString).draw(at: NSPoint(x: 0, y: topY), withAttributes: arrowAttrs)
+        (upValStr as NSString).draw(at: NSPoint(x: valX, y: topY), withAttributes: upAttrs)
+        
+        // Draw bottom row (Down)
+        (downArrowStr as NSString).draw(at: NSPoint(x: 0, y: bottomY), withAttributes: arrowAttrs)
+        (downValStr as NSString).draw(at: NSPoint(x: valX, y: bottomY), withAttributes: downAttrs)
+        
         image.unlockFocus()
         image.isTemplate = false
         return image
