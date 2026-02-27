@@ -2006,7 +2006,7 @@ struct SettingsTab: View {
                                 Spacer()
                                 HStack(spacing: 8) {
                                     Button {
-                                        if viewModel.statusBarWidth > 80 {
+                                        if viewModel.statusBarWidth > 60 {
                                             viewModel.statusBarWidth -= 10
                                             viewModel.saveSettings()
                                         }
@@ -2015,7 +2015,7 @@ struct SettingsTab: View {
                                             .font(.system(size: 16))
                                     }
                                     .buttonStyle(.borderless)
-                                    .disabled(viewModel.statusBarWidth <= 80)
+                                    .disabled(viewModel.statusBarWidth <= 60)
                                     
                                     Text("\(viewModel.statusBarWidth)")
                                         .font(.system(.body, design: .monospaced))

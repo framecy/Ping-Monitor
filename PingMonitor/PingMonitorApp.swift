@@ -1179,15 +1179,7 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
         button.imagePosition = .imageLeft
         button.alignment = .left
 
-        if viewModel.showIconInMenu {
-            if viewModel.isRunning {
-                button.image = NSImage(systemSymbolName: "network.badge.shield.half.filled", accessibilityDescription: nil)
-            } else {
-                button.image = NSImage(systemSymbolName: "network", accessibilityDescription: nil)
-            }
-        } else {
-            button.image = nil
-        }
+        button.image = nil // We will use NSTextAttachment for the icon for strict left alignment
 
         let showingText = viewModel.showLatencyInMenu || viewModel.showLabelsInMenu
         var latencyStr = ""
@@ -1203,6 +1195,22 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
             paragraphStyle.alignment = .left
             paragraphStyle.lineBreakMode = .byClipping
             
+            // 1. Add Icon Attachment (if enabled)
+            if viewModel.showIconInMenu {
+                let iconAttachment = NSTextAttachment()
+                let iconName = viewModel.isRunning ? "network.badge.shield.half.filled" : "network"
+                let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
+                if let iconImage = NSImage(systemSymbolName: iconName, accessibilityDescription: nil)?.withSymbolConfiguration(config) {
+                    iconImage.isTemplate = true
+                    iconAttachment.image = iconImage
+                    // Vertically center icon relative to the font cap height
+                    let yIconOffset = (font.capHeight - iconImage.size.height) / 2.0
+                    iconAttachment.bounds = CGRect(x: 0, y: yIconOffset, width: iconImage.size.width, height: iconImage.size.height)
+                    fullAttr.append(NSAttributedString(attachment: iconAttachment))
+                }
+            }
+            
+            // 2. Add Latency / Label Text
             if !latencyStr.isEmpty {
                 fullAttr.append(NSAttributedString(string: latencyStr, attributes: [
                     .font: font,
@@ -1210,13 +1218,15 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
                 ]))
             }
             
-            let iconWidth: CGFloat = viewModel.showIconInMenu ? widthIconOnly : 8
-            let textWidth = measureWidth(text: latencyStr, font: font)
-            let currentWidth = textWidth + iconWidth
+            // Calculate padding needed to push speed attachment to the right edge
+            let currentWidth = measureWidth(text: latencyStr, font: font) + (viewModel.showIconInMenu ? widthIconOnly : 0)
             let targetWidth = CGFloat(viewModel.statusBarWidth)
             let speedWidth = speedImage.size.width
-            let availableSpace = targetWidth - currentWidth - speedWidth - 10 // Adjusted margin
+            let availableSpace = targetWidth - currentWidth - speedWidth - 6 // Tighter margin
+
             
+            
+            // 3. Add Padding
             if availableSpace > 0 {
                 fullAttr.append(NSAttributedString(string: " ", attributes: [
                     .font: font,
@@ -1224,16 +1234,15 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
                     .paragraphStyle: paragraphStyle
                 ]))
             } else {
-                // Keep it exactly clipping without breaking
                 fullAttr.append(NSAttributedString(string: " ", attributes: [
                     .font: font,
                     .paragraphStyle: paragraphStyle
                 ]))
             }
             
+            // 4. Add Speed Attachment
             let attachment = NSTextAttachment()
             attachment.image = speedImage
-            // Vertically center with the text (font cap height center)
             let yOffset = (font.capHeight - speedImage.size.height) / 2.0
             attachment.bounds = CGRect(x: 0, y: yOffset, width: speedImage.size.width, height: speedImage.size.height)
             let attachStr = NSAttributedString(attachment: attachment)
@@ -1244,10 +1253,37 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
             button.attributedTitle = fullAttr
             statusItem?.length = targetWidth
         } else {
-            button.attributedTitle = NSAttributedString()
-            button.title = latencyStr
+            // No speed text, but we still use the attachment trick to force left alignment for just icon and latency
+            let fullAttr = NSMutableAttributedString()
+            let paragraphStyle = NSMutableParagraphStyle()
+            paragraphStyle.alignment = .left
+            paragraphStyle.lineBreakMode = .byClipping
+            
+            if viewModel.showIconInMenu {
+                let iconAttachment = NSTextAttachment()
+                let iconName = viewModel.isRunning ? "network.badge.shield.half.filled" : "network"
+                let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
+                if let iconImage = NSImage(systemSymbolName: iconName, accessibilityDescription: nil)?.withSymbolConfiguration(config) {
+                    iconImage.isTemplate = true
+                    iconAttachment.image = iconImage
+                    let yIconOffset = (font.capHeight - iconImage.size.height) / 2.0
+                    iconAttachment.bounds = CGRect(x: 0, y: yIconOffset, width: iconImage.size.width, height: iconImage.size.height)
+                    fullAttr.append(NSAttributedString(attachment: iconAttachment))
+                }
+            }
+            
             if !latencyStr.isEmpty {
-                statusItem?.length = measureWidth(text: latencyStr, font: font) + (viewModel.showIconInMenu ? widthIconOnly : 16)
+                fullAttr.append(NSAttributedString(string: latencyStr, attributes: [
+                    .font: font,
+                    .paragraphStyle: paragraphStyle
+                ]))
+            }
+            
+            fullAttr.addAttributes([.paragraphStyle: paragraphStyle], range: NSRange(location: 0, length: fullAttr.length))
+            button.attributedTitle = fullAttr
+            
+            if !latencyStr.isEmpty {
+                statusItem?.length = measureWidth(text: latencyStr, font: font) + (viewModel.showIconInMenu ? widthIconOnly : 4)
             } else {
                 statusItem?.length = viewModel.showIconInMenu ? widthIconOnly : 0
             }
