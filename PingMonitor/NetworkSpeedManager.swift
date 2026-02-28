@@ -216,55 +216,69 @@ class NetworkSpeedManager: ObservableObject {
     
     private func parseNetstatOutput(_ output: String) -> [NetworkInterfaceStats] {
         var results: [String: NetworkInterfaceStats] = [:]
-        let lines = output.components(separatedBy: "\n")
+        let lines = output.components(separatedBy: "\n").filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+        guard let headerLine = lines.first else { return [] }
         
-        for line in lines.dropFirst() { // Skip header
+        // Parse header to find column indices
+        let headerParts = headerLine.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
+        
+        func findIdx(_ name: String) -> Int? {
+            headerParts.firstIndex(of: name)
+        }
+        
+        // Standard netstat -bni headers: Name, Mtu, Network, Address, Ipkts, Ierrs, Ibytes, Opkts, Oerrs, Obytes, [Coll]
+        guard let iPktsIdx = findIdx("Ipkts"),
+              let iErrsIdx = findIdx("Ierrs"),
+              let iBytIdx = findIdx("Ibytes"),
+              let oPktsIdx = findIdx("Opkts"),
+              let oErrsIdx = findIdx("Oerrs"),
+              let oBytIdx = findIdx("Obytes") else {
+            return []
+        }
+        
+        for line in lines.dropFirst() { 
             let parts = line.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
-            let c = parts.count
-            guard c >= 7 else { continue }
+            guard parts.count >= 6 else { continue }
             
             let name = parts[0]
-            // We only care about <Link#N> entries for raw byte counts
-            guard parts[2].contains("<Link") else { continue }
+            // We specifically want <Link#N> rows for byte counts
+            guard parts.count > 2, parts[2].contains("<Link") else { continue }
             
-            // Stats usually occupy the last 7 columns: Ipkts Ierrs Ibytes Opkts Oerrs Obytes Coll
-            // However, depending on the interface type and macOS version, columns might shift.
-            // We'll try to find the first numeric column starting from the end of the header list (excluding Coll).
+            // Adjust indices based on whether 'Address' is present for this specific row
+            // Header usually assumes 'Address' is present. If parts[2] is <Link>, 
+            // then parts[3] might be the MAC address or physical info. 
+            // If parts[3] is a large number, it's actually Ipkts (Address column is skipped in this row).
             
-            // Most reliable indices relative to the end:
-            // Opkts: c-4 or c-5
-            // Obytes: c-2 or c-1
+            var rowOffset = 0
+            // Logic: The header says Ipkts is at index X. 
+            // If parts[X] is NOT a number (and not '-'), it means there's an extra column or Address is pushing it.
+            // If parts[X-1] is the first number, it means Address is missing.
             
-            // Safer heuristic: The first three parts are [Name, Mtu, Network]. 
-            // If parts[3] is NOT numeric, it's 'Address'.
-            // If parts[3] IS numeric, it's 'Ipkts' (Address is missing).
+            // Refined Logic: Standard netstat -bni header:
+            // 0:Name 1:Mtu 2:Network 3:Address 4:Ipkts ...
+            // If Name, Mtu, Network are fixed, stats start at 3 or 4.
             
-            let statStartIndex: Int
-            if UInt64(parts[3]) != nil || parts[3] == "-" {
-                statStartIndex = 3 // Address is missing
-            } else {
-                statStartIndex = 4 // Address is present
+            let hasAddress = UInt64(parts[3]) == nil && parts[3] != "-"
+            let actualIPktsIdx = hasAddress ? iPktsIdx : iPktsIdx - 1
+            let offset = actualIPktsIdx - iPktsIdx
+            
+            func val(_ baseIdx: Int) -> UInt64 {
+                let idx = baseIdx + offset
+                guard idx >= 0, idx < parts.count else { return 0 }
+                let s = parts[idx]
+                if s == "-" { return 0 }
+                return UInt64(s) ?? 0
             }
-            
-            // Indices: statStartIndex + 0:Ipkts, 1:Ierrs, 2:Ibytes, 3:Opkts, 4:Oerrs, 5:Obytes
-            guard c >= statStartIndex + 6 else { continue }
-            
-            let pktsIn  = UInt64(parts[statStartIndex + 0]) ?? 0
-            let errIn   = UInt64(parts[statStartIndex + 1]) ?? 0
-            let bytIn   = UInt64(parts[statStartIndex + 2]) ?? 0
-            let pktsOut = UInt64(parts[statStartIndex + 3]) ?? 0
-            let errOut  = UInt64(parts[statStartIndex + 4]) ?? 0
-            let bytOut  = UInt64(parts[statStartIndex + 5]) ?? 0
             
             results[name] = NetworkInterfaceStats(
                 id: name,
                 name: name,
-                bytesIn: bytIn,
-                bytesOut: bytOut,
-                packetsIn: pktsIn,
-                packetsOut: pktsOut,
-                errorsIn: errIn,
-                errorsOut: errOut
+                bytesIn: val(iBytIdx),
+                bytesOut: val(oBytIdx),
+                packetsIn: val(iPktsIdx),
+                packetsOut: val(oPktsIdx),
+                errorsIn: val(iErrsIdx),
+                errorsOut: val(oErrsIdx)
             )
         }
         
