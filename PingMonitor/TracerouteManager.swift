@@ -197,6 +197,9 @@ class TracerouteManager: ObservableObject {
         isRunning = true
         progress = String(format: LanguageManager.shared.t("traceroute.tracing"), trimmedHost)
         
+        // Fetch origin location (Hop 0)
+        fetchOriginLocation()
+        
         LogManager.shared.info("Starting traceroute to \(trimmedHost)")
         
         if isMTRMode {
@@ -209,14 +212,28 @@ class TracerouteManager: ObservableObject {
     func stop() {
         if let process = process, process.isRunning {
             process.terminate()
-            LogManager.shared.info("Traceroute process terminated")
+            LogManager.shared.info("Traceroute tail process terminated")
         }
+        
+        // Ensure any running traceroute process spawned by osascript is killed
+        let killProc = Process()
+        killProc.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
+        killProc.arguments = ["-9", "-f", "traceroute -I"]
+        try? killProc.run()
+        
         process = nil
         mtrRound = 0
         isRunning = false
         if !hops.isEmpty {
             progress = String(format: LanguageManager.shared.t("traceroute.complete"), hops.count)
         }
+    }
+    
+    func clear() {
+        stop()
+        hops.removeAll()
+        targetHost = ""
+        progress = ""
     }
     
     // MARK: - Single Traceroute
@@ -227,12 +244,40 @@ class TracerouteManager: ObservableObject {
         
         proc.standardOutput = pipe
         proc.standardError = pipe
-        proc.executableURL = URL(fileURLWithPath: "/bin/sh")
-        // Use -I (ICMP) as it's generally more standard for reading, but if it fails, we might want UDP.
-        // For now sticking to -I as in original, but with better parsing.
-        proc.arguments = ["-c", "/usr/sbin/traceroute -I -m \(maxHops) -q 3 -w 1 \(host) 2>&1"]
+        // On macOS, ICMP traceroute (-I) requires root.
+        // We'll use osascript to run it with administrator privileges and pipe output to a file, then tail it
+        let scriptFile = "/tmp/pm_trace_\(UUID().uuidString.prefix(8)).sh"
+        let outFile = "/tmp/pm_trace_\(UUID().uuidString.prefix(8)).out"
+        let traceCmd = "/usr/sbin/traceroute -I -m \(maxHops) -q 3 -w 1 \(host) > \(outFile) 2>&1"
         
-        self.process = proc
+        let scriptContent = "#!/bin/bash\n\(traceCmd)\n"
+        try? scriptContent.write(toFile: scriptFile, atomically: true, encoding: .utf8)
+        let chmodProc = Process()
+        chmodProc.executableURL = URL(fileURLWithPath: "/bin/chmod")
+        chmodProc.arguments = ["+x", scriptFile]
+        try? chmodProc.run()
+        chmodProc.waitUntilExit()
+
+        // Create empty output file
+        FileManager.default.createFile(atPath: outFile, contents: nil)
+        
+        // Start the privileged traceroute in the background
+        let osaProc = Process()
+        osaProc.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        osaProc.arguments = ["-e", "do shell script \"\(scriptFile)\" with administrator privileges"]
+        
+        do {
+            try osaProc.run()
+            
+            // Tail the output file to read results in real-time
+            proc.executableURL = URL(fileURLWithPath: "/usr/bin/tail")
+            proc.arguments = ["-f", outFile]
+            self.process = proc
+        } catch {
+            LogManager.shared.error("Failed to start privileged traceroute: \(error)")
+            isRunning = false
+            progress = "Error: \(error.localizedDescription)"
+        }
         
         pipe.fileHandleForReading.readabilityHandler = { @Sendable handle in
             let data = handle.availableData
@@ -265,45 +310,85 @@ class TracerouteManager: ObservableObject {
                     self.progress = String(format: LanguageManager.shared.t("traceroute.complete"), self.hops.count)
                 }
                 LogManager.shared.info("Traceroute completed with \(self.hops.count) hops")
+                
+                // Cleanup
+                try? FileManager.default.removeItem(atPath: scriptFile)
+                try? FileManager.default.removeItem(atPath: outFile)
             }
         }
     }
     
-    // MARK: - MTR Mode (repeated traceroute)
+    // MARK: - MTR Mode (continuous traceroute loop)
     
     private func startMTRTrace(host: String) {
-        mtrRound = 0
-        runMTRRound(host: host)
-    }
-    
-    private func runMTRRound(host: String) {
-        guard isRunning else { return }
-        
-        mtrRound += 1
-        let roundNum = mtrRound
-        progress = "MTR Round #\(roundNum) → \(host)"
-        
         let proc = Process()
         let pipe = Pipe()
         
         proc.standardOutput = pipe
         proc.standardError = pipe
-        proc.executableURL = URL(fileURLWithPath: "/bin/sh")
-        // MTR mode: quick probes (-q 1), wait 1s (-w 1)
-        proc.arguments = ["-c", "/usr/sbin/traceroute -I -m \(maxHops) -q 1 -w 1 \(host) 2>&1"]
         
-        self.process = proc
+        let scriptFile = "/tmp/pm_mtr_\(UUID().uuidString.prefix(8)).sh"
+        let outFile = "/tmp/pm_mtr_\(UUID().uuidString.prefix(8)).out"
         
-        let roundHops = LockedArray<TracerouteHop>()
+        // MTR mode: quick probes (-q 1), wait 1s (-w 1), continuous loop in bash
+        // To separate rounds in output parsing, we echo a marker line (---MTR-ROUND---)
+        let traceCmd = "/usr/sbin/traceroute -I -m \(maxHops) -q 1 -w 1 \(host) >> \(outFile) 2>&1"
+        
+        let scriptContent = """
+        #!/bin/bash
+        while true; do
+            echo "---MTR-ROUND---" >> \(outFile)
+            \(traceCmd)
+            sleep 1
+        done
+        """
+        
+        try? scriptContent.write(toFile: scriptFile, atomically: true, encoding: .utf8)
+        let chmodProc = Process()
+        chmodProc.executableURL = URL(fileURLWithPath: "/bin/chmod")
+        chmodProc.arguments = ["+x", scriptFile]
+        try? chmodProc.run()
+        chmodProc.waitUntilExit()
+
+        FileManager.default.createFile(atPath: outFile, contents: nil)
+        
+        // Start the infinite loop script with privileges
+        let osaProc = Process()
+        osaProc.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        osaProc.arguments = ["-e", "do shell script \"\(scriptFile)\" with administrator privileges"]
+        
+        do {
+            try osaProc.run()
+            
+            // Tail the output file
+            proc.executableURL = URL(fileURLWithPath: "/usr/bin/tail")
+            proc.arguments = ["-f", outFile]
+            self.process = proc
+        } catch {
+            LogManager.shared.error("Failed to start MTR privileges root process: \(error)")
+            isRunning = false
+            progress = "Error: \(error.localizedDescription)"
+            return
+        }
+        
+        let currentRoundHops = LockedArray<TracerouteHop>()
         
         pipe.fileHandleForReading.readabilityHandler = { @Sendable handle in
             let data = handle.availableData
-            guard let output = String(data: data, encoding: .utf8),
-                  !output.isEmpty else { return }
+            guard let output = String(data: data, encoding: .utf8), !output.isEmpty else { return }
             
             output.enumerateLines { line, _ in
-                if let hop = parseHopLine(line) {
-                    roundHops.append(hop)
+                if line.contains("---MTR-ROUND---") {
+                    // Flush previous round if we have any hops
+                    let collectedHops = currentRoundHops.values
+                    if !collectedHops.isEmpty {
+                        Task { @MainActor [weak self] in
+                            self?.mergeRoundResults(collectedHops)
+                        }
+                        currentRoundHops.clear()
+                    }
+                } else if let hop = parseHopLine(line) {
+                    currentRoundHops.append(hop)
                 }
             }
         }
@@ -311,25 +396,37 @@ class TracerouteManager: ObservableObject {
         do {
             try proc.run()
         } catch {
-            LogManager.shared.error("Failed to start MTR round: \(error)")
+            LogManager.shared.error("Failed to start MTR tail process: \(error)")
             isRunning = false
+            progress = "Error: \(error.localizedDescription)"
             return
         }
         
         proc.terminationHandler = { [weak self] _ in
-            let hops = roundHops.values
             Task { @MainActor [weak self] in
-                guard let self = self, self.isRunning else { return }
+                guard let self = self else { return }
+                self.isRunning = false
                 
-                // Merge round results into cumulative hops
-                self.mergeRoundResults(hops)
-                
-                // Schedule next round after 1 second
-                try? await Task.sleep(nanoseconds: 1_000_000_000)
-                
-                if self.isRunning {
-                    self.runMTRRound(host: host)
+                // Merge any remaining hops
+                let collectedHops = currentRoundHops.values
+                if !collectedHops.isEmpty {
+                    self.mergeRoundResults(collectedHops)
                 }
+                
+                if !self.hops.isEmpty {
+                    self.progress = String(format: LanguageManager.shared.t("traceroute.complete"), self.hops.count)
+                }
+                LogManager.shared.info("MTR trace completed")
+                
+                // Cleanup
+                // Clean up the running script loop using pkill
+                let killProc = Process()
+                killProc.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
+                killProc.arguments = ["-9", "-f", scriptFile]
+                try? killProc.run()
+                
+                try? FileManager.default.removeItem(atPath: scriptFile)
+                try? FileManager.default.removeItem(atPath: outFile)
             }
         }
     }
@@ -346,6 +443,29 @@ class TracerouteManager: ObservableObject {
         progress = String(format: LanguageManager.shared.t("traceroute.tracing"), targetHost) + " (\(hops.count)/\(maxHops))"
         
         fetchGeoLocation(for: hop.hopNumber, ip: hop.ip)
+    }
+    
+    private func fetchOriginLocation() {
+        Task {
+            if let loc = await GeoIPCache.shared.fetchLocalLocation() {
+                await MainActor.run {
+                    // Check if we already have Hop 0 (edge case where it fetches very fast)
+                    if !self.hops.contains(where: { $0.hopNumber == 0 }) {
+                        let origin = TracerouteHop(
+                            hopNumber: 0,
+                            hostName: LanguageManager.shared.t("traceroute.your_location"),
+                            ip: "",
+                            latencies: [],
+                            avgLatency: nil,
+                            packetLoss: 0,
+                            isTimeout: false,
+                            geoLocation: loc
+                        )
+                        self.hops.insert(origin, at: 0)
+                    }
+                }
+            }
+        }
     }
     
     private func fetchGeoLocation(for hopNumber: Int, ip: String) {
@@ -465,6 +585,7 @@ class TracerouteManager: ObservableObject {
         NSPasteboard.general.setString(text, forType: .string)
     }
 }
+// MARK: - Thread-safe array for collecting hops in background
 
 // MARK: - Thread-safe array for collecting hops in background
 
@@ -482,6 +603,12 @@ final class LockedArray<T: Sendable>: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         return array
+    }
+    
+    func clear() {
+        lock.lock()
+        array.removeAll()
+        lock.unlock()
     }
 }
 
@@ -530,6 +657,28 @@ actor GeoIPCache: Sendable {
         }
         
         inFlight[ip] = task
+        return await task.value
+    }
+    
+    func fetchLocalLocation() async -> GeoLocation? {
+        let key = "local"
+        if let cached = cache[key] { return cached }
+        if let task = inFlight[key] { return await task.value }
+        
+        let task = Task<GeoLocation?, Never> {
+            guard let url = URL(string: "http://ip-api.com/json/?fields=status,country,city,lat,lon,isp,as") else { return nil }
+            do {
+                let (data, _) = try await URLSession.shared.data(from: url)
+                let location = try JSONDecoder().decode(GeoLocation.self, from: data)
+                if location.status == "success" {
+                    self.cache[key] = location
+                    return location
+                }
+            } catch {}
+            self.inFlight[key] = nil
+            return nil
+        }
+        inFlight[key] = task
         return await task.value
     }
     

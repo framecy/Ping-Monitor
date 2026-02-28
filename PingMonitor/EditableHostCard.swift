@@ -11,12 +11,25 @@ struct EditableHostCard: View {
     var statusColor: Color {
         guard viewModel.isRunning else { return Theme.Colors.textSecondary }
         if host.isChecking { return Theme.Colors.accentBlue }
-        guard host.isReachable else { return Theme.Colors.accentRed }
+        
+        // Timeout/unreachable state
+        if !host.isReachable { 
+            // If it has history, it means it was timeout (Red)
+            if let stats = viewModel.hostStats[host.id], !stats.latencyHistory.isEmpty {
+                return Theme.Colors.accentRed
+            } else {
+                // Not yet pinged successfully ever
+                return Theme.Colors.textSecondary
+            }
+        }
+        
+        // Reachable state (has latency)
         if let latency = host.lastLatency {
             if latency < 50 { return Theme.Colors.accentGreen }
             if latency < 100 { return Theme.Colors.accentOrange }
             return Theme.Colors.accentRed
         }
+        
         return Theme.Colors.textSecondary
     }
 

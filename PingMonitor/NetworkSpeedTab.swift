@@ -230,14 +230,17 @@ struct NetworkSpeedTab: View {
                 guard let first = points.first else { return }
                 path.move(to: CGPoint(x: first.x, y: height))
                 path.addLine(to: first)
-                for point in points.dropFirst() {
-                    path.addLine(to: point)
+                for i in 1..<points.count {
+                    let prev = points[i - 1]
+                    let cur = points[i]
+                    let mx = (prev.x + cur.x) / 2
+                    path.addCurve(to: cur, control1: CGPoint(x: mx, y: prev.y), control2: CGPoint(x: mx, y: cur.y))
                 }
                 path.addLine(to: CGPoint(x: points.last?.x ?? 0, y: height))
                 path.closeSubpath()
             }
             .fill(
-                LinearGradient(colors: [color.opacity(0.2), color.opacity(0.02)],
+                LinearGradient(colors: [color.opacity(0.3), color.opacity(0.01)],
                               startPoint: .top, endPoint: .bottom)
             )
             
@@ -245,17 +248,22 @@ struct NetworkSpeedTab: View {
             Path { path in
                 guard let first = points.first else { return }
                 path.move(to: first)
-                for point in points.dropFirst() {
-                    path.addLine(to: point)
+                for i in 1..<points.count {
+                    let prev = points[i - 1]
+                    let cur = points[i]
+                    let mx = (prev.x + cur.x) / 2
+                    path.addCurve(to: cur, control1: CGPoint(x: mx, y: prev.y), control2: CGPoint(x: mx, y: cur.y))
                 }
             }
-            .stroke(color, lineWidth: 1.5)
+            .stroke(color, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+            .shadow(color: color.opacity(0.5), radius: 4, x: 0, y: 2)
             
             // Current value dot
             if let last = points.last {
                 Circle()
                     .fill(color)
-                    .frame(width: 5, height: 5)
+                    .frame(width: 6, height: 6)
+                    .shadow(color: color.opacity(0.8), radius: 4, x: 0, y: 0)
                     .position(last)
             }
         }
@@ -570,19 +578,30 @@ struct NetworkSpeedTab: View {
                 guard let first = points.first else { return }
                 path.move(to: CGPoint(x: first.x, y: height))
                 path.addLine(to: first)
-                for point in points.dropFirst() { path.addLine(to: point) }
+                for i in 1..<points.count {
+                    let prev = points[i - 1]
+                    let cur = points[i]
+                    let mx = (prev.x + cur.x) / 2
+                    path.addCurve(to: cur, control1: CGPoint(x: mx, y: prev.y), control2: CGPoint(x: mx, y: cur.y))
+                }
                 path.addLine(to: CGPoint(x: points.last?.x ?? 0, y: height))
                 path.closeSubpath()
             }
-            .fill(LinearGradient(colors: [color.opacity(0.15), color.opacity(0.02)],
+            .fill(LinearGradient(colors: [color.opacity(0.25), color.opacity(0.01)],
                                  startPoint: .top, endPoint: .bottom))
             
             Path { path in
                 guard let first = points.first else { return }
                 path.move(to: first)
-                for point in points.dropFirst() { path.addLine(to: point) }
+                for i in 1..<points.count {
+                    let prev = points[i - 1]
+                    let cur = points[i]
+                    let mx = (prev.x + cur.x) / 2
+                    path.addCurve(to: cur, control1: CGPoint(x: mx, y: prev.y), control2: CGPoint(x: mx, y: cur.y))
+                }
             }
-            .stroke(color, lineWidth: 1.5)
+            .stroke(color, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+            .shadow(color: color.opacity(0.4), radius: 3, x: 0, y: 2)
         }
     }
     

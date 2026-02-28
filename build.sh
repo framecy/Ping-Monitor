@@ -12,8 +12,8 @@ done
 
 INFO_PLIST="PingMonitor/Info.plist"
 WIDGET_PLIST="PingMonitorWidget/Info.plist"
-CURRENT_VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "$INFO_PLIST" 2>/dev/null || echo "2.1.0")
-CURRENT_BUILD=$(/usr/libexec/PlistBuddy -c "Print CFBundleVersion" "$INFO_PLIST" 2>/dev/null || echo "68")
+CURRENT_VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "$INFO_PLIST" 2>/dev/null || echo "2.1.0-r31")
+CURRENT_BUILD=$(/usr/libexec/PlistBuddy -c "Print CFBundleVersion" "$INFO_PLIST" 2>/dev/null || echo "91")
 
 NEW_VERSION="$CURRENT_VERSION"
 NEW_BUILD="$CURRENT_BUILD"

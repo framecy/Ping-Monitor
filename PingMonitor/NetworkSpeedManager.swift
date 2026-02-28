@@ -224,18 +224,19 @@ class NetworkSpeedManager: ObservableObject {
             // Name Mtu Network Address Ipkts Ierrs Ibytes Opkts Oerrs Obytes
             // en0  1500  <Link#4>      ...  12345  0     67890  54321  0     98765
             
-            guard parts.count >= 10 else { continue }
+            let c = parts.count
+            guard c >= 10 else { continue }
             
             let name = parts[0]
             // Skip non-link entries (we want <Link#N> rows for byte counts)
             guard parts[2].contains("Link") else { continue }
             
-            guard let pktsIn = UInt64(parts[4]),
-                  let errIn = UInt64(parts[5]),
-                  let bytIn = UInt64(parts[6]),
-                  let pktsOut = UInt64(parts[7]),
-                  let errOut = UInt64(parts[8]),
-                  let bytOut = UInt64(parts[9]) else { continue }
+            guard let pktsIn = UInt64(parts[c - 7]),
+                  let errIn = UInt64(parts[c - 6]),
+                  let bytIn = UInt64(parts[c - 5]),
+                  let pktsOut = UInt64(parts[c - 4]),
+                  let errOut = UInt64(parts[c - 3]),
+                  let bytOut = UInt64(parts[c - 2]) else { continue }
             
             results[name] = NetworkInterfaceStats(
                 id: name,

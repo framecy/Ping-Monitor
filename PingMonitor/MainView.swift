@@ -906,6 +906,9 @@ struct MonitorTab: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     ScrollView {
+                        // Insert Quick Access Services Ribbon here
+                        QuickAccessServicesRibbon(viewModel: viewModel)
+                        
                         LazyVGrid(columns: [
                             GridItem(.adaptive(minimum: 280, maximum: .infinity), spacing: 12)
                         ], spacing: 12) {
@@ -1001,6 +1004,108 @@ struct MonitorTab: View {
         newHostAddress = ""
         newHostCommand = ""
         newHostRules = []
+    }
+}
+
+// MARK: - Quick Access Services Ribbon
+struct QuickAccessServicesRibbon: View {
+    @ObservedObject var viewModel: PingMonitorViewModel
+    
+    var allShortcuts: [(host: HostConfig, shortcut: ServiceShortcut)] {
+        viewModel.hosts.flatMap { host in
+            host.serviceShortcuts.map { (host: host, shortcut: $0) }
+        }
+    }
+    
+    var body: some View {
+        if !allShortcuts.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Image(systemName: "bolt.fill")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Theme.Colors.accentOrange)
+                    Text("Quick Access")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Theme.Colors.textSecondary)
+                }
+                .padding(.horizontal)
+                
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(allShortcuts, id: \.shortcut.id) { item in
+                            Button(action: {
+                                openService(item.shortcut, host: item.host)
+                            }) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: item.shortcut.icon)
+                                        .font(.system(size: 14))
+                                        .foregroundStyle(serviceColor(for: item.shortcut.type))
+                                        .frame(width: 24, height: 24)
+                                        .background(serviceColor(for: item.shortcut.type).opacity(0.12))
+                                        .cornerRadius(6)
+                                    
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(item.shortcut.name)
+                                            .font(.system(size: 11, weight: .medium))
+                                            .foregroundStyle(Theme.Colors.textPrimary)
+                                        Text(item.host.name)
+                                            .font(.system(size: 9))
+                                            .foregroundStyle(Theme.Colors.textTertiary)
+                                    }
+                                }
+                                .padding(8)
+                                .background(Theme.Colors.cardBackground)
+                                .cornerRadius(8)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+            }
+            .padding(.vertical, 8)
+            .background(Theme.Colors.cardBackground.opacity(0.5))
+        }
+    }
+    
+    private func serviceColor(for type: ServiceShortcut.ServiceType) -> Color {
+        switch type {
+        case .web: return Theme.Colors.accentBlue
+        case .ssh: return Theme.Colors.accentGreen
+        case .custom: return Theme.Colors.accentOrange
+        }
+    }
+    
+    private func openService(_ shortcut: ServiceShortcut, host: HostConfig) {
+        switch shortcut.type {
+        case .web:
+            if let url = URL(string: shortcut.url) {
+                NSWorkspace.shared.open(url)
+            }
+        case .ssh:
+            let cmdFile = "/tmp/pm_ssh_\(UUID().uuidString.prefix(8)).command"
+            let scriptContent = "#!/bin/bash\nrm -f \"\(cmdFile)\"\n\(shortcut.sshCommand)\n"
+            do {
+                try scriptContent.write(toFile: cmdFile, atomically: true, encoding: .utf8)
+                let chmod = Process()
+                chmod.executableURL = URL(fileURLWithPath: "/bin/chmod")
+                chmod.arguments = ["+x", cmdFile]
+                try chmod.run()
+                chmod.waitUntilExit()
+                NSWorkspace.shared.open(URL(fileURLWithPath: cmdFile))
+            } catch {
+                LogManager.shared.error("Failed to create SSH script: \(error)")
+            }
+        case .custom:
+            if let url = URL(string: shortcut.url) {
+                NSWorkspace.shared.open(url)
+            }
+        }
+        LogManager.shared.info("Opened service: \(shortcut.name)", host: host.name)
     }
 }
 
@@ -1758,7 +1863,7 @@ struct LogsTab: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                .frame(width: 250)
+                .fixedSize()
                 
                 Spacer()
                 
@@ -1820,28 +1925,29 @@ struct LogRow: View {
                 .fill(levelColor)
                 .frame(width: 6, height: 6)
             
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 6) {
-                    Text(entry.formattedTimestamp)
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(.tertiary)
-                    
-                    Text(languageManager.t("logs.level.\(entry.level.rawValue.lowercased())"))
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(levelColor)
-                    
+            HStack(alignment: .top, spacing: 12) {
+                Text(entry.formattedTimestamp)
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(.tertiary)
+                    .frame(width: 130, alignment: .leading)
+                
+                Text(languageManager.t("logs.level.\(entry.level.rawValue.lowercased())"))
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(levelColor)
+                    .frame(width: 50, alignment: .leading)
+                
+                VStack(alignment: .leading, spacing: 3) {
                     if let host = entry.host {
                         Text(host)
-                            .font(.system(size: 10))
+                            .font(.system(size: 10, weight: .medium))
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
+                    Text(entry.message)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.primary)
+                        .textSelection(.enabled)
                 }
-                
-                Text(entry.message)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.primary)
-                    .textSelection(.enabled)
             }
         }
         .padding(.vertical, 3)
@@ -2024,7 +2130,7 @@ struct SettingsTab: View {
                                 Spacer()
                                 HStack(spacing: 8) {
                                     Button {
-                                        if viewModel.statusBarWidth > 80 {
+                                        if viewModel.statusBarWidth > 50 {
                                             viewModel.statusBarWidth -= 10
                                             viewModel.saveSettings()
                                         }
@@ -2033,7 +2139,7 @@ struct SettingsTab: View {
                                             .font(.system(size: 16))
                                     }
                                     .buttonStyle(.borderless)
-                                    .disabled(viewModel.statusBarWidth <= 80)
+                                    .disabled(viewModel.statusBarWidth <= 50)
                                     
                                     Text("\(viewModel.statusBarWidth)")
                                         .font(.system(.body, design: .monospaced))

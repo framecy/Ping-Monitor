@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
-APP_PATH="/Applications/PingMonitor.app"
+APP_PATH="/Users/framed/Documents/PingMonitor/build/Debug/PingMonitor.app"
 if [ ! -d "$APP_PATH" ]; then
-    echo "❌ PingMonitor.app not found in /Applications"
+    echo "❌ PingMonitor.app not found in $APP_PATH"
     exit 1
 fi
 
@@ -10,9 +10,10 @@ VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "$APP_PA
 echo "📦 Packaging PingMonitor v$VERSION..."
 
 DMG_NAME="PingMonitor-v${VERSION}.dmg"
-DMG_PATH="$HOME/Desktop/$DMG_NAME"
+DMG_PATH="./$DMG_NAME"
 
-TEMP_DIR=$(mktemp -d)
+TEMP_DIR="./tmp_dmg"
+rm -rf "$TEMP_DIR"
 DMG_CONTENTS_DIR="$TEMP_DIR/dmg_contents"
 mkdir -p "$DMG_CONTENTS_DIR"
 

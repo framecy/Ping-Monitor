@@ -71,5 +71,4 @@ fastlane/screenshots/**/*.png
 fastlane/test_output
 CHANGELOG.md
 Release-v2.1.0.md
-CHANGELOG.md
-Release-v2.1.0.md
+UPDATE.md

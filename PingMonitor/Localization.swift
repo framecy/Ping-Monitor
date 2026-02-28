@@ -116,6 +116,7 @@ public final class LanguageManager: ObservableObject {
             "common.add": "Add",
             "common.cancel": "Cancel",
             "common.save": "Save",
+            "common.back": "Back",
             
             // Editor sections
             "editor.section.basic": "Basic Info",
@@ -275,6 +276,7 @@ public final class LanguageManager: ObservableObject {
             "traceroute.timeout": "Timeout",
             "traceroute.mtr_hint": "MTR combines ping and traceroute for continuous monitoring",
             "traceroute.monitored_hosts": "Monitored Hosts",
+            "traceroute.your_location": "Your Location",
             
             // Host Detail
             "host_detail.checking": "Checking...",
@@ -455,6 +457,7 @@ public final class LanguageManager: ObservableObject {
             "common.add": "添加",
             "common.cancel": "取消",
             "common.save": "保存",
+            "common.back": "返回",
             
             // Editor sections
             "editor.section.basic": "基本信息",
@@ -615,6 +618,7 @@ public final class LanguageManager: ObservableObject {
             "traceroute.timeout": "超时",
             "traceroute.mtr_hint": "MTR 结合了 Ping 和 Traceroute 进行持续监控",
             "traceroute.monitored_hosts": "监控中的主机",
+            "traceroute.your_location": "当前位置",
             
             // Host Detail
             "host_detail.checking": "检测中...",

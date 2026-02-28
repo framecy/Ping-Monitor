@@ -43,6 +43,34 @@ struct TracerouteView: View {
     private var toolbarView: some View {
         VStack(spacing: 12) {
             HStack(spacing: 12) {
+                // Back button (when showing results)
+                if !manager.hops.isEmpty || manager.isRunning {
+                    Button(action: {
+                        manager.stop()
+                        manager.clear()
+                        targetHost = ""
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.uturn.backward")
+                                .font(.system(size: 10))
+                            Text(languageManager.t("common.back"))
+                                .font(.system(size: 12, weight: .medium))
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(
+                            Capsule()
+                                .fill(Theme.Colors.cardBackground)
+                        )
+                        .foregroundStyle(Theme.Colors.textSecondary)
+                    }
+                    .buttonStyle(.plain)
+                    
+                    Spacer()
+                } else {
+                    Spacer()
+                }
+                
                 // Host input
                 HStack(spacing: 8) {
                     Image(systemName: "point.topleft.down.to.point.bottomright.curvepath")
@@ -66,6 +94,7 @@ struct TracerouteView: View {
                     RoundedRectangle(cornerRadius: 8)
                         .stroke(Theme.Colors.separator, lineWidth: 1)
                 )
+                .frame(maxWidth: 400)
                 
                 // MTR toggle
                 Toggle(isOn: $manager.isMTRMode) {
@@ -130,6 +159,8 @@ struct TracerouteView: View {
                     }
                     .buttonStyle(.plain)
                 }
+                
+                Spacer()
             }
             
             // MTR hint
