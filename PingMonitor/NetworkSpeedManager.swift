@@ -220,23 +220,50 @@ class NetworkSpeedManager: ObservableObject {
         
         for line in lines.dropFirst() { // Skip header
             let parts = line.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
-            // netstat -bni format:
-            // Name Mtu Network Address Ipkts Ierrs Ibytes Opkts Oerrs Obytes
-            // en0  1500  <Link#4>      ...  12345  0     67890  54321  0     98765
+            // netstat -bni format varies:
+            // Standard: Name Mtu Network Address Ipkts Ierrs Ibytes Opkts Oerrs Obytes Coll
+            // VPN/utun: Name Mtu Network Address Ipkts Ierrs Ibytes Opkts Oerrs Obytes (No Coll)
             
             let c = parts.count
-            guard c >= 10 else { continue }
+            guard c >= 9 else { continue } // Minimum columns needed
             
             let name = parts[0]
-            // Skip non-link entries (we want <Link#N> rows for byte counts)
-            guard parts[2].contains("Link") else { continue }
+            // Skip non-link entries
+            guard parts[2].contains("<Link") else { continue }
             
-            guard let pktsIn = UInt64(parts[c - 7]),
-                  let errIn = UInt64(parts[c - 6]),
-                  let bytIn = UInt64(parts[c - 5]),
-                  let pktsOut = UInt64(parts[c - 4]),
-                  let errOut = UInt64(parts[c - 3]),
-                  let bytOut = UInt64(parts[c - 2]) else { continue }
+            // Heuristic to detect column mapping:
+            // If the last element is likely 'Collisions' (small number vs bytes), offsets are different.
+            // Usually, 'bytes' are much larger than 'errors' or 'collisions'.
+            
+            // Indices from the end:
+            // -1: Coll (optional)
+            // -2: Obytes
+            // -3: Oerrs
+            // -4: Opkts
+            // -5: Ibytes
+            // -6: Ierrs
+            // -7: Ipkts
+            
+            // In macOS 15+, for utun, if the last column is a large number, it's Obytes.
+            // If it's a small number or 0 and followed by a large Obytes, it might be Coll.
+            
+            // Safer approach: netstat -bni always has:
+            // ... Ipkts Ierrs Ibytes Opkts Oerrs Obytes [Coll]
+            // We search for the pattern: [Number, Number, LargeNumber, Number, Number, LargeNumber]
+            
+            // Let's assume the standard 'Link' row for macOS:
+            // If parts.last is NOT a huge number, it's probably 'Coll' (even if it's 0)
+            // If parts.last IS a huge number, 'Coll' is missing.
+            
+            let hasCollisions = c >= 11 || (UInt64(parts[c-1]) ?? 0 < 1000000 && c >= 10)
+            let offset = hasCollisions ? 1 : 0
+            
+            guard let pktsIn = UInt64(parts[c - 7 - offset]),
+                  let errIn = UInt64(parts[c - 6 - offset]),
+                  let bytIn = UInt64(parts[c - 5 - offset]),
+                  let pktsOut = UInt64(parts[c - 4 - offset]),
+                  let errOut = UInt64(parts[c - 3 - offset]),
+                  let bytOut = UInt64(parts[c - 2 - offset]) else { continue }
             
             results[name] = NetworkInterfaceStats(
                 id: name,
