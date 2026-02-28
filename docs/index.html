@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PingMonitor - 原生 macOS 菜单栏网络延迟监控工具</title>
-    <meta name="description" content="PingMonitor 是一款专为 macOS 设计的网络延迟监控工具。支持多主机监控、Tailscale 集成、实时统计与桌面小组件。">
+    <title>PingMonitor - 专业的 macOS 网络监控工具</title>
+    <meta name="description" content="专为 macOS 打造的原生网络监控面板。可视化路由追踪、实时统计、高度集成。">
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,72 +13,66 @@
 </head>
 
 <body>
-    <div class="spotlight"></div>
+    <div class="glow-top"></div>
 
     <div class="container">
-        <header>
-            <div class="grid-layout">
-                <div class="hero-content animate-fade-in">
-                    <div id="version-badge-container"></div>
-                    <h1>PingMonitor</h1>
-                    <p class="lead">专为 macOS 设计的极简网络监控面板。多主机即时探测、精美统计图表、与系统高度集成的菜单栏体验。</p>
-                    <div class="cta-group">
-                        <a href="https://github.com/framecy/Ping-Monitor/releases/latest" class="btn btn-primary"
-                            id="download-btn">
-                            <span class="icon">↓</span> 立即下载
-                        </a>
-                        <a href="https://github.com/framecy/Ping-Monitor" class="btn btn-secondary">
-                            GitHub 仓库
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </header>
-
-        <section class="features">
-            <div class="section-title animate-fade-in">
-                <h2>全功能网络工具箱</h2>
-                <p class="text-dim">一个应用，满足所有网络诊断需求</p>
+        <!-- Hero Section -->
+        <section class="hero">
+            <div id="version-badge-container"></div>
+            <h1 class="animate-fade-in">Everything at<br>a Glance</h1>
+            <p class="animate-fade-in">PingMonitor 是一款原生的 macOS 监控工具，为您提供实时的并行主机探测与极富美感的专业数据可视化。</p>
+            <div class="cta-group animate-fade-in">
+                <a href="https://github.com/framecy/Ping-Monitor/releases/latest" class="btn btn-white"
+                    id="download-btn">立即下载</a>
+                <a href="https://github.com/framecy/Ping-Monitor" class="btn btn-outline">GitHub 仓库</a>
             </div>
 
-            <div class="feature-grid">
-                <div class="feature-card animate-fade-in">
-                    <span class="feature-icon">📡</span>
-                    <h3>多主机实时监控</h3>
-                    <p>同时监控多个目标，毫秒级响应探测。自适应网格布局配合呼吸灯动画，一眼掌控全局状态。</p>
-                </div>
-                <div class="feature-card animate-fade-in">
-                    <span class="feature-icon">📈</span>
-                    <h3>可视化统计图表</h3>
-                    <p>精美的趋势折线图与 3D 环形统计图，记录每一个网络波动的瞬间，支持数据导出与详细审计。</p>
-                </div>
-                <div class="feature-card animate-fade-in">
-                    <span class="feature-icon">🛣</span>
-                    <h3>智能路由追踪</h3>
-                    <p>集成的可视化 Traceroute 与 MTR 模式。支持公网 IP 地图定位，从本地出发逐级渲染全球路由路径。</p>
-                </div>
-                <div class="feature-card animate-fade-in">
-                    <span class="feature-icon">🔗</span>
-                    <h3>Tailscale 深度集成</h3>
-                    <p>自动发现 Tailscale 节点，一键导入私有网络设备。实时动态监控 VPN 网络健康状况。</p>
-                </div>
-                <div class="feature-card animate-fade-in">
-                    <span class="feature-icon">🧩</span>
-                    <h3>原生桌面小组件</h3>
-                    <p>完美适配 macOS Sonoma/Sequoia 小组件系统。三种尺寸可选，无需打开主程序即可在桌面实时看延迟。</p>
-                </div>
-                <div class="feature-card animate-fade-in">
-                    <span class="feature-icon">⚡️</span>
-                    <h3>菜单栏效率入口</h3>
-                    <p>支持实时网速显示及 SSH/Web 服务快捷跳转。无需离开当前工作空间，一切尽在掌握。</p>
+            <div class="hero-mockup animate-fade-in">
+                <div class="mockup-container">
+                    <img src="pingmonitor_hero_mockup.png" alt="PingMonitor Dashboard">
                 </div>
             </div>
         </section>
 
-        <footer>
-            <div class="container">
-                <p>&copy; 2026 PingMonitor. Project by framecy. Released under MIT License.</p>
+        <!-- Feature 1: Map -->
+        <section class="section-visual">
+            <div class="text-content animate-fade-in">
+                <span class="feature-tag">Visualize</span>
+                <h2>Visualize Your Journey</h2>
+                <p>内置高保真全球地图。不仅能追踪跳点，还能基于地理位置渲染您的数据路径。从本地出发，跨越山海。</p>
+                <ul style="list-style: none; color: var(--primary-dim);">
+                    <li style="margin-bottom: 1rem;">✨ <b>Hop 0 定位</b> — 自动标记您的起始位置</li>
+                    <li style="margin-bottom: 1rem;">🗺️ <b>高德/Apple 地图</b> — 精准渲染路由路径</li>
+                    <li>📊 <b>MTR 支持</b> — 单次授权，长效精准探测</li>
+                </ul>
             </div>
+            <div class="visual-box animate-fade-in">
+                <span>🌍</span>
+            </div>
+        </section>
+
+        <!-- Feature 2: Data -->
+        <section class="section-visual reverse">
+            <div class="text-content animate-fade-in">
+                <span class="feature-tag">Analytics</span>
+                <h2>Data that Speaks</h2>
+                <p>不仅仅是数字。平滑的贝塞尔曲线记录每一毫秒的网速波动，3D 环形图精准分析探测成功率与延迟分布。</p>
+                <div class="cta-group" style="justify-content: flex-start; margin-top: 2rem;">
+                    <a href="#" class="btn btn-outline" style="border-radius: 12px; padding: 0.6rem 1.2rem;">查看文档</a>
+                </div>
+            </div>
+            <div class="visual-box animate-fade-in">
+                <span>📈</span>
+            </div>
+        </section>
+
+        <footer>
+            <div class="links">
+                <a href="https://github.com/framecy/Ping-Monitor">GitHub</a>
+                <a href="https://github.com/framecy/Ping-Monitor/releases">Releases</a>
+                <a href="CHANGELOG.md" style="display:none">Changelog</a>
+            </div>
+            <p>&copy; 2026 PingMonitor. Built for macOS with Excellence.</p>
         </footer>
     </div>
 
