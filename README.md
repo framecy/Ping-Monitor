@@ -13,7 +13,11 @@
   <img src="https://img.shields.io/badge/platform-macOS%2014.0+-blue" alt="Platform">
   <img src="https://img.shields.io/badge/SwiftUI-6.0-orange" alt="SwiftUI">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/version-2.1.0--r35-brightgreen" alt="Version">
+  <img src="https://img.shields.io/badge/version-2.1.0--r36-brightgreen" alt="Version">
+</p>
+
+<p align="center">
+  🚀 <strong>Official Site: <a href="https://ping.diswant.space">ping.diswant.space</a></strong>
 </p>
 
 ---
@@ -236,6 +240,7 @@ AUTO_VERSION=false
 
 | 版本 | 构建 | 更新内容 |
 |------|------|---------|
+| v2.1.0 | r36 | **网络监控优化**：重构 `netstat` 解析逻辑，支持动态列偏移检测，修复了 VPN/Tailscale 接口下 Errors 计数异常的问题；同步更新官方落地页地址 |
 | v2.1.0 | r35 | **项目规范化**：建立正式 `CHANGELOG.md`；升级 `build.sh` 自动打包变更日志到 DMG；同步所有文档版本号 |
 | v2.1.0 | r34 | **文档补全**：更新 `README.md` 版本历史与路由追踪功能描述 |
 | v2.1.0 | r33 | **可视化增强**：Traceroute 地图新增「当前位置」(Hop 0) 起点显示，支持从本地出发逐级渲染跳点，实现完整的点对点路径追踪 |
