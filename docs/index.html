@@ -4,75 +4,92 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PingMonitor - 专业的 macOS 网络监控工具</title>
-    <meta name="description" content="专为 macOS 打造的原生网络监控面板。可视化路由追踪、实时统计、高度集成。">
+    <title>PingMonitor — Network. Nuanced.</title>
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 
 <body>
-    <div class="glow-top"></div>
+    <div class="reveal-container">
+        <div class="stage-gradient"></div>
+        <div class="grid-overlay"></div>
+    </div>
 
     <div class="container">
+        <!-- Brand / Nav -->
+        <nav class="navbar animate-fade-in">
+            <div class="brand">
+                PingMonitor
+            </div>
+        </nav>
+
         <!-- Hero Section -->
-        <section class="hero">
-            <div id="version-badge-container"></div>
-            <h1 class="animate-fade-in">Everything at<br>a Glance</h1>
-            <p class="animate-fade-in">PingMonitor 是一款原生的 macOS 监控工具，为您提供实时的并行主机探测与极富美感的专业数据可视化。</p>
+        <header class="hero">
+            <div id="hero-version-badge" class="animate-fade-in"></div>
+            <h1 class="animate-fade-in">Network.<br>Nuanced.</h1>
+            <p class="animate-fade-in">The native heartbeat of your network. Experience every millisecond with
+                precision, visualized with elegance on macOS.</p>
             <div class="cta-group animate-fade-in">
                 <a href="https://github.com/framecy/Ping-Monitor/releases/latest" class="btn btn-white"
-                    id="download-btn">立即下载</a>
-                <a href="https://github.com/framecy/Ping-Monitor" class="btn btn-outline">GitHub 仓库</a>
+                    id="download-btn">Download for macOS (Apple Chip)</a>
+                <a href="https://github.com/framecy/Ping-Monitor" class="btn btn-outline">Explore the Repo</a>
             </div>
+        </header>
 
-            <div class="hero-mockup animate-fade-in">
-                <div class="mockup-container">
-                    <img src="pingmonitor_hero_mockup.png" alt="PingMonitor Dashboard">
-                </div>
+        <!-- Bento Features Grid -->
+        <section class="bento-grid">
+            <div class="bento-item area-monitor animate-fade-in">
+                <div class="icon-box">📡</div>
+                <h3>The Pulse</h3>
+                <p>Concurrent monitoring of your entire infrastructure. Real-time feedback, zero noise.</p>
+            </div>
+            <div class="bento-item area-stats animate-fade-in">
+                <div class="icon-box">📊</div>
+                <h3>Flow. Measured.</h3>
+                <p>Bézier-curved traffic data that reveals the rhythm of your connection. Analytics with soul.</p>
+            </div>
+            <div class="bento-item area-trace animate-fade-in">
+                <div class="icon-box">🌍</div>
+                <h3>The Path Forward</h3>
+                <p>Visual traceroute and MTR. A geographic journey from your local IP to the global edge.</p>
+            </div>
+            <div class="bento-item area-widget animate-fade-in">
+                <div class="icon-box">🧩</div>
+                <h3>Always Present</h3>
+                <p>Seamlessly integrated Widgets and Menu Bar updates for the focused developer.</p>
             </div>
         </section>
 
-        <!-- Feature 1: Map -->
-        <section class="section-visual">
-            <div class="text-content animate-fade-in">
-                <span class="feature-tag">Visualize</span>
-                <h2>Visualize Your Journey</h2>
-                <p>内置高保真全球地图。不仅能追踪跳点，还能基于地理位置渲染您的数据路径。从本地出发，跨越山海。</p>
-                <ul style="list-style: none; color: var(--primary-dim);">
-                    <li style="margin-bottom: 1rem;">✨ <b>Hop 0 定位</b> — 自动标记您的起始位置</li>
-                    <li style="margin-bottom: 1rem;">🗺️ <b>高德/Apple 地图</b> — 精准渲染路由路径</li>
-                    <li>📊 <b>MTR 支持</b> — 单次授权，长效精准探测</li>
-                </ul>
+        <!-- Technical Specs -->
+        <section class="specs animate-fade-in">
+            <div class="spec-item">
+                <h4>Engine</h4>
+                <p>Pure Swift Craftsmanship</p>
             </div>
-            <div class="visual-box animate-fade-in">
-                <span>🌍</span>
+            <div class="spec-item">
+                <h4>Architecture</h4>
+                <p>Optimized for Apple Silicon</p>
             </div>
-        </section>
-
-        <!-- Feature 2: Data -->
-        <section class="section-visual reverse">
-            <div class="text-content animate-fade-in">
-                <span class="feature-tag">Analytics</span>
-                <h2>Data that Speaks</h2>
-                <p>不仅仅是数字。平滑的贝塞尔曲线记录每一毫秒的网速波动，3D 环形图精准分析探测成功率与延迟分布。</p>
-                <div class="cta-group" style="justify-content: flex-start; margin-top: 2rem;">
-                    <a href="#" class="btn btn-outline" style="border-radius: 12px; padding: 0.6rem 1.2rem;">查看文档</a>
-                </div>
+            <div class="spec-item">
+                <h4>Integration</h4>
+                <p>Tailscale Native Sync</p>
             </div>
-            <div class="visual-box animate-fade-in">
-                <span>📈</span>
+            <div class="spec-item">
+                <h4>Network</h4>
+                <p>Low-level ICMP stack</p>
             </div>
         </section>
 
         <footer>
-            <div class="links">
-                <a href="https://github.com/framecy/Ping-Monitor">GitHub</a>
-                <a href="https://github.com/framecy/Ping-Monitor/releases">Releases</a>
-                <a href="CHANGELOG.md" style="display:none">Changelog</a>
+            <p>PingMonitor &copy; 2026</p>
+            <div style="display: flex; gap: 2rem;">
+                <a href="https://github.com/framecy/Ping-Monitor"
+                    style="color: inherit; text-decoration: none;">GitHub</a>
+                <a href="https://github.com/framecy/Ping-Monitor/releases"
+                    style="color: inherit; text-decoration: none;">History</a>
             </div>
-            <p>&copy; 2026 PingMonitor. Built for macOS with Excellence.</p>
         </footer>
     </div>
 

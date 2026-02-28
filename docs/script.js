@@ -1,70 +1,71 @@
 /**
- * PingMonitor Landing Page Logic
- * Fetches latest release from GitHub API
+ * PingMonitor Landing Page Logic (v4)
  */
-
-const REPO_OWNER = 'framecy';
-const REPO_NAME = 'Ping-Monitor';
 
 async function fetchLatestRelease() {
     const downloadBtn = document.getElementById('download-btn');
-    const badgeContainer = document.getElementById('version-badge-container');
+    const heroBadge = document.getElementById('hero-version-badge');
 
     try {
-        const response = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/latest`);
-
-        if (!response.ok) throw new Error('Release not found');
+        const response = await fetch('https://api.github.com/repos/framecy/Ping-Monitor/releases/latest');
+        if (!response.ok) return;
 
         const data = await response.json();
-        const version = data.tag_name;
+        const tag = data.tag_name;
+        const dmg = data.assets.find(a => a.name.endsWith('.dmg'));
 
-        // Find the .dmg asset
-        const dmgAsset = data.assets.find(asset => asset.name.endsWith('.dmg'));
-
-        if (dmgAsset) {
-            downloadBtn.href = dmgAsset.browser_download_url;
-            downloadBtn.innerHTML = `<span class="icon">↓</span> 下载最新版本 (${version})`;
+        if (heroBadge) {
+            heroBadge.innerText = `Latest Release: ${tag}`;
         }
 
-        // Update version badge if it exists
-        if (badgeContainer) {
-            badgeContainer.innerHTML = `<span class="version-badge">最新发布: ${version}</span>`;
-            badgeContainer.classList.add('animate-fade-in');
+        if (dmg && downloadBtn) {
+            downloadBtn.href = dmg.browser_download_url;
+            downloadBtn.innerHTML = `Download for macOS (Apple Chip)`;
         }
-
-        console.log(`Successfully fetched latest release: ${version}`);
-
-    } catch (error) {
-        console.warn('Failed to fetch latest release from GitHub API:', error);
-        // Fallback is already set in HTML to point to general releases page
+    } catch (err) {
+        console.warn('API Error:', err);
     }
 }
 
-// Scroll reveal animation logic
-function initScrollReveal() {
-    const observerOptions = {
-        threshold: 0.1
-    };
-
+// Subtle scroll reveal
+function initReveal() {
     const observer = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
-                entry.target.style.opacity = "1";
-                entry.target.style.transform = "translateY(0)";
-                observer.unobserve(entry.target);
+                entry.target.classList.add('reveal');
             }
         });
-    }, observerOptions);
+    }, { threshold: 0.1 });
 
     document.querySelectorAll('.animate-fade-in').forEach(el => {
-        el.style.opacity = "0";
-        el.style.transform = "translateY(20px)";
+        el.classList.add('init-hide');
         observer.observe(el);
     });
 }
 
-// Run on load
+// Bento & Background Tracking
+function initTracking() {
+    const root = document.documentElement;
+
+    document.addEventListener('mousemove', (e) => {
+        // Global for background flashlight
+        root.style.setProperty('--bg-mouse-x', `${e.clientX}px`);
+        root.style.setProperty('--bg-mouse-y', `${e.clientY}px`);
+    });
+
+    document.querySelectorAll('.bento-item').forEach(item => {
+        item.addEventListener('mousemove', (e) => {
+            const rect = item.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            item.style.setProperty('--mouse-x', `${x}px`);
+            item.style.setProperty('--mouse-y', `${y}px`);
+        });
+    });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     fetchLatestRelease();
-    initScrollReveal();
+    initReveal();
+    initTracking();
 });
