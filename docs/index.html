@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PingMonitor - 原生 macOS 菜单栏网络延迟监控工具</title>
+    <meta name="description" content="PingMonitor 是一款专为 macOS 设计的网络延迟监控工具。支持多主机监控、Tailscale 集成、实时统计与桌面小组件。">
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="spotlight"></div>
+
+    <div class="container">
+        <header>
+            <div class="grid-layout">
+                <div class="hero-content animate-fade-in">
+                    <div id="version-badge-container"></div>
+                    <h1>PingMonitor</h1>
+                    <p class="lead">专为 macOS 设计的极简网络监控面板。多主机即时探测、精美统计图表、与系统高度集成的菜单栏体验。</p>
+                    <div class="cta-group">
+                        <a href="https://github.com/framecy/Ping-Monitor/releases/latest" class="btn btn-primary"
+                            id="download-btn">
+                            <span class="icon">↓</span> 立即下载
+                        </a>
+                        <a href="https://github.com/framecy/Ping-Monitor" class="btn btn-secondary">
+                            GitHub 仓库
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <section class="features">
+            <div class="section-title animate-fade-in">
+                <h2>全功能网络工具箱</h2>
+                <p class="text-dim">一个应用，满足所有网络诊断需求</p>
+            </div>
+
+            <div class="feature-grid">
+                <div class="feature-card animate-fade-in">
+                    <span class="feature-icon">📡</span>
+                    <h3>多主机实时监控</h3>
+                    <p>同时监控多个目标，毫秒级响应探测。自适应网格布局配合呼吸灯动画，一眼掌控全局状态。</p>
+                </div>
+                <div class="feature-card animate-fade-in">
+                    <span class="feature-icon">📈</span>
+                    <h3>可视化统计图表</h3>
+                    <p>精美的趋势折线图与 3D 环形统计图，记录每一个网络波动的瞬间，支持数据导出与详细审计。</p>
+                </div>
+                <div class="feature-card animate-fade-in">
+                    <span class="feature-icon">🛣</span>
+                    <h3>智能路由追踪</h3>
+                    <p>集成的可视化 Traceroute 与 MTR 模式。支持公网 IP 地图定位，从本地出发逐级渲染全球路由路径。</p>
+                </div>
+                <div class="feature-card animate-fade-in">
+                    <span class="feature-icon">🔗</span>
+                    <h3>Tailscale 深度集成</h3>
+                    <p>自动发现 Tailscale 节点，一键导入私有网络设备。实时动态监控 VPN 网络健康状况。</p>
+                </div>
+                <div class="feature-card animate-fade-in">
+                    <span class="feature-icon">🧩</span>
+                    <h3>原生桌面小组件</h3>
+                    <p>完美适配 macOS Sonoma/Sequoia 小组件系统。三种尺寸可选，无需打开主程序即可在桌面实时看延迟。</p>
+                </div>
+                <div class="feature-card animate-fade-in">
+                    <span class="feature-icon">⚡️</span>
+                    <h3>菜单栏效率入口</h3>
+                    <p>支持实时网速显示及 SSH/Web 服务快捷跳转。无需离开当前工作空间，一切尽在掌握。</p>
+                </div>
+            </div>
+        </section>
+
+        <footer>
+            <div class="container">
+                <p>&copy; 2026 PingMonitor. Project by framecy. Released under MIT License.</p>
+            </div>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
