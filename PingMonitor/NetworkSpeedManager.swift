@@ -220,50 +220,41 @@ class NetworkSpeedManager: ObservableObject {
         
         for line in lines.dropFirst() { // Skip header
             let parts = line.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
-            // netstat -bni format varies:
-            // Standard: Name Mtu Network Address Ipkts Ierrs Ibytes Opkts Oerrs Obytes Coll
-            // VPN/utun: Name Mtu Network Address Ipkts Ierrs Ibytes Opkts Oerrs Obytes (No Coll)
-            
             let c = parts.count
-            guard c >= 9 else { continue } // Minimum columns needed
+            guard c >= 7 else { continue }
             
             let name = parts[0]
-            // Skip non-link entries
+            // We only care about <Link#N> entries for raw byte counts
             guard parts[2].contains("<Link") else { continue }
             
-            // Heuristic to detect column mapping:
-            // If the last element is likely 'Collisions' (small number vs bytes), offsets are different.
-            // Usually, 'bytes' are much larger than 'errors' or 'collisions'.
+            // Stats usually occupy the last 7 columns: Ipkts Ierrs Ibytes Opkts Oerrs Obytes Coll
+            // However, depending on the interface type and macOS version, columns might shift.
+            // We'll try to find the first numeric column starting from the end of the header list (excluding Coll).
             
-            // Indices from the end:
-            // -1: Coll (optional)
-            // -2: Obytes
-            // -3: Oerrs
-            // -4: Opkts
-            // -5: Ibytes
-            // -6: Ierrs
-            // -7: Ipkts
+            // Most reliable indices relative to the end:
+            // Opkts: c-4 or c-5
+            // Obytes: c-2 or c-1
             
-            // In macOS 15+, for utun, if the last column is a large number, it's Obytes.
-            // If it's a small number or 0 and followed by a large Obytes, it might be Coll.
+            // Safer heuristic: The first three parts are [Name, Mtu, Network]. 
+            // If parts[3] is NOT numeric, it's 'Address'.
+            // If parts[3] IS numeric, it's 'Ipkts' (Address is missing).
             
-            // Safer approach: netstat -bni always has:
-            // ... Ipkts Ierrs Ibytes Opkts Oerrs Obytes [Coll]
-            // We search for the pattern: [Number, Number, LargeNumber, Number, Number, LargeNumber]
+            let statStartIndex: Int
+            if UInt64(parts[3]) != nil || parts[3] == "-" {
+                statStartIndex = 3 // Address is missing
+            } else {
+                statStartIndex = 4 // Address is present
+            }
             
-            // Let's assume the standard 'Link' row for macOS:
-            // If parts.last is NOT a huge number, it's probably 'Coll' (even if it's 0)
-            // If parts.last IS a huge number, 'Coll' is missing.
+            // Indices: statStartIndex + 0:Ipkts, 1:Ierrs, 2:Ibytes, 3:Opkts, 4:Oerrs, 5:Obytes
+            guard c >= statStartIndex + 6 else { continue }
             
-            let hasCollisions = c >= 11 || (UInt64(parts[c-1]) ?? 0 < 1000000 && c >= 10)
-            let offset = hasCollisions ? 1 : 0
-            
-            guard let pktsIn = UInt64(parts[c - 7 - offset]),
-                  let errIn = UInt64(parts[c - 6 - offset]),
-                  let bytIn = UInt64(parts[c - 5 - offset]),
-                  let pktsOut = UInt64(parts[c - 4 - offset]),
-                  let errOut = UInt64(parts[c - 3 - offset]),
-                  let bytOut = UInt64(parts[c - 2 - offset]) else { continue }
+            let pktsIn  = UInt64(parts[statStartIndex + 0]) ?? 0
+            let errIn   = UInt64(parts[statStartIndex + 1]) ?? 0
+            let bytIn   = UInt64(parts[statStartIndex + 2]) ?? 0
+            let pktsOut = UInt64(parts[statStartIndex + 3]) ?? 0
+            let errOut  = UInt64(parts[statStartIndex + 4]) ?? 0
+            let bytOut  = UInt64(parts[statStartIndex + 5]) ?? 0
             
             results[name] = NetworkInterfaceStats(
                 id: name,
