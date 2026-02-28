@@ -110,6 +110,22 @@ body::before {
     z-index: 1;
 }
 
+#hero-version-badge {
+    display: inline-flex;
+    padding: 0.45rem 1.1rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border);
+    border-radius: 99px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: 2.5rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+
 /* Typography Hero */
 .hero {
     padding: 180px 0 120px;
