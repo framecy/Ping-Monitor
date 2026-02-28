@@ -235,6 +235,7 @@ class PingMonitorViewModel: ObservableObject {
     @Published var statusBarFontSize: Int = 9
     @Published var statusBarFontWeight: String = "medium" // "regular", "medium", "bold"
     @Published var showIconInMenu: Bool = true
+    @Published var appAppearance: String = "system" // "system", "light", "dark"
     
     var statusBarController: StatusBarController?
     private var pingProcesses: [UUID: Process] = [:]
@@ -313,6 +314,8 @@ class PingMonitorViewModel: ObservableObject {
             showIconInMenu = true
         }
         
+        appAppearance = defaults.string(forKey: "appAppearance") ?? "system"
+        
         LogManager.shared.info("Settings loaded: \(hosts.count) hosts, \(presets.count) presets")
     }
 
@@ -349,6 +352,7 @@ class PingMonitorViewModel: ObservableObject {
         defaults.set(statusBarFontSize, forKey: "statusBarFontSize")
         defaults.set(statusBarFontWeight, forKey: "statusBarFontWeight")
         defaults.set(showIconInMenu, forKey: "showIconInMenu")
+        defaults.set(appAppearance, forKey: "appAppearance")
     }
 
     func setupAutoStart() {
@@ -1075,6 +1079,13 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
                 self?.updateStatusBar()
             }
             .store(in: &cancellables)
+            
+        viewModel.$appAppearance
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.updateAppearance()
+            }
+            .store(in: &cancellables)
     }
     
     private var speedTimer: Timer?
@@ -1138,9 +1149,23 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
         mainWindow?.center()
         mainWindow?.setFrameAutosaveName("PingMonitorMainWindow")
         
+        updateAppearance()
+        
         // 设置窗口关闭时只是隐藏，不是销毁
         mainWindow?.isReleasedWhenClosed = false
         mainWindow?.delegate = self
+    }
+    
+    private func updateAppearance() {
+        guard let window = mainWindow else { return }
+        switch viewModel.appAppearance {
+        case "light":
+            window.appearance = NSAppearance(named: .aqua)
+        case "dark":
+            window.appearance = NSAppearance(named: .darkAqua)
+        default:
+            window.appearance = nil
+        }
     }
     
     private func showWindow() {
@@ -1266,19 +1291,24 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
         default: weight = .medium
         }
         
+        // Use monospaced font for all digits and symbols to ensure absolute width stability
         let smallFont = NSFont.monospacedDigitSystemFont(ofSize: CGFloat(viewModel.statusBarFontSize), weight: weight)
         let upAttrs: [NSAttributedString.Key: Any] = [.font: smallFont, .foregroundColor: NSColor.systemGreen]
         let downAttrs: [NSAttributedString.Key: Any] = [.font: smallFont, .foregroundColor: NSColor.systemBlue]
         
-        let upSize = (upStr as NSString).size(withAttributes: upAttrs)
-        let downSize = (downStr as NSString).size(withAttributes: downAttrs)
-        let width = max(upSize.width, downSize.width) + 2
-        let height = upSize.height + downSize.height
+        // Template for 6-digit number + unit + arrow symbol + padding
+        let templateStr = "↑ 9999.99 MB/s"
+        let templateSize = (templateStr as NSString).size(withAttributes: upAttrs)
+        let fixedWidth = ceil(templateSize.width) + 2
+        let height = ceil(templateSize.height) * 2
         
-        let image = NSImage(size: NSSize(width: width, height: height))
+        let image = NSImage(size: NSSize(width: fixedWidth, height: height))
         image.lockFocus()
-        (upStr as NSString).draw(at: NSPoint(x: 0, y: height - upSize.height), withAttributes: upAttrs)
+        
+        // Symbols and text stay next to each other, anchored to the left of the image container
+        (upStr as NSString).draw(at: NSPoint(x: 0, y: height / 2), withAttributes: upAttrs)
         (downStr as NSString).draw(at: NSPoint(x: 0, y: 0), withAttributes: downAttrs)
+        
         image.unlockFocus()
         image.isTemplate = false
         return image

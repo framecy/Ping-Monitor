@@ -207,6 +207,10 @@ public final class LanguageManager: ObservableObject {
             "settings.system": "System",
             "settings.language": "Language",
             "settings.version": "Version",
+            "settings.appearance": "Appearance",
+            "settings.appearance.system": "System Default",
+            "settings.appearance.light": "Light",
+            "settings.appearance.dark": "Dark",
             
             // Widget Settings
             "settings.widget.mode": "Widget Mode",
@@ -543,6 +547,10 @@ public final class LanguageManager: ObservableObject {
             "settings.system": "系统",
             "settings.language": "语言",
             "settings.version": "版本",
+            "settings.appearance": "外观",
+            "settings.appearance.system": "跟随系统",
+            "settings.appearance.light": "浅色",
+            "settings.appearance.dark": "深色",
             
             // Widget Settings
             "settings.widget.mode": "小组件模式",

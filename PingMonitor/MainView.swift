@@ -1900,6 +1900,24 @@ struct SettingsTab: View {
                         
                         Divider()
                         
+                        HStack {
+                            Text(languageManager.t("settings.appearance"))
+                            Spacer()
+                            Picker("", selection: $viewModel.appAppearance) {
+                                Text(languageManager.t("settings.appearance.light")).tag("light")
+                                Text(languageManager.t("settings.appearance.system")).tag("system")
+                                Text(languageManager.t("settings.appearance.dark")).tag("dark")
+                            }
+                            .pickerStyle(.segmented)
+                            .frame(width: 250)
+                            .onChange(of: viewModel.appAppearance) { _, newValue in
+                                LogManager.shared.info("Appearance changed to \(newValue)")
+                                viewModel.saveSettings()
+                            }
+                        }
+                        
+                        Divider()
+                        
                         Toggle(languageManager.t("settings.auto_start"), isOn: $viewModel.autoStart)
                             .onChange(of: viewModel.autoStart) { _, newValue in
                                 viewModel.toggleAutoStart(newValue)

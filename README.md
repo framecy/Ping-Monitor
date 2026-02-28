@@ -13,7 +13,7 @@
   <img src="https://img.shields.io/badge/platform-macOS%2014.0+-blue" alt="Platform">
   <img src="https://img.shields.io/badge/SwiftUI-6.0-orange" alt="SwiftUI">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/version-2.1.0-brightgreen" alt="Version">
+  <img src="https://img.shields.io/badge/version-2.1.0r23-brightgreen" alt="Version">
 </p>
 
 ---
@@ -236,6 +236,7 @@ AUTO_VERSION=false
 
 | 版本 | 构建 | 更新内容 |
 |------|------|---------|
+| v2.1.0 | r23 | **状态栏稳定性升级**：引入固定宽度与符号左对齐布局，彻底修复网速抖动；并清理了 Git 仓库日志文件 |
 | v2.1.0 | r19 | **全新状态栏监控**：支持图标开关、多级间距与字体高度定制、网速流量仪表盘全集成；**SSH 安全连接**：基于 expect 脚本绕过 AppleScript 授权限制直接进行密钥/密码认证；**数据聚合**：图表升级并修复了网格组件对齐；重构了界面排版引擎 |
 | v2.0.55 | r64 | **SSH 快捷方式增强**：支持配置用户名/端口/密钥路径，实时命令预览；**NAT 检测**：集成 `tailscale netcheck`，显示 NAT 类型/UDP/IPv4/IPv6/全局 IP/DERP 区域延迟图表；**小组件修复**：重构 `WidgetDataManager` 三级回退策略，禁用小组件沙箱确保数据同步 |
 | v2.0.54 | r63 | **Tailscale 集成**：自动发现私有网络节点并一键导入监控；**服务快捷方式**：为每个主机配置 Web/SSH/自定义快捷入口，全局服务面板汇总展示；**新增侧边栏模块**：Tailscale 面板与服务面板；完善中英文本地化 |

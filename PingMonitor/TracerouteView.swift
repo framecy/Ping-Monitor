@@ -17,15 +17,21 @@ struct TracerouteView: View {
                 emptyStateView
             } else {
                 // Results
-                ScrollView {
-                    VStack(spacing: 16) {
-                        // Status bar
-                        statusBar
+                VSplitView {
+                    TracerouteMapView(manager: manager)
+                        .frame(minHeight: 200, idealHeight: 300)
                         
-                        // Hop table
-                        hopTableView
+                    ScrollView {
+                        VStack(spacing: 16) {
+                            // Status bar
+                            statusBar
+                            
+                            // Hop table
+                            hopTableView
+                        }
+                        .padding()
                     }
-                    .padding()
+                    .frame(minHeight: 200)
                 }
             }
         }
@@ -336,9 +342,12 @@ struct TracerouteView: View {
                 }
                 
                 Text(languageManager.t("traceroute.avg"))
-                    .frame(width: 90, alignment: .trailing)
-                Text(languageManager.t("traceroute.loss"))
                     .frame(width: 70, alignment: .trailing)
+                Text(languageManager.t("traceroute.loss"))
+                    .frame(width: 60, alignment: .trailing)
+                Text("Location") // Note: should localize if possible, but hardcoded here if missing translation
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, 8)
             }
             .font(.system(size: 11, weight: .semibold))
             .foregroundStyle(Theme.Colors.textTertiary)
@@ -428,7 +437,7 @@ struct HopRowView: View {
                     }
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(width: 200, alignment: .leading)
             
             // Individual latencies
             ForEach(0..<3, id: \.self) { i in
@@ -449,13 +458,36 @@ struct HopRowView: View {
             Text(hop.formattedAvg)
                 .font(.system(size: 12, weight: .semibold, design: .monospaced))
                 .foregroundStyle(hop.latencyColor)
-                .frame(width: 90, alignment: .trailing)
+                .frame(width: 70, alignment: .trailing)
             
             // Loss
             Text(hop.formattedLoss)
                 .font(.system(size: 12, weight: .medium, design: .monospaced))
                 .foregroundStyle(hop.packetLoss > 0 ? Theme.Colors.accentOrange : Theme.Colors.accentGreen)
-                .frame(width: 70, alignment: .trailing)
+                .frame(width: 60, alignment: .trailing)
+                
+            // Location
+            VStack(alignment: .leading, spacing: 2) {
+                if let locString = hop.geoLocation?.locationString {
+                    Text(locString)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Theme.Colors.textPrimary)
+                        .lineLimit(1)
+                } else if !hop.isTimeout {
+                    Text("-")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.Colors.textTertiary)
+                }
+                
+                if let isp = hop.geoLocation?.isp, !isp.isEmpty {
+                    Text(isp)
+                        .font(.system(size: 10))
+                        .foregroundStyle(Theme.Colors.textTertiary)
+                        .lineLimit(1)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.leading, 8)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
@@ -594,5 +626,98 @@ struct MonitoredHostCard: View {
         if latency < 50 { return .green }
         if latency < 100 { return .orange }
         return .red
+    }
+}
+
+// MARK: - Map View
+
+import MapKit
+
+struct TracerouteMapView: View {
+    @ObservedObject var manager: TracerouteManager
+    
+    // We want to auto-adjust camera based on hops
+    @State private var position: MapCameraPosition = .automatic
+    @Environment(\.colorScheme) private var colorScheme
+    
+    var body: some View {
+        let validLocations = getValidLocations()
+        
+        Map(position: $position) {
+            // Draw lines between consecutive hops with locations
+            if validLocations.count > 1 {
+                let coordinates = validLocations.map { $0.coord }
+                MapPolyline(coordinates: coordinates)
+                    .stroke(Theme.Colors.accentBlue, lineWidth: 2)
+            }
+            
+            // Draw markers for each hop
+            ForEach(validLocations, id: \.hop.id) { loc in
+                Annotation(loc.hop.hostName, coordinate: loc.coord) {
+                    VStack(spacing: 4) {
+                        Circle()
+                            .fill(loc.hop.latencyColor)
+                            .frame(width: 12, height: 12)
+                            .overlay(
+                                Circle().stroke(Color.white, lineWidth: 2)
+                            )
+                            .shadow(radius: 2)
+                        
+                        Text("\(loc.hop.hopNumber)")
+                            .font(.system(size: 10, weight: .bold))
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 2)
+                            .background(Theme.Colors.cardBackground)
+                            .cornerRadius(4)
+                            .shadow(radius: 1)
+                    }
+                }
+            }
+        }
+        .mapStyle(.standard(elevation: .flat, pointsOfInterest: .excludingAll))
+        .mapControls {
+            MapZoomStepper()
+        }
+        .onChange(of: manager.hops.count) { _ in
+            updatePosition(validLocations)
+        }
+    }
+    
+    private struct LocData {
+        let hop: TracerouteHop
+        let coord: CLLocationCoordinate2D
+    }
+    
+    private func getValidLocations() -> [LocData] {
+        return manager.hops.compactMap { hop in
+            guard let lat = hop.geoLocation?.lat, let lon = hop.geoLocation?.lon else { return nil }
+            return LocData(hop: hop, coord: CLLocationCoordinate2D(latitude: lat, longitude: lon))
+        }
+    }
+    
+    private func updatePosition(_ locs: [LocData]) {
+        guard !locs.isEmpty else { return }
+        
+        // If there's only 1 point, just center on it
+        if locs.count == 1 {
+            position = .region(MKCoordinateRegion(center: locs[0].coord, latitudinalMeters: 500000, longitudinalMeters: 500000))
+            return
+        }
+        
+        let coords = locs.map { $0.coord }
+        let lats = coords.map { $0.latitude }
+        let lons = coords.map { $0.longitude }
+        
+        let minLat = lats.min()!
+        let maxLat = lats.max()!
+        let minLon = lons.min()!
+        let maxLon = lons.max()!
+        
+        let center = CLLocationCoordinate2D(latitude: (minLat + maxLat) / 2, longitude: (minLon + maxLon) / 2)
+        let span = MKCoordinateSpan(latitudeDelta: max(maxLat - minLat + 5, 20), longitudeDelta: max(maxLon - minLon + 5, 20)) // Pad edges
+        
+        withAnimation {
+            position = .region(MKCoordinateRegion(center: center, span: span))
+        }
     }
 }

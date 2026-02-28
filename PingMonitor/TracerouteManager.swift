@@ -13,6 +13,10 @@ struct TracerouteHop: Identifiable, Sendable {
     var packetLoss: Double     // 0.0 - 100.0
     var isTimeout: Bool
     
+    // GeoLocation Data
+    var geoLocation: GeoLocation?
+
+    
     // MTR Cumulative Stats
     var sent: Int = 0
     var received: Int = 0
@@ -158,6 +162,7 @@ func parseHopLine(_ line: String) -> TracerouteHop? {
         avgLatency: avg,
         packetLoss: loss,
         isTimeout: validLatencies.isEmpty,
+        geoLocation: nil,
         sent: latencies.count,
         received: validLatencies.count,
         best: validLatencies.min(),
@@ -339,6 +344,23 @@ class TracerouteManager: ObservableObject {
             hops.sort { $0.hopNumber < $1.hopNumber }
         }
         progress = String(format: LanguageManager.shared.t("traceroute.tracing"), targetHost) + " (\(hops.count)/\(maxHops))"
+        
+        fetchGeoLocation(for: hop.hopNumber, ip: hop.ip)
+    }
+    
+    private func fetchGeoLocation(for hopNumber: Int, ip: String) {
+        // Only fetch if valid IP
+        guard !ip.isEmpty, ip != "*" else { return }
+        
+        Task {
+            if let loc = await GeoIPCache.shared.fetch(ip: ip) {
+                await MainActor.run {
+                    if let idx = self.hops.firstIndex(where: { $0.hopNumber == hopNumber }) {
+                        self.hops[idx].geoLocation = loc
+                    }
+                }
+            }
+        }
     }
     
     private func mergeRoundResults(_ roundHops: [TracerouteHop]) {
@@ -394,6 +416,10 @@ class TracerouteManager: ObservableObject {
                 }
                 
                 hops[idx] = existing
+                
+                if existing.geoLocation == nil, existing.ip != "*" {
+                    fetchGeoLocation(for: existing.hopNumber, ip: existing.ip)
+                }
             } else {
                 // New hop
                 var newHop = roundHop
@@ -406,6 +432,10 @@ class TracerouteManager: ObservableObject {
                 }
                 hops.append(newHop)
                 hops.sort { $0.hopNumber < $1.hopNumber }
+                
+                if newHop.ip != "*" {
+                    fetchGeoLocation(for: newHop.hopNumber, ip: newHop.ip)
+                }
             }
         }
     }
@@ -414,16 +444,21 @@ class TracerouteManager: ObservableObject {
     
     func copyResultsToClipboard() {
         var text = "Traceroute to \(targetHost)\n"
-        text += String(repeating: "-", count: 70) + "\n"
-        text += "Hop  Host/IP                        Avg Latency  Loss\n"
-        text += String(repeating: "-", count: 70) + "\n"
+        text += String(repeating: "-", count: 100) + "\n"
+        text += "Hop  Host/IP                        Avg Latency  Loss   Location                ISP\n"
+        text += String(repeating: "-", count: 100) + "\n"
         
         for hop in hops {
             let hostStr = hop.hostName == hop.ip ? hop.ip : "\(hop.hostName) (\(hop.ip))"
             let hopNum = String(hop.hopNumber).padding(toLength: 4, withPad: " ", startingAt: 0)
             let hostPad = String(hostStr.prefix(30)).padding(toLength: 30, withPad: " ", startingAt: 0)
             let avgPad = hop.formattedAvg.padding(toLength: 12, withPad: " ", startingAt: 0)
-            text += "\(hopNum) \(hostPad) \(avgPad) \(hop.formattedLoss)\n"
+            let lossPad = hop.formattedLoss.padding(toLength: 6, withPad: " ", startingAt: 0)
+            let locStr = hop.geoLocation?.locationString ?? "-"
+            let locPad = String(locStr.prefix(22)).padding(toLength: 22, withPad: " ", startingAt: 0)
+            let ispStr = hop.geoLocation?.isp ?? "-"
+            
+            text += "\(hopNum) \(hostPad) \(avgPad) \(lossPad) \(locPad) \(ispStr)\n"
         }
         
         NSPasteboard.general.clearContents()
@@ -447,5 +482,92 @@ final class LockedArray<T: Sendable>: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         return array
+    }
+}
+
+// MARK: - GeoLocation Service
+
+struct GeoLocation: Codable, Equatable, Sendable {
+    let status: String
+    let country: String?
+    let city: String?
+    let lat: Double?
+    let lon: Double?
+    let isp: String?
+    let `as`: String? // AS number
+    
+    var locationString: String? {
+        var components: [String] = []
+        if let city = city, !city.isEmpty { components.append(city) }
+        if let country = country, !country.isEmpty { components.append(country) }
+        return components.isEmpty ? nil : components.joined(separator: ", ")
+    }
+}
+
+actor GeoIPCache: Sendable {
+    static let shared = GeoIPCache()
+    private var cache: [String: GeoLocation] = [:]
+    private var inFlight: [String: Task<GeoLocation?, Never>] = [:]
+    
+    func getIfCached(_ ip: String) -> GeoLocation? {
+        return cache[ip]
+    }
+    
+    func fetch(ip: String) async -> GeoLocation? {
+        if let cached = cache[ip] { return cached }
+        
+        if let task = inFlight[ip] {
+            return await task.value
+        }
+        
+        let task = Task<GeoLocation?, Never> {
+            let result = await performFetch(ip: ip)
+            if let res = result {
+                self.cache[ip] = res
+            }
+            self.inFlight[ip] = nil
+            return result
+        }
+        
+        inFlight[ip] = task
+        return await task.value
+    }
+    
+    private func performFetch(ip: String) async -> GeoLocation? {
+        // Skip local, multicast, broadcast, and invalid IPs
+        guard !isPrivateOrInvalidIP(ip) else { return nil }
+        
+        guard let url = URL(string: "http://ip-api.com/json/\(ip)?fields=status,country,city,lat,lon,isp,as") else { return nil }
+        
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+            guard let httpResp = response as? HTTPURLResponse, httpResp.statusCode == 200 else {
+                return nil
+            }
+            
+            let decoder = JSONDecoder()
+            let location = try decoder.decode(GeoLocation.self, from: data)
+            if location.status == "success" {
+                return location
+            }
+            return nil
+        } catch {
+            await LogManager.shared.error("GeoIP fetch failed for \(ip): \(error.localizedDescription)")
+            return nil
+        }
+    }
+    
+    private func isPrivateOrInvalidIP(_ ip: String) -> Bool {
+        if ip == "127.0.0.1" || ip == "*" || ip.isEmpty { return true }
+        // Simple prefix checks for private IPv4
+        if ip.hasPrefix("10.") || ip.hasPrefix("192.168.") { return true }
+        if ip.hasPrefix("172.") {
+            // Check 172.16.x.x - 172.31.x.x
+            let parts = ip.split(separator: ".")
+            if parts.count == 4, let second = Int(parts[1]), second >= 16 && second <= 31 {
+                return true
+            }
+        }
+        return false
     }
 }
