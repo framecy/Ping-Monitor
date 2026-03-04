@@ -237,10 +237,14 @@ body::before {
 }
 
 .area-trace {
-    grid-area: 2 / 1 / 3 / 5;
+    grid-area: 2 / 1 / 3 / 3;
 }
 
 .area-widget {
+    grid-area: 2 / 3 / 3 / 5;
+}
+
+.area-quick {
     grid-area: 2 / 5 / 3 / 7;
 }
 
@@ -333,7 +337,8 @@ footer {
     .area-monitor,
     .area-stats,
     .area-trace,
-    .area-widget {
+    .area-widget,
+    .area-quick {
         grid-area: auto;
     }
 
