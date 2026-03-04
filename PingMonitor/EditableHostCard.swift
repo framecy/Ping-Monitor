@@ -25,8 +25,8 @@ struct EditableHostCard: View {
         
         // Reachable state (has latency)
         if let latency = host.lastLatency {
-            if latency < 50 { return Theme.Colors.accentGreen }
-            if latency < 100 { return Theme.Colors.accentOrange }
+            if latency < 100 { return Theme.Colors.accentGreen }
+            if latency < 300 { return Theme.Colors.accentOrange }
             return Theme.Colors.accentRed
         }
         
@@ -81,35 +81,69 @@ struct EditableHostCard: View {
                  GeometryReader { geometry in
                      let points = stats.latencyHistory.suffix(20).map { $0.latency }
                      if !points.isEmpty {
-                         Path { path in
-                             let width = geometry.size.width
-                             let height = geometry.size.height
-                             let minVal = points.min() ?? 0
-                             let maxVal = max(points.max() ?? 100, 1)
-                             let range = maxVal - minVal + 1 // avoid div by zero
-                             
-                             let stepX = width / CGFloat(max(points.count - 1, 1))
-                             
-                             for (index, value) in points.enumerated() {
-                                 let x = CGFloat(index) * stepX
-                                 let normalizedY = (value - minVal) / range
-                                 let y = height - (CGFloat(normalizedY) * height)
+                         ZStack {
+                             // Filled Area Underneath
+                             Path { path in
+                                 let width = geometry.size.width
+                                 let height = geometry.size.height
+                                 let minVal = points.min() ?? 0
+                                 let maxVal = max(points.max() ?? 100, 1)
+                                 let range = maxVal - minVal + 1
                                  
-                                 if index == 0 {
-                                     path.move(to: CGPoint(x: x, y: y))
-                                 } else {
-                                     path.addLine(to: CGPoint(x: x, y: y))
+                                 let stepX = width / CGFloat(max(points.count - 1, 1))
+                                 
+                                 for (index, value) in points.enumerated() {
+                                     let x = CGFloat(index) * stepX
+                                     let normalizedY = (value - minVal) / range
+                                     let y = height - (CGFloat(normalizedY) * height)
+                                     
+                                     if index == 0 {
+                                         path.move(to: CGPoint(x: x, y: y))
+                                     } else {
+                                         path.addLine(to: CGPoint(x: x, y: y))
+                                     }
+                                 }
+                                 
+                                 // Close path for fill
+                                 path.addLine(to: CGPoint(x: geometry.size.width, y: geometry.size.height))
+                                 path.addLine(to: CGPoint(x: 0, y: geometry.size.height))
+                                 path.closeSubpath()
+                             }
+                             .fill(
+                                 LinearGradient(
+                                     colors: [statusColor.opacity(0.3), statusColor.opacity(0.0)],
+                                     startPoint: .top,
+                                     endPoint: .bottom
+                                 )
+                             )
+                             
+                             // The actual line (consistent thickness)
+                             Path { path in
+                                 let width = geometry.size.width
+                                 let height = geometry.size.height
+                                 let minVal = points.min() ?? 0
+                                 let maxVal = max(points.max() ?? 100, 1)
+                                 let range = maxVal - minVal + 1
+                                 
+                                 let stepX = width / CGFloat(max(points.count - 1, 1))
+                                 
+                                 for (index, value) in points.enumerated() {
+                                     let x = CGFloat(index) * stepX
+                                     let normalizedY = (value - minVal) / range
+                                     let y = height - (CGFloat(normalizedY) * height)
+                                     
+                                     if index == 0 {
+                                         path.move(to: CGPoint(x: x, y: y))
+                                     } else {
+                                         path.addLine(to: CGPoint(x: x, y: y))
+                                     }
                                  }
                              }
+                             .stroke(
+                                 statusColor,
+                                 style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round)
+                             )
                          }
-                         .stroke(
-                             LinearGradient(
-                                 colors: [statusColor.opacity(0.8), statusColor.opacity(0.3)],
-                                 startPoint: .leading,
-                                 endPoint: .trailing
-                             ),
-                             style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round)
-                         )
                      }
                  }
                  .frame(height: 30)

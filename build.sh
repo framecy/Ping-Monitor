@@ -70,9 +70,9 @@ APP_PATH="$HOME/Library/Developer/Xcode/DerivedData/PingMonitor/Build/Products/R
 echo "🔐 修复签名..."
 WIDGET_PATH="$APP_PATH/Contents/PlugIns/PingMonitorWidget.appex"
 if [ -d "$WIDGET_PATH" ]; then
-    codesign --force -s - --entitlements PingMonitorWidget/PingMonitorWidget.entitlements "$WIDGET_PATH"
+    codesign --force -s "Apple Development" --entitlements PingMonitorWidget/PingMonitorWidget.entitlements "$WIDGET_PATH"
 fi
-codesign --force -s - --entitlements PingMonitor/PingMonitor.entitlements "$APP_PATH"
+codesign --force -s "Apple Development" --entitlements PingMonitor/PingMonitor.entitlements "$APP_PATH"
 
 # 验证构建
 if [ ! -d "$APP_PATH" ]; then

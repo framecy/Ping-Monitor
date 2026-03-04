@@ -2,22 +2,58 @@ import SwiftUI
 
 struct Theme {
     struct Colors {
-        static let background = Color(hex: "141414")
-        static let cardBackground = Color(hex: "1F1F1F")
-        static let sidebarBackground = Color(hex: "1A1A1A")
+        static var background: Color {
+            Color(nsColor: NSColor(name: nil) { appearance in
+                if appearance.name == .darkAqua || appearance.name == .vibrantDark {
+                    return NSColor(hex: "141414")
+                } else {
+                    return NSColor(hex: "F5F5F7")
+                }
+            })
+        }
         
-        static let accentBlue = Color(hex: "2D8CFF")
-        static let accentGreen = Color(hex: "30D158")
-        static let accentPurple = Color(hex: "BF5AF2")
-        static let accentOrange = Color(hex: "FF9F0A")
-        static let accentRed = Color(hex: "FF453A")
-        static let accentCyan = Color(hex: "5AC8FA")
+        static var cardBackground: Color {
+            Color(nsColor: NSColor(name: nil) { appearance in
+                if appearance.name == .darkAqua || appearance.name == .vibrantDark {
+                    return NSColor(hex: "1F1F1F")
+                } else {
+                    return NSColor.white
+                }
+            })
+        }
         
-        static let textPrimary = Color.white
-        static let textSecondary = Color(hex: "8E8E93")
-        static let textTertiary = Color(hex: "636366")
+        static var sidebarBackground: Color {
+            Color(nsColor: NSColor(name: nil) { appearance in
+                if appearance.name == .darkAqua || appearance.name == .vibrantDark {
+                    return NSColor(hex: "1A1A1A")
+                } else {
+                    return NSColor(hex: "EBEBEB")
+                }
+            })
+        }
         
-        static let separator = Color(hex: "38383A")
+        static let accentBlue = Color(hex: "007AFF")
+        static let accentGreen = Color(hex: "34C759")
+        static let accentPurple = Color(hex: "AF52DE")
+        static let accentOrange = Color(hex: "FF9500")
+        static let accentRed = Color(hex: "FF3B30")
+        static let accentCyan = Color(hex: "32ADE6")
+        
+        static var textPrimary: Color {
+            Color(nsColor: .labelColor)
+        }
+        
+        static var textSecondary: Color {
+            Color(nsColor: .secondaryLabelColor)
+        }
+        
+        static var textTertiary: Color {
+            Color(nsColor: .tertiaryLabelColor)
+        }
+        
+        static var separator: Color {
+            Color(nsColor: .separatorColor)
+        }
     }
     
     struct Fonts {
@@ -43,6 +79,12 @@ struct Theme {
 
 extension Color {
     init(hex: String) {
+        self.init(nsColor: NSColor(hex: hex))
+    }
+}
+
+extension NSColor {
+    convenience init(hex: String) {
         let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
         var int: UInt64 = 0
         Scanner(string: hex).scanHexInt64(&int)
@@ -59,11 +101,10 @@ extension Color {
         }
 
         self.init(
-            .sRGB,
-            red: Double(r) / 255,
-            green: Double(g) / 255,
-            blue: Double(b) / 255,
-            opacity: Double(a) / 255
+            red: CGFloat(r) / 255,
+            green: CGFloat(g) / 255,
+            blue: CGFloat(b) / 255,
+            alpha: CGFloat(a) / 255
         )
     }
 }

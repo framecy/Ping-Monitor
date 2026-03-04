@@ -16,6 +16,9 @@ struct TailscaleTab: View {
                 // NAT / Netcheck Card
                 netcheckCard
                 
+                // Quick Commands
+                quickCommandsCard
+                
                 // DERP Region Latency
                 if !tailscale.regionLatencies.isEmpty {
                     derpLatencyCard
@@ -32,6 +35,8 @@ struct TailscaleTab: View {
             tailscale.fetchNetcheck()
         }
     }
+    
+    // MARK: - Status Card
     
     // MARK: - Status Card
     
@@ -119,6 +124,53 @@ struct TailscaleTab: View {
                         .cornerRadius(6)
                 }
             }
+        }
+    }
+    
+    // MARK: - Quick Commands Card
+    
+    private var quickCommandsCard: some View {
+        ModernCard {
+            VStack(alignment: .leading, spacing: 12) {
+                SectionHeader(title: "Quick Commands", icon: "command")
+                
+                HStack(spacing: 12) {
+                    CommandButton(title: "Status", icon: "terminal", action: { executeTailscale("status") })
+                    CommandButton(title: "Netcheck", icon: "shield.checkered", action: { executeTailscale("netcheck") })
+                    CommandButton(title: "Ping All", icon: "waveform", action: { executeTailscale("ping --all") })
+                    CommandButton(title: "Exit Node", icon: "arrow.up.right.circle", action: { executeTailscale("exit-node list") })
+                }
+            }
+        }
+    }
+    
+    private func executeTailscale(_ cmd: String) {
+        tailscale.runTailscaleCommand(cmd)
+    }
+    
+    struct CommandButton: View {
+        let title: String
+        let icon: String
+        let action: () -> Void
+        
+        var body: some View {
+            Button(action: action) {
+                VStack(spacing: 6) {
+                    Image(systemName: icon)
+                        .font(.system(size: 14))
+                    Text(title)
+                        .font(Theme.Fonts.body(10))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .background(Theme.Colors.cardBackground)
+                .cornerRadius(8)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                )
+            }
+            .buttonStyle(.plain)
         }
     }
     
@@ -380,8 +432,15 @@ struct TailscaleTab: View {
                 Text(node.online ? languageManager.t("tailscale.online") : languageManager.t("tailscale.offline"))
                     .font(Theme.Fonts.body(11))
                     .foregroundStyle(node.online ? .green : Theme.Colors.textTertiary)
+                
+                if node.exitNode || node.exitNodeOption {
+                    Image(systemName: "arrow.up.right.circle.fill")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Theme.Colors.accentPurple)
+                        .help(node.exitNode ? "Active Exit Node" : "Exit Node Available")
+                }
             }
-            .frame(width: 60)
+            .frame(width: 80, alignment: .trailing)
             
             if !node.isSelf {
                 if isMonitored {

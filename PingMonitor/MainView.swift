@@ -934,6 +934,10 @@ struct MonitorTab: View {
                                         selectedHost = host
                                     }
                                 }
+                                .onDrag {
+                                    NSItemProvider(object: host.id.uuidString as NSString)
+                                }
+                                .onDrop(of: [.text], delegate: HostDropDelegate(item: host, viewModel: viewModel))
                             }
                         }
                         .padding()
@@ -1030,42 +1034,46 @@ struct QuickAccessServicesRibbon: View {
                 }
                 .padding(.horizontal)
                 
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 12) {
-                        ForEach(allShortcuts, id: \.shortcut.id) { item in
-                            Button(action: {
-                                openService(item.shortcut, host: item.host)
-                            }) {
-                                HStack(spacing: 8) {
-                                    Image(systemName: item.shortcut.icon)
-                                        .font(.system(size: 14))
-                                        .foregroundStyle(serviceColor(for: item.shortcut.type))
-                                        .frame(width: 24, height: 24)
-                                        .background(serviceColor(for: item.shortcut.type).opacity(0.12))
-                                        .cornerRadius(6)
-                                    
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(item.shortcut.name)
-                                            .font(.system(size: 11, weight: .medium))
-                                            .foregroundStyle(Theme.Colors.textPrimary)
-                                        Text(item.host.name)
-                                            .font(.system(size: 9))
-                                            .foregroundStyle(Theme.Colors.textTertiary)
-                                    }
+                LazyVGrid(columns: [
+                    GridItem(.adaptive(minimum: 140, maximum: .infinity), spacing: 12)
+                ], spacing: 12) {
+                    ForEach(allShortcuts, id: \.shortcut.id) { item in
+                        Button(action: {
+                            openService(item.shortcut, host: item.host)
+                        }) {
+                            HStack(spacing: 8) {
+                                Image(systemName: item.shortcut.icon)
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(serviceColor(for: item.shortcut.type))
+                                    .frame(width: 24, height: 24)
+                                    .background(serviceColor(for: item.shortcut.type).opacity(0.12))
+                                    .cornerRadius(6)
+                                
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(item.shortcut.name)
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundStyle(Theme.Colors.textPrimary)
+                                        .lineLimit(1)
+                                    Text(item.host.name)
+                                        .font(.system(size: 9))
+                                        .foregroundStyle(Theme.Colors.textTertiary)
+                                        .lineLimit(1)
                                 }
-                                .padding(8)
-                                .background(Theme.Colors.cardBackground)
-                                .cornerRadius(8)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .stroke(Color.white.opacity(0.06), lineWidth: 1)
-                                )
+                                Spacer(minLength: 0)
                             }
-                            .buttonStyle(.plain)
+                            .padding(8)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Theme.Colors.cardBackground)
+                            .cornerRadius(8)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                            )
                         }
+                        .buttonStyle(.plain)
                     }
-                    .padding(.horizontal)
                 }
+                .padding(.horizontal)
             }
             .padding(.vertical, 8)
             .background(Theme.Colors.cardBackground.opacity(0.5))
@@ -1309,7 +1317,10 @@ struct HostsManagementView: View {
         newHostName = ""
         newHostAddress = ""
         newHostCommand = ""
-        newHostRules = []
+        newHostRules = [
+            DisplayRule(condition: "less", threshold: 50, label: "Direct", enabled: true),
+            DisplayRule(condition: "greater", threshold: 100, label: "Relay", enabled: true)
+        ]
     }
 }
 
@@ -1707,32 +1718,41 @@ struct RuleEditorRow: View {
             }
             
             // Row 2: Condition + Threshold + Label (properly spaced)
-            HStack(spacing: 12) {
+            HStack(spacing: 8) {
                 // Condition picker
                 Picker("", selection: $rule.condition) {
                     Text(languageManager.t("editor.rule.less")).tag("less")
                     Text(languageManager.t("editor.rule.greater")).tag("greater")
                 }
                 .pickerStyle(.segmented)
-                .frame(width: 140)
+                .frame(width: 90)
                 
                 // Threshold
                 HStack(spacing: 4) {
-                    TextField("ms", value: $rule.threshold, format: .number)
+                    TextField("", value: $rule.threshold, format: .number)
                         .textFieldStyle(.roundedBorder)
-                        .frame(width: 60)
+                        .multilineTextAlignment(.center)
+                        .frame(width: 45)
                     Text("ms")
-                        .font(Theme.Fonts.body(10))
+                        .font(.system(size: 10))
                         .foregroundStyle(Theme.Colors.textSecondary)
                 }
                 
-                // Label
-                TextField(languageManager.t("editor.rule.label"), text: $rule.label)
+                Spacer(minLength: 4)
+                
+                // Static Label "显示文本"
+                Text(languageManager.t("editor.rule.label"))
+                    .font(.system(size: 11))
+                    .foregroundStyle(Theme.Colors.textSecondary)
+                
+                // Label TextField
+                TextField(languageManager.t("editor.rule.label_placeholder"), text: $rule.label)
                     .textFieldStyle(.roundedBorder)
-                    .frame(minWidth: 60)
+                    .frame(width: 70)
             }
+            .frame(height: 28) // Force consistent height to fix vertical alignment
         }
-        .padding(.vertical, 6)
+        .padding(.vertical, 8)
     }
 }
 
@@ -1997,7 +2017,7 @@ struct SettingsTab: View {
                                 Text("English").tag(Language.en)
                             }
                             .pickerStyle(.segmented)
-                            .frame(width: 200)
+                            .frame(width: 220, alignment: .trailing)
                             .onChange(of: languageManager.currentLanguage) { _, newValue in
                                 LogManager.shared.info("Language changed to \(newValue.rawValue)")
                                 languageManager.languageString = newValue.rawValue
@@ -2015,7 +2035,7 @@ struct SettingsTab: View {
                                 Text(languageManager.t("settings.appearance.dark")).tag("dark")
                             }
                             .pickerStyle(.segmented)
-                            .frame(width: 250)
+                            .frame(width: 220, alignment: .trailing)
                             .onChange(of: viewModel.appAppearance) { _, newValue in
                                 LogManager.shared.info("Appearance changed to \(newValue)")
                                 viewModel.saveSettings()
@@ -2036,6 +2056,7 @@ struct SettingsTab: View {
                             Spacer()
                             Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "2.0") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"))")
                                 .foregroundStyle(.secondary)
+                                .frame(width: 220, alignment: .trailing)
                         }
                     }
                 }
@@ -2055,7 +2076,7 @@ struct SettingsTab: View {
                                 Text(languageManager.t("settings.display.first")).tag(StatusBarDisplayMode.first)
                             }
                             .pickerStyle(.segmented)
-                            .frame(width: 250)
+                            .frame(width: 220, alignment: .trailing)
                             .onChange(of: viewModel.statusBarDisplayMode) { _, newValue in
                                 LogManager.shared.info("Display mode changed to \(newValue.rawValue)")
                                 viewModel.saveSettings()
@@ -2071,39 +2092,35 @@ struct SettingsTab: View {
                         
                         Divider()
                         
-                        Toggle(languageManager.t("settings.show_icon"), isOn: $viewModel.showIconInMenu)
-                            .disabled((viewModel.showIconInMenu && activeMenuCount <= 1) || (!viewModel.showIconInMenu && activeMenuCount >= 3))
-                            .onChange(of: viewModel.showIconInMenu) { _, newValue in
-                                LogManager.shared.info("Show icon in menu toggled to \(newValue)")
-                                viewModel.saveSettings()
-                            }
-                        
-                        Divider()
-                        
-                        Toggle(languageManager.t("settings.show_latency"), isOn: $viewModel.showLatencyInMenu)
-                            .disabled((viewModel.showLatencyInMenu && activeMenuCount <= 1) || (!viewModel.showLatencyInMenu && activeMenuCount >= 3))
-                            .onChange(of: viewModel.showLatencyInMenu) { _, newValue in
-                                LogManager.shared.info("Show latency in menu toggled to \(newValue)")
-                                viewModel.saveSettings()
-                            }
-
-                        Divider()
-
-                        Toggle(languageManager.t("settings.show_labels"), isOn: $viewModel.showLabelsInMenu)
-                            .disabled((viewModel.showLabelsInMenu && activeMenuCount <= 1) || (!viewModel.showLabelsInMenu && activeMenuCount >= 3))
-                            .onChange(of: viewModel.showLabelsInMenu) { _, newValue in
-                                LogManager.shared.info("Show labels in menu toggled to \(newValue)")
-                                viewModel.saveSettings()
-                            }
-                        
-                        Divider()
-                        
-                        Toggle(languageManager.t("settings.show_speed"), isOn: $viewModel.showSpeedInMenu)
-                            .disabled((viewModel.showSpeedInMenu && activeMenuCount <= 1) || (!viewModel.showSpeedInMenu && activeMenuCount >= 3))
-                            .onChange(of: viewModel.showSpeedInMenu) { _, newValue in
-                                LogManager.shared.info("Show speed in menu toggled to \(newValue)")
-                                viewModel.saveSettings()
-                            }
+                        HStack(spacing: 24) {
+                            Toggle(languageManager.t("settings.show_icon"), isOn: $viewModel.showIconInMenu)
+                                .disabled((viewModel.showIconInMenu && activeMenuCount <= 1) || (!viewModel.showIconInMenu && activeMenuCount >= 3))
+                                .onChange(of: viewModel.showIconInMenu) { _, newValue in
+                                    LogManager.shared.info("Show icon in menu toggled to \(newValue)")
+                                    viewModel.saveSettings()
+                                }
+                            
+                            Toggle(languageManager.t("settings.show_latency"), isOn: $viewModel.showLatencyInMenu)
+                                .disabled((viewModel.showLatencyInMenu && activeMenuCount <= 1) || (!viewModel.showLatencyInMenu && activeMenuCount >= 3))
+                                .onChange(of: viewModel.showLatencyInMenu) { _, newValue in
+                                    LogManager.shared.info("Show latency in menu toggled to \(newValue)")
+                                    viewModel.saveSettings()
+                                }
+    
+                            Toggle(languageManager.t("settings.show_labels"), isOn: $viewModel.showLabelsInMenu)
+                                .disabled((viewModel.showLabelsInMenu && activeMenuCount <= 1) || (!viewModel.showLabelsInMenu && activeMenuCount >= 3))
+                                .onChange(of: viewModel.showLabelsInMenu) { _, newValue in
+                                    LogManager.shared.info("Show labels in menu toggled to \(newValue)")
+                                    viewModel.saveSettings()
+                                }
+                            
+                            Toggle(languageManager.t("settings.show_speed"), isOn: $viewModel.showSpeedInMenu)
+                                .disabled((viewModel.showSpeedInMenu && activeMenuCount <= 1) || (!viewModel.showSpeedInMenu && activeMenuCount >= 3))
+                                .onChange(of: viewModel.showSpeedInMenu) { _, newValue in
+                                    LogManager.shared.info("Show speed in menu toggled to \(newValue)")
+                                    viewModel.saveSettings()
+                                }
+                        }
                         
                         if viewModel.showSpeedInMenu {
                             Divider()
@@ -2116,7 +2133,7 @@ struct SettingsTab: View {
                                     Text("MB/s").tag("MB")
                                 }
                                 .pickerStyle(.segmented)
-                                .frame(width: 200)
+                                .frame(width: 220, alignment: .trailing)
                                 .onChange(of: viewModel.speedUnit) { _, newValue in
                                     LogManager.shared.info("Speed unit changed to \(newValue)")
                                     viewModel.saveSettings()
@@ -2157,6 +2174,7 @@ struct SettingsTab: View {
                                     .buttonStyle(.borderless)
                                     .disabled(viewModel.statusBarWidth >= 250)
                                 }
+                                .frame(width: 220, alignment: .trailing)
                             }
                             Divider()
                             
@@ -2186,6 +2204,7 @@ struct SettingsTab: View {
                                     .buttonStyle(.borderless)
                                     .disabled(viewModel.statusBarFontSize >= 18)
                                 }
+                                .frame(width: 220, alignment: .trailing)
                             }
                             
                             Divider()
@@ -2199,7 +2218,7 @@ struct SettingsTab: View {
                                     Text(languageManager.t("settings.font_weight.bold")).tag("bold")
                                 }
                                 .pickerStyle(.segmented)
-                                .frame(width: 200)
+                                .frame(width: 220, alignment: .trailing)
                                 .onChange(of: viewModel.statusBarFontWeight) { _, newValue in
                                     LogManager.shared.info("Status bar font weight changed to \(newValue)")
                                     viewModel.saveSettings()
@@ -2217,7 +2236,7 @@ struct SettingsTab: View {
                                 Text(languageManager.t("settings.widget.specific")).tag("specific")
                             }
                             .pickerStyle(.segmented)
-                            .frame(width: 200)
+                            .frame(width: 220, alignment: .trailing)
                             .onChange(of: viewModel.widgetDisplayMode) { _, newValue in
                                 LogManager.shared.info("Widget display mode changed to \(newValue)")
                                 viewModel.syncToWidget()
@@ -2236,7 +2255,7 @@ struct SettingsTab: View {
                                     }
                                 }
                                 .pickerStyle(.menu)
-                                .frame(width: 200)
+                                .frame(width: 220, alignment: .trailing)
                                 .onChange(of: viewModel.widgetSelectedHostId) { _, newValue in
                                     LogManager.shared.info("Widget host changed to \(newValue)")
                                     viewModel.syncToWidget()
@@ -2261,7 +2280,7 @@ struct SettingsTab: View {
                                 Text(languageManager.t("settings.interval.30s")).tag(30.0)
                             }
                             .pickerStyle(.segmented)
-                            .frame(width: 200)
+                            .frame(width: 220, alignment: .trailing)
                             .onChange(of: viewModel.pingInterval) { _, newValue in
                                 LogManager.shared.info("Ping interval changed to \(Int(newValue))s")
                                 viewModel.saveSettings()
@@ -2283,7 +2302,7 @@ struct SettingsTab: View {
                                 }
                             }
                             .pickerStyle(.segmented)
-                            .frame(width: 200)
+                            .frame(width: 220, alignment: .trailing)
                             .onChange(of: viewModel.logLevel) { _, newValue in
                                 LogManager.shared.info("Log level changed to \(newValue.rawValue)")
                                 viewModel.saveSettings()
@@ -2314,7 +2333,7 @@ struct SettingsTab: View {
                                     Text(languageManager.t("settings.notify.bark")).tag("bark")
                                 }
                                 .pickerStyle(.segmented)
-                                .frame(width: 200)
+                                .frame(width: 220, alignment: .trailing)
                                 .onChange(of: viewModel.notificationType) { _, newValue in
                                     LogManager.shared.info("Notification type changed to \(newValue)")
                                     viewModel.saveSettings()
@@ -2328,7 +2347,7 @@ struct SettingsTab: View {
                                     Spacer()
                                     TextField("https://api.day.app/...", text: $viewModel.barkURL)
                                         .textFieldStyle(.roundedBorder)
-                                        .frame(width: 200)
+                                        .frame(width: 220, alignment: .trailing)
                                         .onChange(of: viewModel.barkURL) { _, _ in
                                             viewModel.saveSettings()
                                         }
@@ -2357,3 +2376,37 @@ struct SettingsTab: View {
         }
     }
 }
+
+// MARK: - Draggable Sorting Delegate
+struct HostDropDelegate: DropDelegate {
+    let item: HostConfig
+    @ObservedObject var viewModel: PingMonitorViewModel
+    
+    func performDrop(info: DropInfo) -> Bool {
+        return true
+    }
+    
+    func dropEntered(info: DropInfo) {
+        guard let itemProvider = info.itemProviders(for: [.text]).first else { return }
+        
+        itemProvider.loadObject(ofClass: NSString.self) { string, error in
+            guard let idString = string as? String,
+                  let draggingId = UUID(uuidString: idString),
+                  draggingId != item.id else { return }
+            
+            Task { @MainActor in
+                if let fromIndex = viewModel.hosts.firstIndex(where: { $0.id == draggingId }),
+                   let toIndex = viewModel.hosts.firstIndex(where: { $0.id == item.id }) {
+                    withAnimation {
+                        viewModel.moveHost(from: IndexSet(integer: fromIndex), to: toIndex > fromIndex ? toIndex + 1 : toIndex)
+                    }
+                }
+            }
+        }
+    }
+    
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        return DropProposal(operation: .move)
+    }
+}
+

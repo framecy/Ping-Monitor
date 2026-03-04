@@ -382,4 +382,52 @@ class TailscaleManager: ObservableObject {
             }
         }
     }
+    func runTailscaleCommand(_ command: String) {
+        guard let cli = cliPath else {
+            LogManager.shared.error("Tailscale CLI not found")
+            return
+        }
+        
+        let args = command.components(separatedBy: " ")
+        LogManager.shared.info("Executing: tailscale \(command)")
+        
+        Task.detached {
+            let process = Process()
+            let pipe = Pipe()
+            process.executableURL = URL(fileURLWithPath: cli)
+            process.arguments = args
+            process.standardOutput = pipe
+            process.standardError = pipe
+            
+            do {
+                try process.run()
+                process.waitUntilExit()
+                
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                if let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines), !output.isEmpty {
+                    let lines = output.components(separatedBy: .newlines)
+                    for line in lines.prefix(20) {
+                        await LogManager.shared.info("[Tailscale] \(line)")
+                    }
+                    if lines.count > 20 {
+                        await LogManager.shared.info("[Tailscale] ... (truncated)")
+                    }
+                }
+                
+                if process.terminationStatus == 0 {
+                    await LogManager.shared.info("Command executed successfully")
+                    if command.contains("status") || command.contains("netcheck") {
+                        await MainActor.run {
+                            self.fetchStatus()
+                            self.fetchNetcheck()
+                        }
+                    }
+                } else {
+                    await LogManager.shared.error("Command failed with exit code \(process.terminationStatus)")
+                }
+            } catch {
+                await LogManager.shared.error("Failed to run command: \(error.localizedDescription)")
+            }
+        }
+    }
 }

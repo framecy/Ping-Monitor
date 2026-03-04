@@ -456,9 +456,9 @@ class PingMonitorViewModel: ObservableObject {
             let count = Double(stats.successfulPings)
             stats.avgLatency = oldAvg + (lat - oldAvg) / count
             
-            // Add to history (keep last 100 points)
+            // Add to history (keep last 60 points instead of 100 for memory and CPU optimization)
             stats.latencyHistory.append(LatencyPoint(timestamp: Date(), latency: lat))
-            if stats.latencyHistory.count > 100 {
+            if stats.latencyHistory.count > 60 {
                 stats.latencyHistory.removeFirst()
             }
         } else {
@@ -478,7 +478,7 @@ class PingMonitorViewModel: ObservableObject {
         
         let commandString: String
         if customCommand.isEmpty {
-            commandString = "ping -i 1 \(address)"
+            commandString = "ping -i 10 \(address)"
         } else {
             var result = customCommand.replacingOccurrences(of: "$address", with: address)
                                       .replacingOccurrences(of: "${address}", with: address)
@@ -869,6 +869,12 @@ class PingMonitorViewModel: ObservableObject {
             }
         }
     }
+    
+    func moveHost(from source: IndexSet, to destination: Int) {
+        hosts.move(fromOffsets: source, toOffset: destination)
+        saveSettings()
+        LogManager.shared.info("Reordered hosts")
+    }
 }
 
 struct ServiceShortcut: Codable, Identifiable {
@@ -967,8 +973,8 @@ struct HostConfig: Codable, Identifiable, Hashable {
     var isReachable = false
     var isChecking = false
     var displayRules: [DisplayRule] = [
-        DisplayRule(condition: "less", threshold: 50, label: "P2P", enabled: true),
-        DisplayRule(condition: "greater", threshold: 50, label: "转发", enabled: true)
+        DisplayRule(condition: "less", threshold: 50, label: "Direct", enabled: true),
+        DisplayRule(condition: "greater", threshold: 100, label: "Relay", enabled: true)
     ]
     var serviceShortcuts: [ServiceShortcut] = []
     var isTailscaleNode: Bool = false

@@ -204,7 +204,7 @@ struct NetworkStatusCard: View {
                                 if let latency = host.lastLatency {
                                     Text("\(Int(latency)) ms")
                                         .font(Theme.Fonts.display(18))
-                                        .foregroundStyle(latency < 50 ? Theme.Colors.accentGreen : (latency < 100 ? Theme.Colors.accentOrange : Theme.Colors.accentRed))
+                                        .foregroundStyle(latency < 100 ? Theme.Colors.accentGreen : (latency < 300 ? Theme.Colors.accentOrange : Theme.Colors.accentRed))
                                 } else {
                                     Text("---")
                                         .font(Theme.Fonts.display(18))
