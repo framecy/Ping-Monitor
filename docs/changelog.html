@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Changelog — PingMonitor</title>
+    <meta name="description" content="PingMonitor version history and release notes. Track every update, new feature, and bug fix.">
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="reveal-container">
+        <div class="stage-gradient"></div>
+        <div class="grid-overlay"></div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="navbar" id="navbar">
+        <div class="nav-inner">
+            <div class="brand">
+                <span class="brand-dot"></span>
+                <a href="index.html" style="color: inherit; text-decoration: none;">PingMonitor</a>
+            </div>
+            <div class="nav-links">
+                <a href="index.html">Home</a>
+                <a href="index.html#features">Features</a>
+                <a href="https://github.com/framecy/Ping-Monitor" class="nav-github" target="_blank" rel="noopener">
+                    <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
+                    GitHub
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- Hero -->
+        <header class="changelog-hero">
+            <h1 class="animate-fade-in">Version History</h1>
+            <p class="animate-fade-in">Every improvement, every fix — documented with precision.</p>
+        </header>
+
+        <!-- Filters -->
+        <div class="changelog-filters animate-fade-in">
+            <button class="filter-btn active" data-filter="all">All</button>
+            <button class="filter-btn" data-filter="added">Added</button>
+            <button class="filter-btn" data-filter="updated">Updated</button>
+            <button class="filter-btn" data-filter="fixed">Fixed</button>
+        </div>
+
+        <!-- Timeline -->
+        <div class="timeline" id="changelog-timeline">
+
+            <!-- v2.1.1-R6 -->
+            <div class="timeline-item animate-fade-in" data-categories="added,updated,fixed">
+                <div class="timeline-dot"></div>
+                <div class="timeline-card">
+                    <div class="timeline-header" onclick="toggleTimeline(this)">
+                        <div class="timeline-header-left">
+                            <span class="timeline-version">v2.1.1-R6</span>
+                            <span class="timeline-date">2026-03-04</span>
+                        </div>
+                        <div class="timeline-toggle">▼</div>
+                    </div>
+                    <div class="timeline-body open">
+                        <div class="timeline-content">
+                            <div class="change-category" data-type="added">
+                                <div class="category-tag tag-added">Added</div>
+                                <ul class="change-list">
+                                    <li><strong>App Group & Sandbox</strong>：macOS 小组件完全接入 App Sandbox，打通 <code>group.com.pingmonitor.shared</code> App Group，保证主程序与小组件安全共享数据。</li>
+                                </ul>
+                            </div>
+                            <div class="change-category" data-type="updated">
+                                <div class="category-tag tag-updated">Updated</div>
+                                <ul class="change-list">
+                                    <li><strong>Ping 间隔优化</strong>：默认检测命令优化为 <code>ping -i 10</code>，降低后台资源消耗。</li>
+                                    <li><strong>迷你趋势图升级</strong>：统一线条宽度与渐变填充，三色阶梯延迟告警（&lt;100ms 绿，100-300ms 橙，&gt;300ms 红）。</li>
+                                    <li><strong>快捷面板重构</strong>：服务捷径从横向滑动改为自适应流式网格 <code>LazyVGrid</code>。</li>
+                                </ul>
+                            </div>
+                            <div class="change-category" data-type="fixed">
+                                <div class="category-tag tag-fixed">Fixed</div>
+                                <ul class="change-list">
+                                    <li><strong>表单布局修复</strong>：修复编辑表单中输入框高度/基线不一致的错位问题。</li>
+                                    <li><strong>性能优化</strong>：缓解频繁 Ping 探测导致内存消耗过高的问题。</li>
+                                    <li><strong>小组件可见性</strong>：彻底修复小组件在 macOS 画廊中无法显示的核心问题。</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- v2.1.1-R5 -->
+            <div class="timeline-item animate-fade-in" data-categories="fixed">
+                <div class="timeline-dot"></div>
+                <div class="timeline-card">
+                    <div class="timeline-header" onclick="toggleTimeline(this)">
+                        <div class="timeline-header-left">
+                            <span class="timeline-version">v2.1.1-R5</span>
+                            <span class="timeline-date">2026-03-03</span>
+                        </div>
+                        <div class="timeline-toggle">▼</div>
+                    </div>
+                    <div class="timeline-body">
+                        <div class="timeline-content">
+                            <div class="change-category" data-type="fixed">
+                                <div class="category-tag tag-fixed">Fixed</div>
+                                <ul class="change-list">
+                                    <li><strong>设置页对齐</strong>：完成像素级对齐，右侧控件宽度扩展至 220pt，修复"参差不齐"的外观。</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- v2.1.1-R4 -->
+            <div class="timeline-item animate-fade-in" data-categories="fixed">
+                <div class="timeline-dot"></div>
+                <div class="timeline-card">
+                    <div class="timeline-header" onclick="toggleTimeline(this)">
+                        <div class="timeline-header-left">
+                            <span class="timeline-version">v2.1.1-R4</span>
+                            <span class="timeline-date">2026-03-03</span>
+                        </div>
+                        <div class="timeline-toggle">▼</div>
+                    </div>
+                    <div class="timeline-body">
+                        <div class="timeline-content">
+                            <div class="change-category" data-type="fixed">
+                                <div class="category-tag tag-fixed">Fixed</div>
+                                <ul class="change-list">
+                                    <li><strong>Tailscale 快捷命令</strong>：完整实现 Status、Netcheck、Ping All、Exit Node 按钮的 CLI 执行逻辑。</li>
+                                    <li><strong>操作反馈</strong>：Tailscale CLI 操作结果自动记录至日志标签页。</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- v2.1.1-R2 -->
+            <div class="timeline-item animate-fade-in" data-categories="fixed">
+                <div class="timeline-dot"></div>
+                <div class="timeline-card">
+                    <div class="timeline-header" onclick="toggleTimeline(this)">
+                        <div class="timeline-header-left">
+                            <span class="timeline-version">v2.1.1-R2</span>
+                            <span class="timeline-date">2026-03-02</span>
+                        </div>
+                        <div class="timeline-toggle">▼</div>
+                    </div>
+                    <div class="timeline-body">
+                        <div class="timeline-content">
+                            <div class="change-category" data-type="fixed">
+                                <div class="category-tag tag-fixed">Fixed</div>
+                                <ul class="change-list">
+                                    <li><strong>UI 对齐修复</strong>：解决显示规则编辑器的组件对齐问题，新增"显示文本"固定标签。</li>
+                                    <li><strong>默认值校正</strong>：添加主机时自动填充默认规则（&lt;50ms Direct, &gt;100ms Relay）。</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- v2.1.1-R1 -->
+            <div class="timeline-item animate-fade-in" data-categories="added,updated,fixed">
+                <div class="timeline-dot"></div>
+                <div class="timeline-card">
+                    <div class="timeline-header" onclick="toggleTimeline(this)">
+                        <div class="timeline-header-left">
+                            <span class="timeline-version">v2.1.1-R1</span>
+                            <span class="timeline-date">2026-03-02</span>
+                        </div>
+                        <div class="timeline-toggle">▼</div>
+                    </div>
+                    <div class="timeline-body">
+                        <div class="timeline-content">
+                            <div class="change-category" data-type="added">
+                                <div class="category-tag tag-added">Added</div>
+                                <ul class="change-list">
+                                    <li><strong>拖拽排序</strong>：监控主机支持长按拖放重新排序。</li>
+                                    <li><strong>Tailscale 命令面板</strong>：新增 Command Ribbon 快捷指令入口。</li>
+                                    <li><strong>Exit Node 标识</strong>：节点显示出口节点专属图标。</li>
+                                    <li><strong>节点元数据</strong>：Tailscale 节点显示 OS 专属图标。</li>
+                                </ul>
+                            </div>
+                            <div class="change-category" data-type="updated">
+                                <div class="category-tag tag-updated">Updated</div>
+                                <ul class="change-list">
+                                    <li><strong>主题系统</strong>：全面重构浅色/深色双模式设计系统，确保 100% 视觉保真度。</li>
+                                    <li><strong>默认规则更新</strong>：<code>&lt;50ms → Direct</code>，<code>&gt;100ms → Relay</code>。</li>
+                                    <li><strong>设置页标准化</strong>：右侧控件宽度统一，实现竖直对齐。</li>
+                                </ul>
+                            </div>
+                            <div class="change-category" data-type="fixed">
+                                <div class="category-tag tag-fixed">Fixed</div>
+                                <ul class="change-list">
+                                    <li>修复显示规则编辑器行布局错位问题。</li>
+                                    <li>修正浅色模式下多个组件的对比度和可见性问题。</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- v2.1.0-r38 -->
+            <div class="timeline-item animate-fade-in" data-categories="added">
+                <div class="timeline-dot"></div>
+                <div class="timeline-card">
+                    <div class="timeline-header" onclick="toggleTimeline(this)">
+                        <div class="timeline-header-left">
+                            <span class="timeline-version">v2.1.0-r38</span>
+                            <span class="timeline-date">2026-02-28</span>
+                        </div>
+                        <div class="timeline-toggle">▼</div>
+                    </div>
+                    <div class="timeline-body">
+                        <div class="timeline-content">
+                            <div class="change-category" data-type="added">
+                                <div class="category-tag tag-added">Added</div>
+                                <ul class="change-list">
+                                    <li><strong>网络接口调试</strong>：重构 <code>netstat</code> 解析，修复 VPN/Tailscale 接口下 Errors 计数异常。</li>
+                                    <li><strong>Visual Traceroute DMG</strong>：新增路由追踪功能专属打包。</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- v2.1.0-r35 -->
+            <div class="timeline-item animate-fade-in" data-categories="added">
+                <div class="timeline-dot"></div>
+                <div class="timeline-card">
+                    <div class="timeline-header" onclick="toggleTimeline(this)">
+                        <div class="timeline-header-left">
+                            <span class="timeline-version">v2.1.0-r35</span>
+                            <span class="timeline-date">2026-02-28</span>
+                        </div>
+                        <div class="timeline-toggle">▼</div>
+                    </div>
+                    <div class="timeline-body">
+                        <div class="timeline-content">
+                            <div class="change-category" data-type="added">
+                                <div class="category-tag tag-added">Added</div>
+                                <ul class="change-list">
+                                    <li>建立正式 <code>CHANGELOG.md</code> 变更日志体系。</li>
+                                    <li>升级 <code>build.sh</code> 自动打包变更日志到 DMG。</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- v2.1.0-r33 -->
+            <div class="timeline-item animate-fade-in" data-categories="added">
+                <div class="timeline-dot"></div>
+                <div class="timeline-card">
+                    <div class="timeline-header" onclick="toggleTimeline(this)">
+                        <div class="timeline-header-left">
+                            <span class="timeline-version">v2.1.0-r33</span>
+                            <span class="timeline-date">2026-02-28</span>
+                        </div>
+                        <div class="timeline-toggle">▼</div>
+                    </div>
+                    <div class="timeline-body">
+                        <div class="timeline-content">
+                            <div class="change-category" data-type="added">
+                                <div class="category-tag tag-added">Added</div>
+                                <ul class="change-list">
+                                    <li><strong>地图起点增强</strong>：Traceroute 地图新增"当前位置"(Hop 0) 起点，实现完整的点对点路径追踪。</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- v2.1.0-r32 -->
+            <div class="timeline-item animate-fade-in" data-categories="fixed">
+                <div class="timeline-dot"></div>
+                <div class="timeline-card">
+                    <div class="timeline-header" onclick="toggleTimeline(this)">
+                        <div class="timeline-header-left">
+                            <span class="timeline-version">v2.1.0-r32</span>
+                            <span class="timeline-date">2026-02-27</span>
+                        </div>
+                        <div class="timeline-toggle">▼</div>
+                    </div>
+                    <div class="timeline-body">
+                        <div class="timeline-content">
+                            <div class="change-category" data-type="fixed">
+                                <div class="category-tag tag-fixed">Fixed</div>
+                                <ul class="change-list">
+                                    <li><strong>MTR 授权优化</strong>：采用单次提权 Bash 容器封装 MTR 循环，消除每秒弹出的授权窗口。</li>
+                                    <li>移除 <code>-n</code> 参数恢复主机名解析能力。</li>
+                                    <li>校正 Traceroute 返回按钮靠左边距对齐。</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- v2.1.0-r31 -->
+            <div class="timeline-item animate-fade-in" data-categories="fixed">
+                <div class="timeline-dot"></div>
+                <div class="timeline-card">
+                    <div class="timeline-header" onclick="toggleTimeline(this)">
+                        <div class="timeline-header-left">
+                            <span class="timeline-version">v2.1.0-r31</span>
+                            <span class="timeline-date">2026-02-27</span>
+                        </div>
+                        <div class="timeline-toggle">▼</div>
+                    </div>
+                    <div class="timeline-body">
+                        <div class="timeline-content">
+                            <div class="change-category" data-type="fixed">
+                                <div class="category-tag tag-fixed">Fixed</div>
+                                <ul class="change-list">
+                                    <li>修正 <code>EditableHostCard</code> 成功连接逻辑（&lt;50ms 恢复绿色显示）。</li>
+                                    <li>解决 TracerouteView 返回按钮在特定情况下的显示异常。</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- v2.1.0-r30 -->
+            <div class="timeline-item animate-fade-in" data-categories="added,updated,fixed">
+                <div class="timeline-dot"></div>
+                <div class="timeline-card">
+                    <div class="timeline-header" onclick="toggleTimeline(this)">
+                        <div class="timeline-header-left">
+                            <span class="timeline-version">v2.1.0-r30</span>
+                            <span class="timeline-date">2026-02-27</span>
+                        </div>
+                        <div class="timeline-toggle">▼</div>
+                    </div>
+                    <div class="timeline-body">
+                        <div class="timeline-content">
+                            <div class="change-category" data-type="fixed">
+                                <div class="category-tag tag-fixed">Fixed</div>
+                                <ul class="change-list">
+                                    <li><strong>Traceroute 权限</strong>：完美解决需要 Root 权限执行的问题。</li>
+                                </ul>
+                            </div>
+                            <div class="change-category" data-type="updated">
+                                <div class="category-tag tag-updated">Updated</div>
+                                <ul class="change-list">
+                                    <li>状态栏支持缩窄至 50 宽度，设置页严格左右对齐。</li>
+                                    <li>监控页顶部常驻快捷访问面板 <code>ServiceShortcutsRibbon</code>。</li>
+                                    <li>网速折线图采用 ECharts 风格平滑贝塞尔曲线及炫光渐变引擎。</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- v2.1.0-r23 -->
+            <div class="timeline-item animate-fade-in" data-categories="fixed">
+                <div class="timeline-dot"></div>
+                <div class="timeline-card">
+                    <div class="timeline-header" onclick="toggleTimeline(this)">
+                        <div class="timeline-header-left">
+                            <span class="timeline-version">v2.1.0-r23</span>
+                            <span class="timeline-date">2026-02-26</span>
+                        </div>
+                        <div class="timeline-toggle">▼</div>
+                    </div>
+                    <div class="timeline-body">
+                        <div class="timeline-content">
+                            <div class="change-category" data-type="fixed">
+                                <div class="category-tag tag-fixed">Fixed</div>
+                                <ul class="change-list">
+                                    <li>引入固定宽度与符号左对齐布局，彻底修复状态栏网速抖动问题。</li>
+                                    <li>清理 Git 仓库日志文件。</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- v2.1.0-r19 -->
+            <div class="timeline-item animate-fade-in" data-categories="added">
+                <div class="timeline-dot"></div>
+                <div class="timeline-card">
+                    <div class="timeline-header" onclick="toggleTimeline(this)">
+                        <div class="timeline-header-left">
+                            <span class="timeline-version">v2.1.0-r19</span>
+                            <span class="timeline-date">2026-02-25</span>
+                        </div>
+                        <div class="timeline-toggle">▼</div>
+                    </div>
+                    <div class="timeline-body">
+                        <div class="timeline-content">
+                            <div class="change-category" data-type="added">
+                                <div class="category-tag tag-added">Added</div>
+                                <ul class="change-list">
+                                    <li><strong>全新状态栏监控</strong>：图标开关、多级间距与字体高度定制、网速流量仪表盘集成。</li>
+                                    <li><strong>SSH 安全连接</strong>：基于 expect 脚本绕过 AppleScript 授权进行密钥/密码认证。</li>
+                                    <li>图表升级与网格组件对齐修复，界面排版引擎重构。</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- v2.0.55-r64 -->
+            <div class="timeline-item animate-fade-in" data-categories="added">
+                <div class="timeline-dot"></div>
+                <div class="timeline-card">
+                    <div class="timeline-header" onclick="toggleTimeline(this)">
+                        <div class="timeline-header-left">
+                            <span class="timeline-version">v2.0.55-r64</span>
+                            <span class="timeline-date">2026-02-24</span>
+                        </div>
+                        <div class="timeline-toggle">▼</div>
+                    </div>
+                    <div class="timeline-body">
+                        <div class="timeline-content">
+                            <div class="change-category" data-type="added">
+                                <div class="category-tag tag-added">Added</div>
+                                <ul class="change-list">
+                                    <li><strong>SSH 增强</strong>：支持用户名/端口/密钥路径配置与实时命令预览。</li>
+                                    <li><strong>NAT 检测</strong>：集成 <code>tailscale netcheck</code>，显示 NAT 类型与 DERP 区域延迟图表。</li>
+                                    <li><strong>小组件修复</strong>：重构 <code>WidgetDataManager</code> 三级回退策略。</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- v2.0.54-r63 -->
+            <div class="timeline-item animate-fade-in" data-categories="added">
+                <div class="timeline-dot"></div>
+                <div class="timeline-card">
+                    <div class="timeline-header" onclick="toggleTimeline(this)">
+                        <div class="timeline-header-left">
+                            <span class="timeline-version">v2.0.54-r63</span>
+                            <span class="timeline-date">2026-02-23</span>
+                        </div>
+                        <div class="timeline-toggle">▼</div>
+                    </div>
+                    <div class="timeline-body">
+                        <div class="timeline-content">
+                            <div class="change-category" data-type="added">
+                                <div class="category-tag tag-added">Added</div>
+                                <ul class="change-list">
+                                    <li><strong>Tailscale 集成</strong>：自动发现私有网络节点，一键导入监控。</li>
+                                    <li><strong>服务快捷方式</strong>：Web/SSH/自定义快捷入口，全局服务面板汇总展示。</li>
+                                    <li>新增 Tailscale 面板与服务面板侧边栏模块。</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- v2.0.53-r62 -->
+            <div class="timeline-item animate-fade-in" data-categories="added,updated">
+                <div class="timeline-dot"></div>
+                <div class="timeline-card">
+                    <div class="timeline-header" onclick="toggleTimeline(this)">
+                        <div class="timeline-header-left">
+                            <span class="timeline-version">v2.0.53-r62</span>
+                            <span class="timeline-date">2026-02-22</span>
+                        </div>
+                        <div class="timeline-toggle">▼</div>
+                    </div>
+                    <div class="timeline-body">
+                        <div class="timeline-content">
+                            <div class="change-category" data-type="updated">
+                                <div class="category-tag tag-updated">Updated</div>
+                                <ul class="change-list">
+                                    <li><strong>3D 饼图</strong>：统计仪表盘引入极具质感的 3D 立体饼图。</li>
+                                    <li><strong>设置页重构</strong>：全面采用 <code>ModernCard</code> 与原生列表结合的卡片式分组设计。</li>
+                                    <li><strong>审计日志</strong>：新增应用设置修改的操作审计跟踪，支持一键导出。</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- v2.0.51-r60 -->
+            <div class="timeline-item animate-fade-in" data-categories="updated,fixed">
+                <div class="timeline-dot"></div>
+                <div class="timeline-card">
+                    <div class="timeline-header" onclick="toggleTimeline(this)">
+                        <div class="timeline-header-left">
+                            <span class="timeline-version">v2.0.51-r60</span>
+                            <span class="timeline-date">2026-02-20</span>
+                        </div>
+                        <div class="timeline-toggle">▼</div>
+                    </div>
+                    <div class="timeline-body">
+                        <div class="timeline-content">
+                            <div class="change-category" data-type="updated">
+                                <div class="category-tag tag-updated">Updated</div>
+                                <ul class="change-list">
+                                    <li>小组件深度优化，重构 <code>WidgetDataManager</code> 实现可靠数据同步。</li>
+                                    <li>全面支持中英文动态切换。</li>
+                                    <li>优化 Dashboard 布局与趋势图平滑度。</li>
+                                </ul>
+                            </div>
+                            <div class="change-category" data-type="fixed">
+                                <div class="category-tag tag-fixed">Fixed</div>
+                                <ul class="change-list">
+                                    <li>修复"无数据"小组件显示问题。</li>
+                                    <li>增强 Traceroute/MTR 稳定性。</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- v2.0.40-r41 -->
+            <div class="timeline-item animate-fade-in" data-categories="added,updated">
+                <div class="timeline-dot"></div>
+                <div class="timeline-card">
+                    <div class="timeline-header" onclick="toggleTimeline(this)">
+                        <div class="timeline-header-left">
+                            <span class="timeline-version">v2.0.40-r41</span>
+                            <span class="timeline-date">2026-02-18</span>
+                        </div>
+                        <div class="timeline-toggle">▼</div>
+                    </div>
+                    <div class="timeline-body">
+                        <div class="timeline-content">
+                            <div class="change-category" data-type="added">
+                                <div class="category-tag tag-added">Added</div>
+                                <ul class="change-list">
+                                    <li>3D 环形统计图、实时内存监控。</li>
+                                    <li>Dashboard 布局优化，本地化完善。</li>
+                                    <li>侧边栏显示 macOS 用户名。</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- v2.0.25-r26 -->
+            <div class="timeline-item animate-fade-in" data-categories="added">
+                <div class="timeline-dot"></div>
+                <div class="timeline-card">
+                    <div class="timeline-header" onclick="toggleTimeline(this)">
+                        <div class="timeline-header-left">
+                            <span class="timeline-version">v2.0.25-r26</span>
+                            <span class="timeline-date">2026-02-15</span>
+                        </div>
+                        <div class="timeline-toggle">▼</div>
+                    </div>
+                    <div class="timeline-body">
+                        <div class="timeline-content">
+                            <div class="change-category" data-type="added">
+                                <div class="category-tag tag-added">Added</div>
+                                <ul class="change-list">
+                                    <li><strong>UI 全面重构</strong>：侧边栏导航、Bézier 曲线图表、渐变卡片、迷你趋势图、小组件重新设计。</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- v2.0.20-r21 -->
+            <div class="timeline-item animate-fade-in" data-categories="added">
+                <div class="timeline-dot"></div>
+                <div class="timeline-card">
+                    <div class="timeline-header" onclick="toggleTimeline(this)">
+                        <div class="timeline-header-left">
+                            <span class="timeline-version">v2.0.20-r21</span>
+                            <span class="timeline-date">2026-02-12</span>
+                        </div>
+                        <div class="timeline-toggle">▼</div>
+                    </div>
+                    <div class="timeline-body">
+                        <div class="timeline-content">
+                            <div class="change-category" data-type="added">
+                                <div class="category-tag tag-added">Added</div>
+                                <ul class="change-list">
+                                    <li>连续 Ping 模式与数据统计功能上线。</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            <div class="footer-inner">
+                <div>
+                    <div class="footer-brand">PingMonitor</div>
+                    <p class="footer-desc">The native heartbeat of your network. Built with pure Swift for macOS.</p>
+                </div>
+                <div class="footer-col">
+                    <h5>Product</h5>
+                    <a href="https://github.com/framecy/Ping-Monitor/releases/latest">Download</a>
+                    <a href="changelog.html">Changelog</a>
+                    <a href="index.html#features">Features</a>
+                </div>
+                <div class="footer-col">
+                    <h5>Resources</h5>
+                    <a href="https://github.com/framecy/Ping-Monitor" target="_blank" rel="noopener">GitHub</a>
+                    <a href="https://github.com/framecy/Ping-Monitor/issues" target="_blank" rel="noopener">Issues</a>
+                    <a href="https://github.com/framecy/Ping-Monitor/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <span>PingMonitor &copy; 2026</span>
+                <span>Built with ❤️ for macOS</span>
+            </div>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
