@@ -1180,14 +1180,18 @@ struct HostManagementTab: View {
     @ObservedObject var viewModel: PingMonitorViewModel
     @State private var selectedSection = 0
     @ObservedObject private var languageManager = LanguageManager.shared
+    @Namespace private var animation
     
     var body: some View {
         VStack(spacing: 0) {
-            Picker("", selection: $selectedSection) {
-                Text("\(languageManager.t("host.manage.section.saved")) (\(viewModel.hosts.count))").tag(0)
-                Text("\(languageManager.t("host.manage.section.presets")) (\(viewModel.presets.count))").tag(1)
+            // Custom Segmented Control
+            HStack(spacing: 0) {
+                customTabButton(title: "\(languageManager.t("host.manage.section.saved")) (\(viewModel.hosts.count))", section: 0)
+                customTabButton(title: "\(languageManager.t("host.manage.section.presets")) (\(viewModel.presets.count))", section: 1)
             }
-            .pickerStyle(.segmented)
+            .padding(4)
+            .background(Theme.Colors.cardBackground)
+            .cornerRadius(8)
             .padding()
             
             if selectedSection == 0 {
@@ -1196,6 +1200,34 @@ struct HostManagementTab: View {
                 PresetsManagementView(viewModel: viewModel)
             }
         }
+    }
+    
+    @ViewBuilder
+    private func customTabButton(title: String, section: Int) -> some View {
+        Button {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                selectedSection = section
+            }
+        } label: {
+            Text(title)
+                .font(Theme.Fonts.body(12))
+                .fontWeight(selectedSection == section ? .medium : .regular)
+                .foregroundStyle(selectedSection == section ? Color.white : Theme.Colors.textSecondary)
+                .padding(.vertical, 6)
+                .padding(.horizontal, 16)
+                .frame(maxWidth: .infinity)
+                .background(
+                    ZStack {
+                        if selectedSection == section {
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(Theme.Colors.accentBlue)
+                                .matchedGeometryEffect(id: "HostManageTabBackground", in: animation)
+                        }
+                    }
+                )
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
 

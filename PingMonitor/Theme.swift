@@ -32,7 +32,7 @@ struct Theme {
             })
         }
         
-        static let accentBlue = Color(hex: "007AFF")
+        static let accentBlue = Color(hex: "4b5cc4")
         static let accentGreen = Color(hex: "34C759")
         static let accentPurple = Color(hex: "AF52DE")
         static let accentOrange = Color(hex: "FF9500")

@@ -14,7 +14,6 @@ struct DashboardView: View {
                     NetworkStatusCard(viewModel: viewModel)
                         .gridCellColumns(1)
                 }
-                .frame(minHeight: 180)
                 
                 // Row 2: Traffic Stats & Traffic Trend
                 GridRow {
@@ -23,7 +22,6 @@ struct DashboardView: View {
                     TrafficTrendCard(viewModel: viewModel)
                         .gridCellColumns(1)
                 }
-                .frame(minHeight: 220)
                 
                 // Row 3: Summary & Ranking
                 GridRow {
@@ -32,7 +30,6 @@ struct DashboardView: View {
                     RankingListCard(viewModel: viewModel)
                         .gridCellColumns(1)
                 }
-                .frame(minHeight: 220)
             }
             .padding(Theme.Layout.cardPadding)
         }
@@ -128,6 +125,7 @@ struct RunningStatusCard: View {
                     }
                 }
             }
+            .frame(minHeight: 180, maxHeight: .infinity)
         }
     }
 }
@@ -230,6 +228,7 @@ struct NetworkStatusCard: View {
                          .foregroundStyle(Theme.Colors.textTertiary)
                 }
             }
+            .frame(minHeight: 180, maxHeight: .infinity)
         }
     }
 }
@@ -272,7 +271,7 @@ struct TrafficAndLatencyCard: View {
                                 x: .value("Index", index),
                                 y: .value("Latency", latency)
                             )
-                            .interpolationMethod(.catmullRom)
+                            .interpolationMethod(.monotone)
                             .foregroundStyle(
                                 .linearGradient(
                                     colors: [Theme.Colors.accentBlue, Theme.Colors.accentPurple],
@@ -285,7 +284,7 @@ struct TrafficAndLatencyCard: View {
                                 x: .value("Index", index),
                                 y: .value("Latency", latency)
                             )
-                            .interpolationMethod(.catmullRom)
+                            .interpolationMethod(.monotone)
                             .foregroundStyle(
                                 .linearGradient(
                                     colors: [Theme.Colors.accentBlue.opacity(0.3), Theme.Colors.accentBlue.opacity(0.0)],
@@ -295,6 +294,7 @@ struct TrafficAndLatencyCard: View {
                             )
                         }
                     }
+                    .animation(.easeInOut, value: avgLatencyHistory)
                     .chartYAxis {
                         AxisMarks(position: .leading) { value in
                             AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [5, 5]))
@@ -311,6 +311,7 @@ struct TrafficAndLatencyCard: View {
                      }
                 }
             }
+            .frame(minHeight: 220, maxHeight: .infinity)
         }
     }
 }
@@ -372,6 +373,7 @@ struct TrafficTrendCard: View {
                                 .foregroundStyle(Theme.Colors.accentBlue)
                         }
                 }
+                .animation(.easeInOut, value: data)
                  .chartYAxis(.hidden)
                  .chartXAxis {
                      AxisMarks { value in
@@ -381,6 +383,7 @@ struct TrafficTrendCard: View {
                      }
                  }
             }
+            .frame(minHeight: 220, maxHeight: .infinity)
         }
     }
 }
@@ -435,6 +438,7 @@ struct SummaryDonutCard: View {
                         .foregroundStyle(slice.color)
                         .cornerRadius(3)
                     }
+                    .animation(.easeInOut, value: slices.map { $0.count })
                     .chartLegend(.hidden)
                     .frame(height: 120)
                     
@@ -478,7 +482,7 @@ struct SummaryDonutCard: View {
                 
                 Spacer(minLength: 0)
             }
-            .frame(maxHeight: .infinity)
+            .frame(minHeight: 220, maxHeight: .infinity)
         }
     }
 }
@@ -593,7 +597,7 @@ struct RankingListCard: View {
                 }
                 Spacer(minLength: 0)
             }
-            .frame(maxHeight: .infinity)
+            .frame(minHeight: 220, maxHeight: .infinity)
         }
     }
 }

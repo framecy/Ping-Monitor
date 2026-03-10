@@ -295,7 +295,7 @@ struct HostDetailView: View {
                                 x: .value("Time", index),
                                 y: .value("Latency", point.latency)
                             )
-                            .interpolationMethod(.catmullRom)
+                            .interpolationMethod(.monotone)
                             .foregroundStyle(
                                 .linearGradient(
                                     colors: [Theme.Colors.accentBlue, Theme.Colors.accentPurple],
@@ -308,7 +308,7 @@ struct HostDetailView: View {
                                 x: .value("Time", index),
                                 y: .value("Latency", point.latency)
                             )
-                            .interpolationMethod(.catmullRom)
+                            .interpolationMethod(.monotone)
                             .foregroundStyle(
                                 .linearGradient(
                                     colors: [Theme.Colors.accentBlue.opacity(0.25), Theme.Colors.accentBlue.opacity(0.0)],
@@ -330,6 +330,7 @@ struct HostDetailView: View {
                                 }
                         }
                     }
+                    .animation(.easeInOut, value: recent.map { $0.latency })
                     .chartYAxis {
                         AxisMarks(position: .leading) { value in
                             AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [4, 4]))
@@ -408,6 +409,7 @@ struct HostDetailView: View {
                                 .fill(successRateColor)
                                 .frame(width: geo.size.width * CGFloat((stats?.successRate ?? 0) / 100.0))
                         }
+                        .animation(.easeInOut, value: stats?.successRate)
                     }
                     .frame(height: 6)
                     

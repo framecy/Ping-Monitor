@@ -52,6 +52,44 @@ struct TrafficSnapshot: Codable, Identifiable {
     let speedOut: Double
 }
 
+// MARK: - Process Network Data
+
+struct ProcessNetworkInfo: Identifiable {
+    let id = UUID()
+    let pid: Int32
+    let processName: String
+    let user: String
+    let fileDescriptor: String
+    let protocolType: String  // TCP, UDP
+    let localAddress: String
+    let localPort: String
+    let remoteAddress: String
+    let remotePort: String
+    let state: String  // ESTABLISHED, LISTEN, CLOSE_WAIT, etc.
+}
+
+struct ProcessSummary: Identifiable {
+    let id: Int32  // PID
+    let pid: Int32
+    let processName: String
+    let user: String
+    var connections: [ProcessNetworkInfo]
+    
+    var connectionCount: Int { connections.count }
+    
+    var protocols: Set<String> {
+        Set(connections.map { $0.protocolType })
+    }
+    
+    var listeningPorts: [String] {
+        connections.filter { $0.state == "LISTEN" }.map { $0.localPort }
+    }
+    
+    var establishedCount: Int {
+        connections.filter { $0.state == "ESTABLISHED" }.count
+    }
+}
+
 // MARK: - Network Speed Manager
 
 @MainActor
@@ -68,9 +106,12 @@ class NetworkSpeedManager: ObservableObject {
     @Published var isMonitoring = false
     @Published var refreshInterval: TimeInterval = 1.0
     @Published var trafficHistory: [TrafficSnapshot] = []
+    @Published var processList: [ProcessSummary] = []
+    @Published var isProcessMonitoring = false
     
     private var timer: Timer?
     private var snapshotTimer: Timer?
+    private var processTimer: Timer?
     private var previousStats: [String: (bytesIn: UInt64, bytesOut: UInt64)] = [:]
     private var previousTimestamp: Date?
     private let maxHistoryCount = 60
@@ -128,6 +169,215 @@ class NetworkSpeedManager: ObservableObject {
         saveTrafficSnapshot() // Save final snapshot
     }
     
+    // MARK: - Process Monitoring
+    
+    func startProcessMonitoring() {
+        guard !isProcessMonitoring else { return }
+        isProcessMonitoring = true
+        refreshProcessList()
+        processTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.refreshProcessList()
+            }
+        }
+    }
+    
+    func stopProcessMonitoring() {
+        processTimer?.invalidate()
+        processTimer = nil
+        isProcessMonitoring = false
+    }
+    
+    func refreshProcessList() {
+        let connections = parseLsof()
+        // Group by PID
+        var grouped: [Int32: ProcessSummary] = [:]
+        for conn in connections {
+            if var existing = grouped[conn.pid] {
+                existing.connections.append(conn)
+                grouped[conn.pid] = existing
+            } else {
+                grouped[conn.pid] = ProcessSummary(
+                    id: conn.pid,
+                    pid: conn.pid,
+                    processName: conn.processName,
+                    user: conn.user,
+                    connections: [conn]
+                )
+            }
+        }
+        // Sort by connection count descending, then by name
+        processList = Array(grouped.values).sorted {
+            if $0.connectionCount != $1.connectionCount {
+                return $0.connectionCount > $1.connectionCount
+            }
+            return $0.processName.localizedCaseInsensitiveCompare($1.processName) == .orderedAscending
+        }
+    }
+    
+    private func parseLsof() -> [ProcessNetworkInfo] {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/sbin/lsof")
+        process.arguments = ["-i", "-n", "-P"]
+        
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = Pipe()
+        
+        do {
+            try process.run()
+            process.waitUntilExit()
+            
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            guard let output = String(data: data, encoding: .utf8) else { return [] }
+            return parseLsofOutput(output)
+        } catch {
+            return []
+        }
+    }
+    
+    private func parseLsofOutput(_ output: String) -> [ProcessNetworkInfo] {
+        var results: [ProcessNetworkInfo] = []
+        let lines = output.components(separatedBy: "\n")
+        
+        for line in lines.dropFirst() { // Skip header
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.isEmpty else { continue }
+            
+            // lsof -i -n -P output columns:
+            // COMMAND  PID  USER  FD  TYPE  DEVICE  SIZE/OFF  NODE  NAME
+            let parts = trimmed.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
+            guard parts.count >= 9 else { continue }
+            
+            let command = parts[0]
+            guard let pid = Int32(parts[1]) else { continue }
+            let user = parts[2]
+            let fd = parts[3]
+            let node = parts[7]  // TCP or UDP
+            let nameField = parts[8...].joined(separator: " ")
+            
+            // Parse the NAME field
+            var localAddr = ""
+            var localPort = ""
+            var remoteAddr = ""
+            var remotePort = ""
+            var state = ""
+            
+            // Extract state from parentheses
+            if let stateRange = nameField.range(of: #"\(([^)]+)\)"#, options: .regularExpression) {
+                state = String(nameField[stateRange]).replacingOccurrences(of: "(", with: "").replacingOccurrences(of: ")", with: "")
+            }
+            
+            // Remove the state part for address parsing
+            let addrPart = nameField.replacingOccurrences(of: #"\s*\([^)]*\)"#, with: "", options: .regularExpression)
+            
+            if addrPart.contains("->") {
+                // Connection: local->remote
+                let sides = addrPart.components(separatedBy: "->")
+                if sides.count == 2 {
+                    (localAddr, localPort) = splitAddressPort(sides[0])
+                    (remoteAddr, remotePort) = splitAddressPort(sides[1])
+                }
+            } else {
+                // Listening or single address
+                (localAddr, localPort) = splitAddressPort(addrPart)
+                if state.isEmpty { state = node == "TCP" ? "LISTEN" : "" }
+            }
+            
+            // Skip kernel/launchd noise with no useful info
+            guard !localAddr.isEmpty || !remoteAddr.isEmpty else { continue }
+            
+            // Handle edge case of UDP *:* which maps to * and *
+            if localAddr == "*" && localPort == "*" {
+                localPort = ""
+            }
+            if remoteAddr == "*" && remotePort == "*" {
+                remotePort = ""
+            }
+            
+            results.append(ProcessNetworkInfo(
+                pid: pid,
+                processName: command,
+                user: user,
+                fileDescriptor: fd,
+                protocolType: node,
+                localAddress: localAddr,
+                localPort: localPort,
+                remoteAddress: remoteAddr,
+                remotePort: remotePort,
+                state: state
+            ))
+        }
+        
+        return results
+    }
+    
+    private func splitAddressPort(_ str: String) -> (String, String) {
+        // IPv6: [::1]:8080 or *:8080 or 127.0.0.1:8080
+        let s = str.trimmingCharacters(in: .whitespaces)
+        if s.hasPrefix("[") {
+            // IPv6 bracketed
+            if let closeBracket = s.firstIndex(of: "]") {
+                let addr = String(s[s.index(after: s.startIndex)..<closeBracket])
+                let afterBracket = s[s.index(after: closeBracket)...]
+                if afterBracket.hasPrefix(":") {
+                    let port = String(afterBracket.dropFirst())
+                    return (addr, port)
+                }
+                return (addr, "")
+            }
+        }
+        // Regular: find last colon
+        if let lastColon = s.lastIndex(of: ":") {
+            let addr = String(s[s.startIndex..<lastColon])
+            let port = String(s[s.index(after: lastColon)...])
+            return (addr, port)
+        }
+        return (s, "")
+    }
+    
+    func killProcess(pid: Int32, completion: @escaping (Bool) -> Void) {
+        // First try SIGTERM
+        let result = kill(pid, SIGTERM)
+        if result == 0 {
+            LogManager.shared.info("Terminated process PID \(pid)")
+            // Wait a moment then refresh
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                self?.refreshProcessList()
+                completion(true)
+            }
+            return
+        }
+        
+        // If SIGTERM fails (e.g. permission denied), try with privilege escalation
+        let script = "do shell script \"kill -9 \(pid)\" with administrator privileges"
+        let appleScript = Process()
+        appleScript.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        appleScript.arguments = ["-e", script]
+        
+        let errPipe = Pipe()
+        appleScript.standardError = errPipe
+        appleScript.standardOutput = Pipe()
+        
+        do {
+            try appleScript.run()
+            appleScript.waitUntilExit()
+            if appleScript.terminationStatus == 0 {
+                LogManager.shared.info("Force-terminated process PID \(pid) with admin privileges")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                    self?.refreshProcessList()
+                    completion(true)
+                }
+            } else {
+                LogManager.shared.error("Failed to terminate PID \(pid)")
+                completion(false)
+            }
+        } catch {
+            LogManager.shared.error("Failed to run kill script: \(error)")
+            completion(false)
+        }
+    }
+    
     private func fetchStats() {
         let currentStats = parseNetstat()
         let now = Date()
@@ -163,8 +413,11 @@ class NetworkSpeedManager: ObservableObject {
             // Calculate totals based on selection
             let selectedIfaces: [NetworkInterfaceStats]
             if selectedInterface == "all" {
-                // Exclude loopback
-                selectedIfaces = interfaces.filter { !$0.name.starts(with: "lo") }
+                // Exclude loopback and virtual/tunnel interfaces to prevent double-counting VPN traffic
+                let virtualPrefixes = ["lo", "utun", "ipsec", "awdl", "llw", "gif", "stf", "bridge"]
+                selectedIfaces = interfaces.filter { iface in
+                    !virtualPrefixes.contains(where: { iface.name.starts(with: $0) })
+                }
             } else {
                 selectedIfaces = interfaces.filter { $0.id == selectedInterface }
             }
