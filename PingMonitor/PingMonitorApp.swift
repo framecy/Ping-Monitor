@@ -73,11 +73,14 @@ struct HostStats: Codable, Identifiable {
         return formatBytes(total)
     }
     
+    private static let byteCountFormatter: ByteCountFormatter = {
+        let f = ByteCountFormatter()
+        f.allowedUnits = [.useBytes, .useKB, .useMB, .useGB]
+        f.countStyle = .file
+        return f
+    }()
     private func formatBytes(_ bytes: Int64) -> String {
-        let formatter = ByteCountFormatter()
-        formatter.allowedUnits = [.useBytes, .useKB, .useMB, .useGB]
-        formatter.countStyle = .file
-        return formatter.string(fromByteCount: bytes)
+        HostStats.byteCountFormatter.string(fromByteCount: bytes)
     }
 }
 
@@ -106,10 +109,13 @@ class LogManager: ObservableObject {
         let message: String
         let host: String?
         
+        private static let timestampFormatter: DateFormatter = {
+            let f = DateFormatter()
+            f.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
+            return f
+        }()
         var formattedTimestamp: String {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
-            return formatter.string(from: timestamp)
+            LogEntry.timestampFormatter.string(from: timestamp)
         }
     }
     
@@ -240,6 +246,11 @@ class PingMonitorViewModel: ObservableObject {
     var statusBarController: StatusBarController?
     private var pingProcesses: [UUID: Process] = [:]
     private let defaults = UserDefaults.standard
+    private static let pingRegexes: [NSRegularExpression] = [
+        try! NSRegularExpression(pattern: #"time[=<>](\d+\.?\d*)\s*ms"#, options: .caseInsensitive),
+        try! NSRegularExpression(pattern: #"time[=<>](\d+)"#, options: .caseInsensitive),
+    ]
+    private var widgetSyncTask: Task<Void, Never>?
 
     init() {
         loadSettings()
@@ -383,8 +394,8 @@ class PingMonitorViewModel: ObservableObject {
         LogManager.shared.info("Starting all monitors")
         isRunning = true
         
-        for i in hosts.indices {
-            startPingProcess(for: hosts[i], at: i)
+        for host in hosts {
+            startPingProcess(for: host)
         }
         
         saveSettings()
@@ -468,9 +479,7 @@ class PingMonitorViewModel: ObservableObject {
         hostStats[hostId] = stats
     }
     
-    func startPingProcess(for host: HostConfig, at index: Int) {
-        guard index < hosts.count else { return }
-        
+    func startPingProcess(for host: HostConfig) {
         let hostName = host.name
         let address = host.address.trimmingCharacters(in: .whitespacesAndNewlines)
         let customCommand = host.command.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -509,22 +518,26 @@ class PingMonitorViewModel: ObservableObject {
             let data = handle.availableData
             guard let output = String(data: data, encoding: .utf8),
                   !output.isEmpty else { return }
-            
+
             output.enumerateLines { line, _ in
                 Task { @MainActor [weak self] in
-                    self?.parsePingLine(line, for: index, hostName: hostName)
+                    self?.parsePingLine(line, hostId: hostId, hostName: hostName)
                 }
             }
         }
-        
+
         do {
             try process.run()
-            hosts[index].isChecking = true
+            if let idx = hosts.firstIndex(where: { $0.id == hostId }) {
+                hosts[idx].isChecking = true
+            }
             LogManager.shared.debug("Ping process started for \(hostName)", host: hostName)
         } catch {
             LogManager.shared.error("Failed to start ping: \(error)", host: hostName)
-            hosts[index].isChecking = false
-            hosts[index].isReachable = false
+            if let idx = hosts.firstIndex(where: { $0.id == hostId }) {
+                hosts[idx].isChecking = false
+                hosts[idx].isReachable = false
+            }
         }
         
         process.terminationHandler = { [weak self] process in
@@ -541,50 +554,36 @@ class PingMonitorViewModel: ObservableObject {
         }
     }
     
-    private func parsePingLine(_ line: String, for index: Int, hostName: String) {
-        guard index < hosts.count else { return }
-        let hostId = hosts[index].id
-        
-        let patterns = [
-            #"time[=<>](\d+\.?\d*)\s*ms"#,
-            #"time[=<>](\d+)"#,
-        ]
-        
-        for pattern in patterns {
-            if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
-               let match = regex.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)) {
-                if let timeRange = Range(match.range(at: 1), in: line) {
-                    let timeStr = String(line[timeRange])
-                    if let latency = Double(timeStr) {
-                        DispatchQueue.main.async { [weak self] in
-                            guard let self = self, index < self.hosts.count else { return }
-                            self.hosts[index].lastLatency = latency
-                            self.hosts[index].isReachable = true
-                            self.hosts[index].isChecking = false
-                            
-                            self.updateStats(for: hostId, latency: latency, success: true)
-                            
-                            if self.notificationEnabled {
-                                self.checkNotification(host: self.hosts[index])
-                            }
-                            
-                            self.syncToWidget()
-                        }
-                        return
+    private func parsePingLine(_ line: String, hostId: UUID, hostName: String) {
+        for regex in Self.pingRegexes {
+            if let match = regex.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)),
+               let timeRange = Range(match.range(at: 1), in: line),
+               let latency = Double(String(line[timeRange])) {
+                DispatchQueue.main.async { [weak self] in
+                    guard let self = self,
+                          let idx = self.hosts.firstIndex(where: { $0.id == hostId }) else { return }
+                    self.hosts[idx].lastLatency = latency
+                    self.hosts[idx].isReachable = true
+                    self.hosts[idx].isChecking = false
+                    self.updateStats(for: hostId, latency: latency, success: true)
+                    if self.notificationEnabled {
+                        self.checkNotification(host: self.hosts[idx])
                     }
+                    self.debouncedSyncToWidget()
                 }
+                return
             }
         }
-        
         if line.contains("Request timeout") || line.contains("No route to host") || line.contains("100% packet loss") {
             DispatchQueue.main.async { [weak self] in
-                guard let self = self, index < self.hosts.count else { return }
-                self.hosts[index].isReachable = false
+                guard let self = self,
+                      let idx = self.hosts.firstIndex(where: { $0.id == hostId }) else { return }
+                self.hosts[idx].isReachable = false
                 self.updateStats(for: hostId, latency: nil, success: false)
                 if self.notificationEnabled {
-                    self.checkNotification(host: self.hosts[index])
+                    self.checkNotification(host: self.hosts[idx])
                 }
-                self.syncToWidget()
+                self.debouncedSyncToWidget()
             }
         }
     }
@@ -665,7 +664,15 @@ class PingMonitorViewModel: ObservableObject {
         
         WidgetCenter.shared.reloadAllTimelines()
     }
-    
+
+    private func debouncedSyncToWidget() {
+        widgetSyncTask?.cancel()
+        widgetSyncTask = Task {
+            try? await Task.sleep(for: .seconds(5))
+            if !Task.isCancelled { syncToWidget() }
+        }
+    }
+
     private func createWidgetStatus(for host: HostConfig) -> WidgetData.HostStatus {
         let latency = host.lastLatency ?? 0
         let color: String
@@ -783,9 +790,7 @@ class PingMonitorViewModel: ObservableObject {
         LogManager.shared.info("Added host: \(name) (\(address))")
         
         if isRunning {
-            if let index = hosts.firstIndex(where: { $0.id == newHost.id }) {
-                startPingProcess(for: hosts[index], at: index)
-            }
+            startPingProcess(for: newHost)
         }
     }
 
@@ -829,7 +834,7 @@ class PingMonitorViewModel: ObservableObject {
         LogManager.shared.info("Updated host: \(oldName) -> \(name)")
         
         if needRestart && isRunning {
-            startPingProcess(for: hosts[index], at: index)
+            startPingProcess(for: hosts[index])
         }
     }
     
@@ -864,9 +869,7 @@ class PingMonitorViewModel: ObservableObject {
         LogManager.shared.info("Added host from preset: \(preset.name)")
         
         if isRunning {
-            if let index = hosts.firstIndex(where: { $0.name == preset.name && $0.address == preset.address }) {
-                startPingProcess(for: hosts[index], at: index)
-            }
+            startPingProcess(for: newHost)
         }
     }
     
