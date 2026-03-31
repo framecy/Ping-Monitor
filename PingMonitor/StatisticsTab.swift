@@ -181,7 +181,7 @@ struct AggregatedStats {
         return formatBytes(total)
     }
 
-    private static let byteCountFormatter: ByteCountFormatter = {
+    nonisolated(unsafe) private static let byteCountFormatter: ByteCountFormatter = {
         let f = ByteCountFormatter()
         f.allowedUnits = [.useBytes, .useKB, .useMB, .useGB]
         f.countStyle = .file
@@ -596,7 +596,7 @@ struct DetailedStatsView: View {
         )
     }
 
-    private static let byteCountFormatter: ByteCountFormatter = {
+    nonisolated(unsafe) private static let byteCountFormatter: ByteCountFormatter = {
         let f = ByteCountFormatter()
         f.allowedUnits = [.useBytes, .useKB, .useMB, .useGB]
         f.countStyle = .file

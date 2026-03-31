@@ -13,7 +13,7 @@
   <img src="https://img.shields.io/badge/platform-macOS%2014.0+-blue" alt="Platform">
   <img src="https://img.shields.io/badge/SwiftUI-6.0-orange" alt="SwiftUI">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/version-2.1.0--r36-brightgreen" alt="Version">
+  <img src="https://img.shields.io/badge/version-2.1.1--R9-brightgreen" alt="Version">
 </p>
 
 <p align="center">
@@ -156,22 +156,36 @@
 ```
 PingMonitor/
 ├── PingMonitor/
-│   ├── PingMonitorApp.swift      # 应用入口、数据模型、ViewModel
-│   ├── MainView.swift            # 主视图与标签页
-│   ├── DashboardView.swift       # 统计仪表盘（3D 饼图、趋势卡片）
-│   ├── SidebarView.swift         # 自定义侧边栏导航
-│   ├── EditableHostCard.swift    # 主机卡片组件
-│   ├── Components.swift          # 通用 UI 组件
-│   ├── Theme.swift               # 设计系统（颜色、字体、布局）
-│   ├── LanguageManager.swift     # 中英多语言管理
+│   ├── PingMonitorApp.swift        # 应用入口、数据模型、ViewModel、StatusBarController
+│   ├── MainView.swift              # 主视图路由与侧边栏导航
+│   ├── MonitorTab.swift            # 监控 Tab、快捷服务面板、Sparkline 组件
+│   ├── StatisticsTab.swift         # 统计 Tab、延迟图表、聚合统计
+│   ├── DashboardView.swift         # 统计仪表盘（3D 饼图、趋势卡片）
+│   ├── HostManagementTab.swift     # 主机/预设管理、编辑 Sheet
+│   ├── HostDetailView.swift        # 主机详情页（图表、丢包、流量）
+│   ├── SettingsTab.swift           # 设置 Tab（状态栏、Widget、通知）
+│   ├── LogsTab.swift               # 日志 Tab、日志导出
+│   ├── SidebarView.swift           # 自定义侧边栏导航
+│   ├── EditableHostCard.swift      # 主机卡片组件
+│   ├── TracerouteManager.swift     # 路由追踪逻辑与地理定位
+│   ├── TracerouteView.swift        # 路由追踪 UI（地图、跳点表）
+│   ├── TailscaleManager.swift      # Tailscale VPN 集成
+│   ├── TailscaleTab.swift          # Tailscale Tab UI
+│   ├── NetworkSpeedManager.swift   # 网速监控（接口/进程级）
+│   ├── NetworkSpeedTab.swift       # 网速 Tab UI
+│   ├── ServicesTab.swift           # 服务快捷方式面板
+│   ├── WidgetDataManager.swift     # Widget 数据同步（三级回退）
+│   ├── Components.swift            # 通用 UI 组件（ModernCard 等）
+│   ├── Theme.swift                 # 设计系统（颜色、字体、布局）
+│   ├── Localization.swift          # 中英多语言管理
 │   ├── Info.plist
 │   ├── PingMonitor.entitlements
-│   └── Assets.xcassets/          # 应用图标
+│   └── Assets.xcassets/            # 应用图标
 ├── PingMonitorWidget/
-│   ├── PingMonitorWidget.swift   # 桌面小组件（小/中/大）
+│   ├── PingMonitorWidget.swift     # 桌面小组件（小/中/大）
 │   └── Info.plist
-├── project.yml                   # XcodeGen 工程配置
-└── build.sh                      # 自动化打包脚本
+├── project.yml                     # XcodeGen 工程配置
+└── build.sh                        # 自动化打包脚本
 ```
 
 ---
@@ -240,6 +254,7 @@ AUTO_VERSION=false
 
 | 版本 | 构建 | 更新内容 |
 |------|------|---------|
+| v2.1.1 | R9 | **性能优化与代码重构**：缓存正则表达式与 DateFormatter/ByteCountFormatter 静态实例，消除高频路径重复创建开销；Widget 同步节流（5s 防抖），减少 90%+ 无效文件 IO；Ping 主机追踪从 index 改为 UUID 查找，消除列表变更时的数据错位风险；将 MainView.swift（2444 行）拆分为 5 个独立文件（MonitorTab / StatisticsTab / HostManagementTab / LogsTab / SettingsTab），大幅提升可维护性 |
 | v2.1.1 | R6 | **小组件终极修复**：严格适配 macOS 沙盒强制规范与本地开发者实体证书深度签名，打通主应用/小组件的双向 App Group 数据通讯，彻底解决了组件画廊找不到应用的问题；**性能与UI进阶**：默认拉长探测间隔至10秒护航内存与系统负载，全面修复了主机规则编辑器不堪入目的排版错位，监控大盘服务快捷键重构为流式网格完整展示；图表引擎全面换装渐变底色填充色块及阶梯式警示色调（百兆内长绿，100-300橙，三百红） |
 | v2.1.1 | R2 | **UI 布局深度修复**：彻底解决了显示规则编辑器的组件对齐问题，新增「显示文本」固定标签；**默认值校正**：修复了添加主机时规则列表为空的 Bug，现在默认自动填充（<50ms Direct, >100ms Relay） |
 | v2.1.1 | R1 | **交互与功能增强**：实现监控主机拖拽排序；新增 Tailscale 快捷命令面板与 Exit Node 状态标识；适配完整的浅色/深色模式设计系统 |

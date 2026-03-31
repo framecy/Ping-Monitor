@@ -8,8 +8,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "6.0"
-    MARKETING_VERSION: "2.1.1-R7"
-    CURRENT_PROJECT_VERSION: "107"
+    MARKETING_VERSION: "2.1.1-R9"
+    CURRENT_PROJECT_VERSION: "109"
 
 targets:
   PingMonitor:

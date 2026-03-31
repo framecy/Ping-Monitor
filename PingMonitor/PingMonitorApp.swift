@@ -73,7 +73,7 @@ struct HostStats: Codable, Identifiable {
         return formatBytes(total)
     }
     
-    private static let byteCountFormatter: ByteCountFormatter = {
+    nonisolated(unsafe) private static let byteCountFormatter: ByteCountFormatter = {
         let f = ByteCountFormatter()
         f.allowedUnits = [.useBytes, .useKB, .useMB, .useGB]
         f.countStyle = .file

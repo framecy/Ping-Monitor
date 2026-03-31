@@ -15,11 +15,16 @@
 		3330EB9A488B83DBABE5AD53 /* PingMonitorApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E41F61BD4463C6191AD4EDE /* PingMonitorApp.swift */; };
 		33AD6AB75AE993FC3E52C539 /* TracerouteManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F8FBCAF71E64AA07B49E06E /* TracerouteManager.swift */; };
 		4C3C437301B189F841D93F10 /* WidgetDataManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C62A376D664EEDA030D950E1 /* WidgetDataManager.swift */; };
+		5A262CAF8C8428D2BCDCB753 /* SettingsTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51C489995006DCC9CF19C9D9 /* SettingsTab.swift */; };
 		5BF5E72CF22CF7843AFC6FEB /* HostDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFBB594A7F65924059D8AAE0 /* HostDetailView.swift */; };
 		63114EF0657645E84EDDEA9F /* NetworkSpeedManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474327D7C84A6AAE5A807E5C /* NetworkSpeedManager.swift */; };
+		763CDE358B75FFF49838014C /* StatisticsTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6E0366905953915776F60ED /* StatisticsTab.swift */; };
+		7C58225895805D58D2BA65FA /* LogsTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7B9D44A9B395C035410B2D4 /* LogsTab.swift */; };
 		803F6C9D4A09CECABE3CABA8 /* ServicesTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEBAD6B6485D09287CF9324F /* ServicesTab.swift */; };
 		8F84DCCB37A985B1311F07CD /* PingMonitorWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0474E749B23CD3D59A534A02 /* PingMonitorWidget.swift */; };
 		A06242D4A433449AF55BF13F /* NetworkSpeedTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FD92B08785B04290AABFFA4 /* NetworkSpeedTab.swift */; };
+		A396854E7B48B6D1D69F1D1A /* HostManagementTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34899BDE60F60F8D02C2B09C /* HostManagementTab.swift */; };
+		AB06603AEA7A327A15C7978B /* MonitorTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58DA7B279477222AB1BE15DA /* MonitorTab.swift */; };
 		ACAE48593119B446A7CAF1E8 /* EditableHostCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCE2F25F03FD5A086CB489B3 /* EditableHostCard.swift */; };
 		AE4DFB14EB5C0241FFF90C09 /* PingMonitorWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 019A9A5FF0AE2400BEA630D5 /* PingMonitorWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		BD2D2F8996970A91AA479273 /* TailscaleManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BD6ADE6D05C2D9CEFE0A729 /* TailscaleManager.swift */; };
@@ -62,11 +67,14 @@
 		0474E749B23CD3D59A534A02 /* PingMonitorWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PingMonitorWidget.swift; sourceTree = "<group>"; };
 		054C652334D83BFC7E046C1C /* AppIcon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = AppIcon.icns; sourceTree = "<group>"; };
 		1D8D528B5138EACA882501AB /* TailscaleTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TailscaleTab.swift; sourceTree = "<group>"; };
+		34899BDE60F60F8D02C2B09C /* HostManagementTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostManagementTab.swift; sourceTree = "<group>"; };
 		3E15E69887F7957EA47FA06D /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
 		474327D7C84A6AAE5A807E5C /* NetworkSpeedManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkSpeedManager.swift; sourceTree = "<group>"; };
 		491A22FB66A984CCBB76CACC /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		4FD92B08785B04290AABFFA4 /* NetworkSpeedTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkSpeedTab.swift; sourceTree = "<group>"; };
+		51C489995006DCC9CF19C9D9 /* SettingsTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsTab.swift; sourceTree = "<group>"; };
 		5594A1194F05016AEA7F7897 /* Localization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Localization.swift; sourceTree = "<group>"; };
+		58DA7B279477222AB1BE15DA /* MonitorTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonitorTab.swift; sourceTree = "<group>"; };
 		608C42835018CF66383AF67E /* PingMonitorWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PingMonitorWidget.entitlements; sourceTree = "<group>"; };
 		6F8FBCAF71E64AA07B49E06E /* TracerouteManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TracerouteManager.swift; sourceTree = "<group>"; };
 		7DFD8FDF48D0DAAE46E9D261 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -76,6 +84,8 @@
 		8BD6ADE6D05C2D9CEFE0A729 /* TailscaleManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TailscaleManager.swift; sourceTree = "<group>"; };
 		9BEF6778E3667CA0C05B7AF6 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		A7666F60CCBB8B7ADFCB51FB /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
+		B6E0366905953915776F60ED /* StatisticsTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatisticsTab.swift; sourceTree = "<group>"; };
+		B7B9D44A9B395C035410B2D4 /* LogsTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogsTab.swift; sourceTree = "<group>"; };
 		C04ACB73A62AC186335F394B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		C62A376D664EEDA030D950E1 /* WidgetDataManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetDataManager.swift; sourceTree = "<group>"; };
 		CFBB594A7F65924059D8AAE0 /* HostDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostDetailView.swift; sourceTree = "<group>"; };
@@ -96,15 +106,20 @@
 				9BEF6778E3667CA0C05B7AF6 /* DashboardView.swift */,
 				DCE2F25F03FD5A086CB489B3 /* EditableHostCard.swift */,
 				CFBB594A7F65924059D8AAE0 /* HostDetailView.swift */,
+				34899BDE60F60F8D02C2B09C /* HostManagementTab.swift */,
 				491A22FB66A984CCBB76CACC /* Info.plist */,
 				5594A1194F05016AEA7F7897 /* Localization.swift */,
+				B7B9D44A9B395C035410B2D4 /* LogsTab.swift */,
 				3E15E69887F7957EA47FA06D /* MainView.swift */,
+				58DA7B279477222AB1BE15DA /* MonitorTab.swift */,
 				474327D7C84A6AAE5A807E5C /* NetworkSpeedManager.swift */,
 				4FD92B08785B04290AABFFA4 /* NetworkSpeedTab.swift */,
 				8256800946515CA010ECF247 /* PingMonitor.entitlements */,
 				7E41F61BD4463C6191AD4EDE /* PingMonitorApp.swift */,
 				FEBAD6B6485D09287CF9324F /* ServicesTab.swift */,
+				51C489995006DCC9CF19C9D9 /* SettingsTab.swift */,
 				EC7D0D255C49F352EA4083FB /* SidebarView.swift */,
+				B6E0366905953915776F60ED /* StatisticsTab.swift */,
 				8BD6ADE6D05C2D9CEFE0A729 /* TailscaleManager.swift */,
 				1D8D528B5138EACA882501AB /* TailscaleTab.swift */,
 				857B8B71FC13AC1C33464767 /* Theme.swift */,
@@ -205,7 +220,6 @@
 				};
 			};
 			buildConfigurationList = F0D742B88309BA60F98FF056 /* Build configuration list for PBXProject "PingMonitor" */;
-			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -215,6 +229,7 @@
 			mainGroup = 7AE4AF509B358A8D7A5C01FA;
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
+			productRefGroup = B4F5375F058C33028D422325 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -262,13 +277,18 @@
 				2E8FE799A9C7CCD844B33CED /* DashboardView.swift in Sources */,
 				ACAE48593119B446A7CAF1E8 /* EditableHostCard.swift in Sources */,
 				5BF5E72CF22CF7843AFC6FEB /* HostDetailView.swift in Sources */,
+				A396854E7B48B6D1D69F1D1A /* HostManagementTab.swift in Sources */,
 				BD48291C728E07252C391F44 /* Localization.swift in Sources */,
+				7C58225895805D58D2BA65FA /* LogsTab.swift in Sources */,
 				CEB7B9C677A78A18AF0ED5DD /* MainView.swift in Sources */,
+				AB06603AEA7A327A15C7978B /* MonitorTab.swift in Sources */,
 				63114EF0657645E84EDDEA9F /* NetworkSpeedManager.swift in Sources */,
 				A06242D4A433449AF55BF13F /* NetworkSpeedTab.swift in Sources */,
 				3330EB9A488B83DBABE5AD53 /* PingMonitorApp.swift in Sources */,
 				803F6C9D4A09CECABE3CABA8 /* ServicesTab.swift in Sources */,
+				5A262CAF8C8428D2BCDCB753 /* SettingsTab.swift in Sources */,
 				18216F0F2CCA0F345936B0DE /* SidebarView.swift in Sources */,
+				763CDE358B75FFF49838014C /* StatisticsTab.swift in Sources */,
 				BD2D2F8996970A91AA479273 /* TailscaleManager.swift in Sources */,
 				D33251091ED883F53D96FF57 /* TailscaleTab.swift in Sources */,
 				FD908B3EBFD3A95E91601B6C /* Theme.swift in Sources */,
@@ -345,7 +365,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 107;
+				CURRENT_PROJECT_VERSION = 109;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -364,7 +384,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = "2.1.1-R7";
+				MARKETING_VERSION = "2.1.1-R9";
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -451,7 +471,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 107;
+				CURRENT_PROJECT_VERSION = 109;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -464,7 +484,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = "2.1.1-R7";
+				MARKETING_VERSION = "2.1.1-R9";
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";

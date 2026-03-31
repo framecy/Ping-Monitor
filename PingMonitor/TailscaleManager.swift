@@ -272,9 +272,7 @@ class TailscaleManager: ObservableObject {
         LogManager.shared.info("Imported Tailscale node: \(node.hostname) (\(node.tailscaleIP))")
         
         if viewModel.isRunning {
-            if let index = viewModel.hosts.firstIndex(where: { $0.id == newHost.id }) {
-                viewModel.startPingProcess(for: viewModel.hosts[index], at: index)
-            }
+            viewModel.startPingProcess(for: newHost)
         }
     }
     
