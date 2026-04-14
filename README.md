@@ -13,7 +13,7 @@
   <img src="https://img.shields.io/badge/platform-macOS%2014.0+-blue" alt="Platform">
   <img src="https://img.shields.io/badge/SwiftUI-6.0-orange" alt="SwiftUI">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/version-2.1.1--R9-brightgreen" alt="Version">
+  <img src="https://img.shields.io/badge/version-2.1.2--R12-brightgreen" alt="Version">
 </p>
 
 <p align="center">
@@ -252,35 +252,14 @@ AUTO_VERSION=false
 
 ## 📋 版本历史
 
-| 版本 | 构建 | 更新内容 |
-|------|------|---------|
-| v2.1.1 | R9 | **性能优化与代码重构**：缓存正则表达式与 DateFormatter/ByteCountFormatter 静态实例，消除高频路径重复创建开销；Widget 同步节流（5s 防抖），减少 90%+ 无效文件 IO；Ping 主机追踪从 index 改为 UUID 查找，消除列表变更时的数据错位风险；将 MainView.swift（2444 行）拆分为 5 个独立文件（MonitorTab / StatisticsTab / HostManagementTab / LogsTab / SettingsTab），大幅提升可维护性 |
-| v2.1.1 | R6 | **小组件终极修复**：严格适配 macOS 沙盒强制规范与本地开发者实体证书深度签名，打通主应用/小组件的双向 App Group 数据通讯，彻底解决了组件画廊找不到应用的问题；**性能与UI进阶**：默认拉长探测间隔至10秒护航内存与系统负载，全面修复了主机规则编辑器不堪入目的排版错位，监控大盘服务快捷键重构为流式网格完整展示；图表引擎全面换装渐变底色填充色块及阶梯式警示色调（百兆内长绿，100-300橙，三百红） |
-| v2.1.1 | R2 | **UI 布局深度修复**：彻底解决了显示规则编辑器的组件对齐问题，新增「显示文本」固定标签；**默认值校正**：修复了添加主机时规则列表为空的 Bug，现在默认自动填充（<50ms Direct, >100ms Relay） |
-| v2.1.1 | R1 | **交互与功能增强**：实现监控主机拖拽排序；新增 Tailscale 快捷命令面板与 Exit Node 状态标识；适配完整的浅色/深色模式设计系统 |
-| v2.1.0 | r38 | **网络监控优化**：重构 `netstat` 解析逻辑，支持动态列偏移检测，修复了 VPN/Tailscale 接口下 Errors 计数异常的问题；同步更新官方落地页地址 |
-| v2.1.0 | r35 | **项目规范化**：建立正式 `CHANGELOG.md`；升级 `build.sh` 自动打包变更日志到 DMG；同步所有文档版本号 |
-| v2.1.0 | r34 | **文档补全**：更新 `README.md` 版本历史与路由追踪功能描述 |
-| v2.1.0 | r33 | **可视化增强**：Traceroute 地图新增「当前位置」(Hop 0) 起点显示，支持从本地出发逐级渲染跳点，实现完整的点对点路径追踪 |
-| v2.1.0 | r32 | **身份认证与参数修复**：采用单次提权的 Bash 容器封装 MTR 循环，彻底消除每秒弹出的 `osascript` 授权窗口；移除 `-n` 参数恢复主机名解析能力；校正 Traceroute 返回按钮的靠左边距对齐 |
-| v2.1.0 | r31 | **UI 修复与状态反馈**：修正 `EditableHostCard` 成功连接逻辑（<50ms 恢复绿色显示）；解决 TracerouteView 中返回按钮在特定情况下的显示异常 |
-| v2.1.0 | r30 | **核心功能修复**：完美解决 Traceroute 需要 Root 权限执行的问题；**布局与视觉整齐度提升**：状态栏支持缩窄至 50 宽度，设置页所有表单严格左右对齐，日志页时间戳与级别绝对定宽对齐；**便捷性增强**：监控页顶部常驻快捷访问面板 `ServiceShortcutsRibbon`；**图表美化升级**：网速页实时折线图采用 ECharts 风格的平滑贝塞尔曲线及炫光渐变引擎 |
-| v2.1.0 | r23 | **状态栏稳定性升级**：引入固定宽度与符号左对齐布局，彻底修复网速抖动；并清理了 Git 仓库日志文件 |
-| v2.1.0 | r19 | **全新状态栏监控**：支持图标开关、多级间距与字体高度定制、网速流量仪表盘全集成；**SSH 安全连接**：基于 expect 脚本绕过 AppleScript 授权限制直接进行密钥/密码认证；**数据聚合**：图表升级并修复了网格组件对齐；重构了界面排版引擎 |
-| v2.0.55 | r64 | **SSH 快捷方式增强**：支持配置用户名/端口/密钥路径，实时命令预览；**NAT 检测**：集成 `tailscale netcheck`，显示 NAT 类型/UDP/IPv4/IPv6/全局 IP/DERP 区域延迟图表；**小组件修复**：重构 `WidgetDataManager` 三级回退策略，禁用小组件沙箱确保数据同步 |
-| v2.0.54 | r63 | **Tailscale 集成**：自动发现私有网络节点并一键导入监控；**服务快捷方式**：为每个主机配置 Web/SSH/自定义快捷入口，全局服务面板汇总展示；**新增侧边栏模块**：Tailscale 面板与服务面板；完善中英文本地化 |
-| v2.0.53 | r62 | **UI 全面优化**：统计仪表盘引入极具质感的 3D 立体饼图，并运用严格风格的 Grid 网格布局重置了延迟排行榜；**设置页重构**：全面采用 `ModernCard` 与原生列表结合的卡片式分组设计；**审计与日志增强**：新增针对应用设置修改的操作审计跟踪，并在主机详情页提供了支持一键导出的单主机专项历史日志功能 |
-| v2.0.51 | r60 | **小组件深度优化**：重构 `WidgetDataManager` 实现可靠数据同步，修复“无数据”显示；**本地化增强**：全面支持中英文动态切换，覆盖小组件设置与系统菜单；**可视化升级**：优化 Dashboard 布局与趋势图平滑度；**路由追踪改进**：增强 Traceroute/MTR 稳定性 |
-| v2.0.40 | r41 | **UI 全面升级**：3D 环形统计图、实时内存监控、Dashboard 布局优化；**本地化完善**：补全所有翻译 key、日志级别本地化；侧边栏显示 macOS 用户名 |
-| v2.0.34 | r35 | **多语言支持**：完整的中文/英文界面，支持动态切换；UI 细节优化与 Bug 修复 |
-| v2.0.29 | r30 | 修复自定义命令中空格导致解析错误的问题 |
-| v2.0.28 | r29 | 移除 DMG 文件名中的构建号后缀 |
-| v2.0.27 | r28 | UI 细节优化：统一主机卡片高度，优化状态栏宽度自适应 |
-| v2.0.26 | r27 | 修复 macOS 15.7+ 小组件背景色崩溃问题，完善打包脚本 |
-| v2.0.25 | r26 | UI 全面重构：侧边栏导航、Bézier 曲线图表、渐变卡片、迷你趋势图、小组件重新设计 |
-| v2.0.24 | r25 | 美化卡片、悬浮效果、延迟图表、应用图标 |
-| v2.0.22 | r23 | 响应式网格布局、聚合统计、延迟图表 |
-| v2.0.20 | r21 | 连续 ping 模式、数据统计 |
+| 版本 | 更新内容 |
+|------|---------|
+| **v2.1.1 R9**<br>性能优化 | 缓存 NSRegularExpression / DateFormatter / ByteCountFormatter 静态实例，消除高频路径重复创建开销；Widget 同步 5s 防抖节流，减少 90%+ 无效文件 IO；Ping 主机追踪改为 UUID 查找，消除索引错位风险；MainView.swift（2444 行）拆分为 5 个独立 Tab 文件（MonitorTab / StatisticsTab / HostManagementTab / LogsTab / SettingsTab） |
+| **v2.1.1 R1–R6**<br>UI 与 Widget 修复 | 主机拖拽排序；Tailscale 快捷命令面板与 Exit Node 状态标识；浅/深色模式设计系统；规则编辑器布局修复与默认规则补全；Widget App Group 双向数据通讯打通，彻底解决组件画廊找不到应用的问题；图表阶梯式警示色（&lt;100ms 绿 / 100–300ms 橙 / &gt;300ms 红） |
+| **v2.1.0**<br>Traceroute & 状态栏 | Traceroute / MTR 路由追踪（单次提权 Bash 容器封装、地图逐级渲染本地→目标）；全新状态栏（网速仪表盘、图标开关、可调字体/间距、固定宽度防抖）；SSH 安全连接（expect 脚本绕过 AppleScript 授权）；监控页常驻 ServiceShortcutsRibbon 面板；网速折线图贝塞尔曲线 + 炫光渐变；netstat 动态列偏移检测修复 VPN 下 Errors 计数异常 |
+| **v2.0.51–v2.0.55**<br>Tailscale & 服务集成 | Tailscale 自动发现私网节点并一键导入监控；服务快捷方式（Web / SSH / 自定义）全局汇总面板；NAT 类型检测（tailscale netcheck，展示 UDP / IPv4 / IPv6 / DERP 区域延迟图）；WidgetDataManager 三级回退策略重构，彻底修复小组件无数据；SSH 配置支持用户名 / 端口 / 密钥路径与实时命令预览 |
+| **v2.0.34–v2.0.40**<br>UI 升级 & 多语言 | 中/英文界面国际化，支持运行时动态切换（覆盖小组件与系统菜单）；统计仪表盘 3D 立体饼图与 Grid 延迟排行榜；实时内存监控；ModernCard 卡片式设置页；侧边栏显示 macOS 用户名；操作审计日志与单主机日志一键导出 |
+| **v2.0.20–v2.0.29**<br>基础功能建设 | 连续 ping 模式与聚合数据统计；响应式网格布局、延迟图表体系；侧边栏导航、Bézier 曲线图表、渐变卡片、迷你趋势图；小组件首版设计；macOS 15.7+ 小组件背景色崩溃修复；应用图标与 DMG 打包流程优化 |
 
 ---
 
