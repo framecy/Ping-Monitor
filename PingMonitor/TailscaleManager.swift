@@ -3,6 +3,13 @@ import Combine
 
 // MARK: - Tailscale Node Model
 
+enum TailscaleConnectionType: String, Codable {
+    case p2p = "P2P"       // Direct peer-to-peer
+    case relay = "Relay"    // Via DERP relay
+    case derp = "DERP"     // Using DERP server
+    case unknown = "—"
+}
+
 struct TailscaleNode: Identifiable, Codable {
     var id: String { tailscaleIP }
     let hostname: String
@@ -12,6 +19,18 @@ struct TailscaleNode: Identifiable, Codable {
     let isSelf: Bool
     let exitNode: Bool
     let exitNodeOption: Bool
+    
+    // Connection info
+    var connectionType: TailscaleConnectionType = .unknown
+    var currentNode: String? = nil
+    var rxBytes: Int64 = 0
+    var txBytes: Int64 = 0
+    
+    // Diagnostic info
+    var lastPingResult: String? = nil
+    var isCheckingPath: Bool = false
+    var relayCode: String? = nil
+    var directAddr: String? = nil
     
     var osIcon: String {
         switch os.lowercased() {
@@ -31,18 +50,76 @@ struct TailscaleNode: Identifiable, Codable {
     }
 }
 
+// MARK: - Exit Node Model
+
+struct ExitNode: Identifiable {
+    var id: String { node.tailscaleIP }
+    let node: TailscaleNode
+    var latency: Double?  // average milliseconds, nil = not tested
+    var packetLoss: Double?  // percentage, nil = not tested
+    var jitter: Double? // stddev, nil = not tested
+    var isReachable: Bool = true
+    
+    var latencyString: String {
+        guard let lat = latency else { return "—" }
+        return String(format: "%.0fms", lat)
+    }
+    
+    var score: Int {
+        guard let lat = latency else { return 0 }
+        
+        // RTT score (40%)
+        let rttScore: Double
+        if lat < 30 { rttScore = 100 }
+        else if lat < 100 { rttScore = 80 }
+        else if lat < 200 { rttScore = 50 }
+        else { rttScore = 20 }
+        
+        // Packet Loss score (30%)
+        let loss = packetLoss ?? 0
+        let lossScore: Double
+        if loss == 0 { lossScore = 100 }
+        else if loss < 2 { lossScore = 70 }
+        else if loss < 5 { lossScore = 40 }
+        else { lossScore = 0 }
+        
+        // Jitter score (20%)
+        let jit = jitter ?? 0
+        let jitterScore: Double
+        if jit < 5 { jitterScore = 100 }
+        else if jit < 15 { jitterScore = 70 }
+        else if jit < 30 { jitterScore = 40 }
+        else { jitterScore = 10 }
+        
+        // Network Type score (10%)
+        // P2P = 100, Relay = 20
+        let typeScore: Double = node.connectionType == .p2p ? 100 : 20
+        
+        let totalScore = (rttScore * 0.4) + (lossScore * 0.3) + (jitterScore * 0.2) + (typeScore * 0.1)
+        return Int(totalScore)
+    }
+}
+
 // MARK: - Tailscale Status Response
 
 private struct TailscaleStatus: Codable {
     let `Self`: TailscalePeer?
     let Peer: [String: TailscalePeer]?
     let MagicDNSSuffix: String?
+    let CurrentTailnet: TailnetInfo?
     
     enum CodingKeys: String, CodingKey {
         case `Self` = "Self"
         case Peer = "Peer"
         case MagicDNSSuffix = "MagicDNSSuffix"
+        case CurrentTailnet = "CurrentTailnet"
     }
+}
+
+private struct TailnetInfo: Codable {
+    let MagicDNSSuffix: String?
+    let MagicDNSEnabled: Bool?
+    let MagicDNSSuffixOverride: Bool?
 }
 
 private struct TailscalePeer: Codable {
@@ -53,6 +130,13 @@ private struct TailscalePeer: Codable {
     let Online: Bool?
     let ExitNode: Bool?
     let ExitNodeOption: Bool?
+    let Relay: String?  // Current DERP relay node code (e.g., "sfo")
+    let PeerRelay: String?  // Peer's relay node
+    let CurAddr: String?  // Current direct address
+    let Addrs: [String]?  // Available addresses
+    let RxBytes: Int64?
+    let TxBytes: Int64?
+    let LastSeen: String?
 }
 
 // MARK: - Netcheck Result Model
@@ -81,6 +165,24 @@ private struct NetcheckResponse: Codable {
     let CaptivePortal: Bool?
 }
 
+// MARK: - Tailscale Ping JSON Result
+
+struct TailscalePingResponse: Codable {
+    let IP: String?
+    let NodeKey: String?
+    let NodeName: String?
+    let Err: String?
+    let LatencySeconds: Double?
+    let Endpoint: String?
+    let DERPRegionID: Int?
+    let DERPRegionCode: String?
+    let IsP2P: Bool?
+    
+    enum CodingKeys: String, CodingKey {
+        case IP, NodeKey, NodeName, Err, LatencySeconds, Endpoint, DERPRegionID, DERPRegionCode, IsP2P
+    }
+}
+
 // MARK: - Tailscale Manager
 
 @MainActor
@@ -96,6 +198,11 @@ class TailscaleManager: ObservableObject {
     @Published var isLoading = false
     @Published var lastError: String?
     
+    // Exit Node properties
+    @Published var currentExitNode: TailscaleNode? = nil
+    @Published var availableExitNodes: [ExitNode] = []
+    @Published var isTestingExitNodes = false
+    
     // Netcheck properties
     @Published var netcheckLoading = false
     @Published var natType: String = "—"
@@ -110,7 +217,10 @@ class TailscaleManager: ObservableObject {
     @Published var regionLatencies: [NetcheckRegionLatency] = []
     @Published var captivePortal: Bool = false
     
-    private var cliPath: String?
+    // Health Advice
+    @Published var healthAdvice: [String] = []
+    
+    public var cliPath: String?
     
     private init() {
         detectCLI()
@@ -170,22 +280,40 @@ class TailscaleManager: ObservableObject {
         Task.detached { [cli] in
             let process = Process()
             let pipe = Pipe()
+            let errPipe = Pipe()
             process.executableURL = URL(fileURLWithPath: cli)
             process.arguments = ["status", "--json"]
             process.standardOutput = pipe
-            process.standardError = FileHandle.nullDevice
+            process.standardError = errPipe
             
+            var dataSize = 0
+            var stderrOutput = ""
+            var dataForDebug = Data()
             do {
                 try process.run()
                 process.waitUntilExit()
                 
                 let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                dataSize = data.count
+                dataForDebug = data
+                
+                let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
+                stderrOutput = String(data: errData, encoding: .utf8) ?? ""
                 
                 guard process.terminationStatus == 0 else {
                     await MainActor.run {
                         self.isLoading = false
                         self.isConnected = false
                         self.lastError = "Tailscale not running (exit code \(process.terminationStatus))"
+                    }
+                    return
+                }
+                
+                // Validate data before parsing
+                guard dataSize > 0 else {
+                    await MainActor.run {
+                        self.isLoading = false
+                        self.lastError = "No data received from tailscale"
                     }
                     return
                 }
@@ -201,6 +329,14 @@ class TailscaleManager: ObservableObject {
                 if let selfPeer = status.Self {
                     selfIP = selfPeer.TailscaleIPs?.first ?? ""
                     selfHostname = selfPeer.HostName ?? ""
+                    
+                    var connType: TailscaleConnectionType = .unknown
+                    if let relay = selfPeer.Relay, !relay.isEmpty {
+                        connType = .derp
+                    } else if let curAddr = selfPeer.CurAddr, !curAddr.isEmpty {
+                        connType = .p2p
+                    }
+                    
                     parsedNodes.append(TailscaleNode(
                         hostname: selfPeer.HostName ?? "Unknown",
                         tailscaleIP: selfIP,
@@ -208,7 +344,11 @@ class TailscaleManager: ObservableObject {
                         online: true,
                         isSelf: true,
                         exitNode: selfPeer.ExitNode ?? false,
-                        exitNodeOption: selfPeer.ExitNodeOption ?? false
+                        exitNodeOption: selfPeer.ExitNodeOption ?? false,
+                        connectionType: connType,
+                        currentNode: selfPeer.Relay ?? selfPeer.CurAddr,
+                        rxBytes: selfPeer.RxBytes ?? 0,
+                        txBytes: selfPeer.TxBytes ?? 0
                     ))
                 }
                 
@@ -216,6 +356,13 @@ class TailscaleManager: ObservableObject {
                 if let peers = status.Peer {
                     for (_, peer) in peers {
                         let ip = peer.TailscaleIPs?.first ?? ""
+                        var connType: TailscaleConnectionType = .unknown
+                        if let relay = peer.Relay, !relay.isEmpty {
+                            connType = .derp
+                        } else if let curAddr = peer.CurAddr, !curAddr.isEmpty {
+                            connType = .p2p
+                        }
+                        
                         parsedNodes.append(TailscaleNode(
                             hostname: peer.HostName ?? "Unknown",
                             tailscaleIP: ip,
@@ -223,12 +370,17 @@ class TailscaleManager: ObservableObject {
                             online: peer.Online ?? false,
                             isSelf: false,
                             exitNode: peer.ExitNode ?? false,
-                            exitNodeOption: peer.ExitNodeOption ?? false
+                            exitNodeOption: peer.ExitNodeOption ?? false,
+                            connectionType: connType,
+                            currentNode: peer.Relay ?? peer.CurAddr,
+                            rxBytes: peer.RxBytes ?? 0,
+                            txBytes: peer.TxBytes ?? 0,
+                            relayCode: peer.Relay,
+                            directAddr: peer.CurAddr
                         ))
                     }
                 }
                 
-                // Sort: self first, then online, then offline
                 parsedNodes.sort { a, b in
                     if a.isSelf != b.isSelf { return a.isSelf }
                     if a.online != b.online { return a.online }
@@ -242,12 +394,13 @@ class TailscaleManager: ObservableObject {
                     self.selfHostname = selfHostname
                     self.magicDNSSuffix = status.MagicDNSSuffix ?? ""
                     self.nodes = parsedNodes
+                    self.updateExitNodeInfo()
                 }
                 
             } catch {
                 await MainActor.run {
                     self.isLoading = false
-                    self.lastError = "Failed to parse: \(error.localizedDescription)"
+                    self.lastError = "Failed to parse Tailscale status: \(error.localizedDescription)"
                 }
             }
         }
@@ -256,7 +409,6 @@ class TailscaleManager: ObservableObject {
     // MARK: - Import Nodes
     
     func importNode(_ node: TailscaleNode, into viewModel: PingMonitorViewModel) {
-        // Check if already exists
         if viewModel.hosts.contains(where: { $0.address == node.tailscaleIP }) {
             return
         }
@@ -269,7 +421,6 @@ class TailscaleManager: ObservableObject {
         viewModel.hosts.append(newHost)
         viewModel.hostStats[newHost.id] = HostStats(hostId: newHost.id)
         viewModel.saveSettings()
-        LogManager.shared.info("Imported Tailscale node: \(node.hostname) (\(node.tailscaleIP))")
         
         if viewModel.isRunning {
             if let index = viewModel.hosts.firstIndex(where: { $0.id == newHost.id }) {
@@ -282,6 +433,115 @@ class TailscaleManager: ObservableObject {
         let onlineNodes = nodes.filter { $0.online && !$0.isSelf }
         for node in onlineNodes {
             importNode(node, into: viewModel)
+        }
+    }
+    
+    // MARK: - Exit Node Management
+    
+    private func updateExitNodeInfo() {
+        currentExitNode = nodes.first { $0.exitNode }
+        let optionNodes = nodes.filter { $0.exitNodeOption && $0.online && !$0.isSelf }
+        var updatedNodes: [ExitNode] = []
+        for node in optionNodes {
+            if let existing = availableExitNodes.first(where: { $0.node.tailscaleIP == node.tailscaleIP }) {
+                updatedNodes.append(ExitNode(
+                    node: node,
+                    latency: existing.latency,
+                    packetLoss: existing.packetLoss,
+                    isReachable: existing.isReachable
+                ))
+            } else {
+                updatedNodes.append(ExitNode(node: node, latency: nil, packetLoss: nil))
+            }
+        }
+        availableExitNodes = updatedNodes.sorted { a, b in
+            if a.latency != nil && b.latency != nil {
+                return a.latency! < b.latency!
+            }
+            if a.latency != nil { return true }
+            if b.latency != nil { return false }
+            return a.node.hostname < b.node.hostname
+        }
+    }
+    
+    nonisolated func testAllExitNodesLatency() {
+        Task { @MainActor in
+            guard !availableExitNodes.isEmpty else { return }
+            isTestingExitNodes = true
+            let nodesToTest = availableExitNodes
+            let results = await withTaskGroup(of: ExitNode.self) { group in
+                for exitNode in nodesToTest {
+                    group.addTask {
+                        let metrics = await self.pingNodeMetrics(exitNode.node.tailscaleIP, count: 5)
+                        return ExitNode(
+                            node: exitNode.node,
+                            latency: metrics.avg,
+                            packetLoss: metrics.loss,
+                            jitter: metrics.stddev,
+                            isReachable: metrics.avg != nil
+                        )
+                    }
+                }
+                var results: [ExitNode] = []
+                for await result in group { results.append(result) }
+                return results
+            }
+            availableExitNodes = results.sorted { a, b in
+                if a.score != b.score { return a.score > b.score }
+                if let al = a.latency, let bl = b.latency { return al < bl }
+                return a.node.hostname < b.node.hostname
+            }
+            isTestingExitNodes = false
+        }
+    }
+    
+    private struct PingMetrics {
+        var avg: Double?
+        var loss: Double?
+        var stddev: Double?
+    }
+    
+    private func pingNodeMetrics(_ ip: String, count: Int) async -> PingMetrics {
+        let process = Process()
+        let pipe = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/sbin/ping")
+        process.arguments = ["-c", "\(count)", "-W", "2", ip]
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+        var metrics = PingMetrics()
+        do {
+            try process.run()
+            process.waitUntilExit()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            guard let output = String(data: data, encoding: .utf8) else { return metrics }
+            let lossPattern = #"([\d.]+)\% packet loss"#
+            if let regex = try? NSRegularExpression(pattern: lossPattern),
+               let match = regex.firstMatch(in: output, range: NSRange(output.startIndex..., in: output)),
+               let range = Range(match.range(at: 1), in: output) {
+                metrics.loss = Double(output[range])
+            }
+            let rttPattern = #"min/avg/max/stddev = ([\d.]+)/([\d.]+)/([\d.]+)/([\d.]+)"#
+            if let regex = try? NSRegularExpression(pattern: rttPattern),
+               let match = regex.firstMatch(in: output, range: NSRange(output.startIndex..., in: output)) {
+                if let avgRange = Range(match.range(at: 2), in: output) { metrics.avg = Double(output[avgRange]) }
+                if let stddevRange = Range(match.range(at: 4), in: output) { metrics.stddev = Double(output[stddevRange]) }
+            }
+            return metrics
+        } catch { return metrics }
+    }
+    
+    func switchExitNode(to node: TailscaleNode) {
+        Task {
+            await runTailscaleCommand(["set", "--exit-node="], background: true)
+            await runTailscaleCommand(["set", "--exit-node=\(node.tailscaleIP)"], background: true)
+            fetchStatus()
+        }
+    }
+    
+    func disableExitNode() {
+        Task {
+            await runTailscaleCommand(["set", "--exit-node="], background: true)
+            fetchStatus()
         }
     }
     
@@ -301,7 +561,6 @@ class TailscaleManager: ObservableObject {
     
     func fetchNetcheck() {
         guard let cli = cliPath else { return }
-        
         netcheckLoading = true
         
         Task.detached { [cli, derpRegionNames] in
@@ -316,48 +575,32 @@ class TailscaleManager: ObservableObject {
             do {
                 try process.run()
                 process.waitUntilExit()
-                
                 let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                
                 guard process.terminationStatus == 0 else {
-                    await MainActor.run {
-                        self.netcheckLoading = false
-                    }
+                    await MainActor.run { self.netcheckLoading = false }
                     return
                 }
                 
                 let decoder = JSONDecoder()
                 let result = try decoder.decode(NetcheckResponse.self, from: data)
                 
-                // Determine NAT type
                 let natType: String
-                if result.MappingVariesByDestIP == true {
-                    natType = "Symmetric NAT"
-                } else if result.HairPinning == true {
-                    natType = "Full Cone NAT"
-                } else if result.UDP == true {
-                    natType = "Easy NAT"
-                } else {
-                    natType = "Hard NAT"
-                }
+                if result.MappingVariesByDestIP == true { natType = "Symmetric NAT" }
+                else if result.HairPinning == true { natType = "Full Cone NAT" }
+                else if result.UDP == true { natType = "Easy NAT" }
+                else { natType = "Hard NAT" }
                 
-                // Parse region latencies (nanoseconds → ms)
                 var latencies: [NetcheckRegionLatency] = []
                 if let regions = result.RegionLatency {
                     for (regionId, nsLatency) in regions {
-                        let msLatency = nsLatency / 1_000_000.0  // ns to ms
+                        let msLatency = nsLatency / 1_000_000.0
                         if msLatency > 0 {
                             let name = derpRegionNames[regionId] ?? "DERP \(regionId)"
-                            latencies.append(NetcheckRegionLatency(
-                                regionCode: regionId,
-                                regionName: name,
-                                latency: msLatency
-                            ))
+                            latencies.append(NetcheckRegionLatency(regionCode: regionId, regionName: name, latency: msLatency))
                         }
                     }
                 }
                 latencies.sort { $0.latency < $1.latency }
-                
                 let preferredDERP = derpRegionNames[String(result.PreferredDERP ?? 0)] ?? "DERP \(result.PreferredDERP ?? 0)"
                 
                 await MainActor.run {
@@ -373,61 +616,104 @@ class TailscaleManager: ObservableObject {
                     self.globalIPv6 = result.GlobalV6 ?? "—"
                     self.regionLatencies = latencies
                     self.captivePortal = result.CaptivePortal ?? false
+                    
+                    var advice: [String] = []
+                    let lang = LanguageManager.shared
+                    if result.UDP == false { advice.append(lang.t("tailscale.advice.udp_blocked")) }
+                    else if result.MappingVariesByDestIP == true { advice.append(lang.t("tailscale.advice.symmetric_nat")) }
+                    else if result.UDP == true { advice.append(lang.t("tailscale.advice.easy_nat")) }
+                    if result.CaptivePortal == true { advice.append(lang.t("tailscale.advice.captive_portal")) }
+                    self.healthAdvice = advice
                 }
+            } catch { await MainActor.run { self.netcheckLoading = false } }
+        }
+    }
+    
+    // MARK: - Path Diagnosis
+    
+    func runPathDiagnosis(for node: TailscaleNode) {
+        guard let cli = cliPath else { return }
+        
+        if let index = nodes.firstIndex(where: { $0.tailscaleIP == node.tailscaleIP }) {
+            nodes[index].isCheckingPath = true
+            nodes[index].lastPingResult = nil
+        }
+        
+        Task.detached { [cli, ip = node.tailscaleIP] in
+            let process = Process()
+            let pipe = Pipe()
+            process.executableURL = URL(fileURLWithPath: cli)
+            process.arguments = ["ping", "--json", "--c=1", ip]
+            process.standardOutput = pipe
+            process.standardError = FileHandle.nullDevice
+            
+            do {
+                try process.run()
+                process.waitUntilExit()
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                let decoder = JSONDecoder()
+                let output = String(data: data, encoding: .utf8) ?? ""
+                let lines = output.components(separatedBy: .newlines).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
                 
+                var finalResult = ""
+                if let lastLine = lines.last, let lineData = lastLine.data(using: .utf8) {
+                    if let pingRes = try? decoder.decode(TailscalePingResponse.self, from: lineData) {
+                        if let err = pingRes.Err, !err.isEmpty {
+                            finalResult = "Error: \(err)"
+                        } else {
+                            let type = pingRes.IsP2P == true ? "P2P" : "Relay"
+                            let endpoint = pingRes.Endpoint ?? pingRes.DERPRegionCode ?? "unknown"
+                            let latency = String(format: "%.1fms", (pingRes.LatencySeconds ?? 0) * 1000)
+                            finalResult = "\(type) via \(endpoint) (\(latency))"
+                        }
+                    } else { finalResult = "Failed to parse result" }
+                } else { finalResult = "Check complete" }
+                
+                await MainActor.run {
+                    if let index = self.nodes.firstIndex(where: { $0.tailscaleIP == ip }) {
+                        self.nodes[index].isCheckingPath = false
+                        self.nodes[index].lastPingResult = finalResult
+                        if finalResult.contains("P2P") { self.nodes[index].connectionType = .p2p }
+                        else if finalResult.contains("Relay") { self.nodes[index].connectionType = .relay }
+                    }
+                }
             } catch {
                 await MainActor.run {
-                    self.netcheckLoading = false
+                    if let index = self.nodes.firstIndex(where: { $0.tailscaleIP == ip }) {
+                        self.nodes[index].isCheckingPath = false
+                        self.nodes[index].lastPingResult = "Error: \(error.localizedDescription)"
+                    }
                 }
             }
         }
     }
-    func runTailscaleCommand(_ command: String) {
+    
+    func runTailscaleCommand(_ args: [String], background: Bool = false) async {
         guard let cli = cliPath else {
             LogManager.shared.error("Tailscale CLI not found")
             return
         }
-        
-        let args = command.components(separatedBy: " ")
-        LogManager.shared.info("Executing: tailscale \(command)")
-        
-        Task.detached {
+        let commandStr = args.joined(separator: " ")
+        LogManager.shared.info("Executing: tailscale \(commandStr)")
+        let task = Task.detached {
             let process = Process()
             let pipe = Pipe()
             process.executableURL = URL(fileURLWithPath: cli)
             process.arguments = args
             process.standardOutput = pipe
             process.standardError = pipe
-            
             do {
                 try process.run()
                 process.waitUntilExit()
-                
                 let data = pipe.fileHandleForReading.readDataToEndOfFile()
                 if let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines), !output.isEmpty {
                     let lines = output.components(separatedBy: .newlines)
-                    for line in lines.prefix(20) {
-                        await LogManager.shared.info("[Tailscale] \(line)")
-                    }
-                    if lines.count > 20 {
-                        await LogManager.shared.info("[Tailscale] ... (truncated)")
-                    }
+                    for line in lines.prefix(20) { await LogManager.shared.info("[Tailscale] \(line)") }
                 }
-                
-                if process.terminationStatus == 0 {
-                    await LogManager.shared.info("Command executed successfully")
-                    if command.contains("status") || command.contains("netcheck") {
-                        await MainActor.run {
-                            self.fetchStatus()
-                            self.fetchNetcheck()
-                        }
-                    }
-                } else {
-                    await LogManager.shared.error("Command failed with exit code \(process.terminationStatus)")
-                }
-            } catch {
-                await LogManager.shared.error("Failed to run command: \(error.localizedDescription)")
-            }
+                if process.terminationStatus == 0 { await LogManager.shared.info("Command executed successfully") }
+                else { await LogManager.shared.error("Command failed with exit code \(process.terminationStatus)") }
+            } catch { await LogManager.shared.error("Failed to run command: \(error.localizedDescription)") }
         }
+        if !background { await task.value }
     }
 }

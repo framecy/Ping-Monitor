@@ -9,7 +9,14 @@ xcuserdata/
 ## Logs and Build Artifacts
 *.log
 build_log.txt
+build_log*.txt
 *.dmg
+DerivedData/
+build/
+*.app
+
+## Local scratch and cache
+.local/
 
 ## Reproduction Scripts
 repro_*.swift

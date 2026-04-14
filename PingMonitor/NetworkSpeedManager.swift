@@ -1,7 +1,15 @@
 import Foundation
 import Combine
+import AppKit
 
 // MARK: - Network Interface Data
+
+enum InterfaceRole {
+    case physical
+    case tunnel
+    case loopback
+    case virtual
+}
 
 struct NetworkInterfaceStats: Identifiable {
     let id: String  // interface name, e.g. "en0"
@@ -33,6 +41,25 @@ struct NetworkInterfaceStats: Identifiable {
     
     var isActive: Bool {
         bytesIn > 0 || bytesOut > 0
+    }
+
+    var role: InterfaceRole {
+        switch name {
+        case let n where n.starts(with: "utun") || n.starts(with: "ipsec"):
+            return .tunnel
+        case let n where n.starts(with: "lo"):
+            return .loopback
+        case let n where
+            n.starts(with: "awdl") ||
+            n.starts(with: "llw") ||
+            n.starts(with: "gif") ||
+            n.starts(with: "stf") ||
+            n.starts(with: "bridge") ||
+            n.starts(with: "ap"):
+            return .virtual
+        default:
+            return .physical
+        }
     }
 }
 
@@ -66,6 +93,12 @@ struct ProcessNetworkInfo: Identifiable {
     let remoteAddress: String
     let remotePort: String
     let state: String  // ESTABLISHED, LISTEN, CLOSE_WAIT, etc.
+    
+    // Optional speed info from nettop
+    var bytesIn: UInt64 = 0
+    var bytesOut: UInt64 = 0
+    var speedIn: Double = 0
+    var speedOut: Double = 0
 }
 
 struct ProcessSummary: Identifiable {
@@ -74,6 +107,14 @@ struct ProcessSummary: Identifiable {
     let processName: String
     let user: String
     var connections: [ProcessNetworkInfo]
+    
+    // Speed info
+    var bytesIn: UInt64 = 0
+    var bytesOut: UInt64 = 0
+    var speedIn: Double = 0
+    var speedOut: Double = 0
+    
+    var totalSpeed: Double { speedIn + speedOut }
     
     var connectionCount: Int { connections.count }
     
@@ -102,6 +143,10 @@ class NetworkSpeedManager: ObservableObject {
     @Published var totalSpeedOut: Double = 0           // bytes/sec
     @Published var totalBytesIn: UInt64 = 0
     @Published var totalBytesOut: UInt64 = 0
+    @Published var tunnelSpeedIn: Double = 0
+    @Published var tunnelSpeedOut: Double = 0
+    @Published var tunnelBytesIn: UInt64 = 0
+    @Published var tunnelBytesOut: UInt64 = 0
     @Published var speedHistory: [SpeedSample] = []
     @Published var isMonitoring = false
     @Published var refreshInterval: TimeInterval = 1.0
@@ -114,6 +159,10 @@ class NetworkSpeedManager: ObservableObject {
     private var processTimer: Timer?
     private var previousStats: [String: (bytesIn: UInt64, bytesOut: UInt64)] = [:]
     private var previousTimestamp: Date?
+    
+    private var lastProcessStats: [Int32: (bytesIn: UInt64, bytesOut: UInt64)] = [:]
+    private var lastProcessTimestamp: Date?
+    private var isRefreshingProcessList = false
     private let maxHistoryCount = 60
     
     private var trafficFilePath: URL {
@@ -175,7 +224,8 @@ class NetworkSpeedManager: ObservableObject {
         guard !isProcessMonitoring else { return }
         isProcessMonitoring = true
         refreshProcessList()
-        processTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+        // Faster refresh for speed calculation (2s)
+        processTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.refreshProcessList()
             }
@@ -189,36 +239,123 @@ class NetworkSpeedManager: ObservableObject {
     }
     
     func refreshProcessList() {
-        let connections = parseLsof()
-        // Group by PID
-        var grouped: [Int32: ProcessSummary] = [:]
-        for conn in connections {
-            if var existing = grouped[conn.pid] {
-                existing.connections.append(conn)
-                grouped[conn.pid] = existing
-            } else {
-                grouped[conn.pid] = ProcessSummary(
-                    id: conn.pid,
-                    pid: conn.pid,
-                    processName: conn.processName,
-                    user: conn.user,
-                    connections: [conn]
-                )
+        guard !isRefreshingProcessList else { return }
+        isRefreshingProcessList = true
+        
+        Task.detached(priority: .background) { [weak self] in
+            guard let self = self else { return }
+            let connections = self.parseLsof()
+            let traffic = self.fetchProcessTraffic()
+            let now = Date()
+            
+            await MainActor.run {
+                defer { self.isRefreshingProcessList = false }
+                let interval = self.lastProcessTimestamp != nil ? now.timeIntervalSince(self.lastProcessTimestamp!) : 0
+                
+                // Group by PID
+                var grouped: [Int32: ProcessSummary] = [:]
+                for conn in connections {
+                    if var existing = grouped[conn.pid] {
+                        existing.connections.append(conn)
+                        grouped[conn.pid] = existing
+                    } else {
+                        var summary = ProcessSummary(
+                            id: conn.pid,
+                            pid: conn.pid,
+                            processName: conn.processName,
+                            user: conn.user,
+                            connections: [conn]
+                        )
+                        
+                        // Add traffic info
+                        if let stats = traffic[conn.pid] {
+                            summary.bytesIn = stats.bytesIn
+                            summary.bytesOut = stats.bytesOut
+                            
+                            if let prev = self.lastProcessStats[conn.pid], interval > 0 {
+                                // Delta calculation
+                                if stats.bytesIn >= prev.bytesIn {
+                                    summary.speedIn = Double(stats.bytesIn - prev.bytesIn) / interval
+                                }
+                                if stats.bytesOut >= prev.bytesOut {
+                                    summary.speedOut = Double(stats.bytesOut - prev.bytesOut) / interval
+                                }
+                            }
+                        }
+                        
+                        grouped[conn.pid] = summary
+                    }
+                }
+                
+                // Store for next delta
+                self.lastProcessStats = traffic
+                self.lastProcessTimestamp = now
+                
+                // Sort by total speed descending, then connection count
+                self.processList = Array(grouped.values).sorted {
+                    if abs($0.totalSpeed - $1.totalSpeed) > 1024 { // More than 1KB/s difference
+                        return $0.totalSpeed > $1.totalSpeed
+                    }
+                    if $0.connectionCount != $1.connectionCount {
+                        return $0.connectionCount > $1.connectionCount
+                    }
+                    return $0.processName.localizedCaseInsensitiveCompare($1.processName) == .orderedAscending
+                }
             }
-        }
-        // Sort by connection count descending, then by name
-        processList = Array(grouped.values).sorted {
-            if $0.connectionCount != $1.connectionCount {
-                return $0.connectionCount > $1.connectionCount
-            }
-            return $0.processName.localizedCaseInsensitiveCompare($1.processName) == .orderedAscending
         }
     }
     
-    private func parseLsof() -> [ProcessNetworkInfo] {
+    nonisolated private func fetchProcessTraffic() -> [Int32: (bytesIn: UInt64, bytesOut: UInt64)] {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/nettop")
+        // -P: Aggregate by process
+        // -L 1: One sample
+        // -k state,interface: skip columns to keep CSV shorter
+        process.arguments = ["-P", "-L", "1", "-k", "state,interface"]
+        
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = Pipe()
+        
+        do {
+            try process.run()
+            process.waitUntilExit()
+            
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            guard let output = String(data: data, encoding: .utf8) else { return [:] }
+            
+            var results: [Int32: (bytesIn: UInt64, bytesOut: UInt64)] = [:]
+            let lines = output.components(separatedBy: "\n")
+            
+            for line in lines {
+                let parts = line.components(separatedBy: ",")
+                // nettop -P CSV columns: time(0), process.pid(1), bytes_in(2), bytes_out(3), ...
+                guard parts.count >= 4 else { continue }
+                
+                // Column 1 is "name.PID"
+                let procPart = parts[1]
+                let procComponents = procPart.components(separatedBy: ".")
+                guard let lastPart = procComponents.last, let pid = Int32(lastPart) else { continue }
+                
+                // Column 2 is bytes_in, 3 is bytes_out
+                if let bin = UInt64(parts[2]), let bout = UInt64(parts[3]) {
+                    // Aggregate just in case multiple entries appear for same PID
+                    let current = results[pid] ?? (0, 0)
+                    results[pid] = (current.bytesIn + bin, current.bytesOut + bout)
+                }
+            }
+            return results
+        } catch {
+            return [:]
+        }
+    }
+    
+    nonisolated private func parseLsof() -> [ProcessNetworkInfo] {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/sbin/lsof")
-        process.arguments = ["-i", "-n", "-P"]
+        // Use -a to AND conditions: -i (network files only) AND -u (current user only)
+        // -P -n to skip DNS/Port resolution
+        process.arguments = ["-i", "-n", "-P", "-a", "-u", NSUserName()]
         
         let pipe = Pipe()
         process.standardOutput = pipe
@@ -236,7 +373,7 @@ class NetworkSpeedManager: ObservableObject {
         }
     }
     
-    private func parseLsofOutput(_ output: String) -> [ProcessNetworkInfo] {
+    nonisolated private func parseLsofOutput(_ output: String) -> [ProcessNetworkInfo] {
         var results: [ProcessNetworkInfo] = []
         let lines = output.components(separatedBy: "\n")
         
@@ -312,7 +449,7 @@ class NetworkSpeedManager: ObservableObject {
         return results
     }
     
-    private func splitAddressPort(_ str: String) -> (String, String) {
+    nonisolated private func splitAddressPort(_ str: String) -> (String, String) {
         // IPv6: [::1]:8080 or *:8080 or 127.0.0.1:8080
         let s = str.trimmingCharacters(in: .whitespaces)
         if s.hasPrefix("[") {
@@ -350,102 +487,93 @@ class NetworkSpeedManager: ObservableObject {
         }
         
         // If SIGTERM fails (e.g. permission denied), try with privilege escalation
-        let script = "do shell script \"kill -9 \(pid)\" with administrator privileges"
-        let appleScript = Process()
-        appleScript.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-        appleScript.arguments = ["-e", script]
+        PrivilegedManager.shared.run("kill -9 \(pid)")
         
-        let errPipe = Pipe()
-        appleScript.standardError = errPipe
-        appleScript.standardOutput = Pipe()
-        
-        do {
-            try appleScript.run()
-            appleScript.waitUntilExit()
-            if appleScript.terminationStatus == 0 {
-                LogManager.shared.info("Force-terminated process PID \(pid) with admin privileges")
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                    self?.refreshProcessList()
-                    completion(true)
-                }
-            } else {
-                LogManager.shared.error("Failed to terminate PID \(pid)")
-                completion(false)
-            }
-        } catch {
-            LogManager.shared.error("Failed to run kill script: \(error)")
-            completion(false)
+        LogManager.shared.info("Force-terminated process PID \(pid) with PrivilegedManager")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.refreshProcessList()
+            completion(true)
         }
     }
     
     private func fetchStats() {
-        let currentStats = parseNetstat()
-        let now = Date()
-        
-        if let prevTimestamp = previousTimestamp {
-            let elapsed = now.timeIntervalSince(prevTimestamp)
-            guard elapsed > 0 else { return }
+        Task.detached(priority: .background) { [weak self] in
+            guard let self = self else { return }
+            let currentStats = self.parseNetstat()
+            let now = Date()
             
-            var updatedInterfaces: [NetworkInterfaceStats] = []
-            
-            for var iface in currentStats {
-                if let prev = previousStats[iface.id] {
-                    let deltaIn = iface.bytesIn >= prev.bytesIn ? iface.bytesIn - prev.bytesIn : 0
-                    let deltaOut = iface.bytesOut >= prev.bytesOut ? iface.bytesOut - prev.bytesOut : 0
-                    iface.speedIn = Double(deltaIn) / elapsed
-                    iface.speedOut = Double(deltaOut) / elapsed
+            await MainActor.run {
+                if let prevTimestamp = self.previousTimestamp {
+                    let elapsed = now.timeIntervalSince(prevTimestamp)
+                    guard elapsed > 0 else { return }
+                    
+                    var updatedInterfaces: [NetworkInterfaceStats] = []
+                    
+                    for var iface in currentStats {
+                        if let prev = self.previousStats[iface.id] {
+                            let deltaIn = iface.bytesIn >= prev.bytesIn ? iface.bytesIn - prev.bytesIn : 0
+                            let deltaOut = iface.bytesOut >= prev.bytesOut ? iface.bytesOut - prev.bytesOut : 0
+                            iface.speedIn = Double(deltaIn) / elapsed
+                            iface.speedOut = Double(deltaOut) / elapsed
+                        }
+                        updatedInterfaces.append(iface)
+                    }
+                    
+                    self.interfaces = updatedInterfaces.sorted { a, b in
+                        // Priority: active with traffic > active no traffic > loopback > inactive
+                        let aIsLo = a.name.starts(with: "lo")
+                        let bIsLo = b.name.starts(with: "lo")
+                        if a.isActive != b.isActive { return a.isActive }
+                        if aIsLo != bIsLo { return !aIsLo }
+                        let aTraffic = a.speedIn + a.speedOut
+                        let bTraffic = b.speedIn + b.speedOut
+                        if aTraffic != bTraffic { return aTraffic > bTraffic }
+                        return a.displayName < b.displayName
+                    }
+                    
+                    // Calculate totals based on selection
+                    let physicalIfaces = self.interfaces.filter { $0.role == .physical }
+                    let tunnelIfaces = self.interfaces.filter { $0.role == .tunnel }
+
+                    let selectedIfaces: [NetworkInterfaceStats]
+                    if self.selectedInterface == "all" {
+                        // Preserve physical totals for "internet-facing" traffic and
+                        // expose tunnel traffic separately to avoid VPN double-counting.
+                        selectedIfaces = physicalIfaces
+                    } else {
+                        selectedIfaces = self.interfaces.filter { $0.id == self.selectedInterface }
+                    }
+                    
+                    self.totalSpeedIn = selectedIfaces.reduce(0) { $0 + $1.speedIn }
+                    self.totalSpeedOut = selectedIfaces.reduce(0) { $0 + $1.speedOut }
+                    self.totalBytesIn = selectedIfaces.reduce(0) { $0 + $1.bytesIn }
+                    self.totalBytesOut = selectedIfaces.reduce(0) { $0 + $1.bytesOut }
+                    self.tunnelSpeedIn = tunnelIfaces.reduce(0) { $0 + $1.speedIn }
+                    self.tunnelSpeedOut = tunnelIfaces.reduce(0) { $0 + $1.speedOut }
+                    self.tunnelBytesIn = tunnelIfaces.reduce(0) { $0 + $1.bytesIn }
+                    self.tunnelBytesOut = tunnelIfaces.reduce(0) { $0 + $1.bytesOut }
+                    
+                    // Add to history
+                    let sample = SpeedSample(timestamp: now, speedIn: self.totalSpeedIn, speedOut: self.totalSpeedOut)
+                    self.speedHistory.append(sample)
+                    if self.speedHistory.count > self.maxHistoryCount {
+                        self.speedHistory.removeFirst(self.speedHistory.count - self.maxHistoryCount)
+                    }
                 }
-                updatedInterfaces.append(iface)
-            }
-            
-            interfaces = updatedInterfaces.sorted { a, b in
-                // Priority: active with traffic > active no traffic > loopback > inactive
-                let aIsLo = a.name.starts(with: "lo")
-                let bIsLo = b.name.starts(with: "lo")
-                if a.isActive != b.isActive { return a.isActive }
-                if aIsLo != bIsLo { return !aIsLo }
-                let aTraffic = a.speedIn + a.speedOut
-                let bTraffic = b.speedIn + b.speedOut
-                if aTraffic != bTraffic { return aTraffic > bTraffic }
-                return a.displayName < b.displayName
-            }
-            
-            // Calculate totals based on selection
-            let selectedIfaces: [NetworkInterfaceStats]
-            if selectedInterface == "all" {
-                // Exclude loopback and virtual/tunnel interfaces to prevent double-counting VPN traffic
-                let virtualPrefixes = ["lo", "utun", "ipsec", "awdl", "llw", "gif", "stf", "bridge"]
-                selectedIfaces = interfaces.filter { iface in
-                    !virtualPrefixes.contains(where: { iface.name.starts(with: $0) })
+                
+                // Store for next iteration
+                self.previousStats = [:]
+                for iface in currentStats {
+                    self.previousStats[iface.id] = (bytesIn: iface.bytesIn, bytesOut: iface.bytesOut)
                 }
-            } else {
-                selectedIfaces = interfaces.filter { $0.id == selectedInterface }
-            }
-            
-            totalSpeedIn = selectedIfaces.reduce(0) { $0 + $1.speedIn }
-            totalSpeedOut = selectedIfaces.reduce(0) { $0 + $1.speedOut }
-            totalBytesIn = selectedIfaces.reduce(0) { $0 + $1.bytesIn }
-            totalBytesOut = selectedIfaces.reduce(0) { $0 + $1.bytesOut }
-            
-            // Add to history
-            let sample = SpeedSample(timestamp: now, speedIn: totalSpeedIn, speedOut: totalSpeedOut)
-            speedHistory.append(sample)
-            if speedHistory.count > maxHistoryCount {
-                speedHistory.removeFirst(speedHistory.count - maxHistoryCount)
+                self.previousTimestamp = now
             }
         }
-        
-        // Store for next iteration
-        previousStats = [:]
-        for iface in currentStats {
-            previousStats[iface.id] = (bytesIn: iface.bytesIn, bytesOut: iface.bytesOut)
-        }
-        previousTimestamp = now
     }
     
     // MARK: - Parse netstat -bni
     
-    private func parseNetstat() -> [NetworkInterfaceStats] {
+    nonisolated private func parseNetstat() -> [NetworkInterfaceStats] {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/sbin/netstat")
         process.arguments = ["-bni"]
@@ -467,7 +595,7 @@ class NetworkSpeedManager: ObservableObject {
         }
     }
     
-    private func parseNetstatOutput(_ output: String) -> [NetworkInterfaceStats] {
+    nonisolated private func parseNetstatOutput(_ output: String) -> [NetworkInterfaceStats] {
         var results: [String: NetworkInterfaceStats] = [:]
         let lines = output.components(separatedBy: "\n").filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
         guard let headerLine = lines.first else { return [] }
@@ -501,11 +629,6 @@ class NetworkSpeedManager: ObservableObject {
             // Header usually assumes 'Address' is present. If parts[2] is <Link>, 
             // then parts[3] might be the MAC address or physical info. 
             // If parts[3] is a large number, it's actually Ipkts (Address column is skipped in this row).
-            
-            var rowOffset = 0
-            // Logic: The header says Ipkts is at index X. 
-            // If parts[X] is NOT a number (and not '-'), it means there's an extra column or Address is pushing it.
-            // If parts[X-1] is the first number, it means Address is missing.
             
             // Refined Logic: Standard netstat -bni header:
             // 0:Name 1:Mtu 2:Network 3:Address 4:Ipkts ...
@@ -605,6 +728,42 @@ class NetworkSpeedManager: ObservableObject {
     func trafficSnapshots(for range: TrafficTimeRange) -> [TrafficSnapshot] {
         let cutoff = Date().timeIntervalSince1970 - range.seconds
         return trafficHistory.filter { $0.timestamp >= cutoff }
+    }
+    
+    func exportTrafficStats(for range: TrafficTimeRange) {
+        let snapshots = trafficSnapshots(for: range)
+        guard !snapshots.isEmpty else { return }
+        
+        var csv = "Timestamp,Date,BytesIn,BytesOut,SpeedIn,SpeedOut\n"
+        let formatter = ISO8601DateFormatter()
+        for s in snapshots {
+            let dateStr = formatter.string(from: Date(timeIntervalSince1970: s.timestamp))
+            csv += "\(s.timestamp),\(dateStr),\(s.bytesIn),\(s.bytesOut),\(s.speedIn),\(s.speedOut)\n"
+        }
+        
+        DispatchQueue.main.async {
+            let panel = NSSavePanel()
+            panel.allowedContentTypes = [.commaSeparatedText]
+            panel.nameFieldStringValue = "network_traffic_\(range.rawValue).csv"
+            panel.begin { result in
+                if result == .OK, let url = panel.url {
+                    do {
+                        try csv.write(to: url, atomically: true, encoding: .utf8)
+                        LogManager.shared.info("Exported traffic stats to \(url.path)")
+                    } catch {
+                        LogManager.shared.error("Failed to export traffic stats: \(error)")
+                    }
+                }
+            }
+        }
+    }
+    
+    func resetTrafficStats() {
+        trafficHistory.removeAll()
+        persistTrafficHistory()
+        totalBytesIn = 0
+        totalBytesOut = 0
+        LogManager.shared.info("Reset traffic history")
     }
     
     func trafficTotals(for range: TrafficTimeRange) -> (bytesIn: UInt64, bytesOut: UInt64) {

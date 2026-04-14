@@ -1,6 +1,7 @@
 
 import SwiftUI
 import UniformTypeIdentifiers
+import Charts
 
 // MARK: - Sidebar Navigation Item
 enum SidebarItem: String, CaseIterable, Identifiable {
@@ -155,6 +156,9 @@ struct MainView: View {
             .buttonStyle(.plain)
             .help("Switch Language")
 
+            // Tailscale Quick Action
+            TailscaleQuickActionView()
+
             Button(action: { viewModel.toggle() }) {
                 HStack(spacing: 6) {
                     Image(systemName: viewModel.isRunning ? "stop.fill" : "play.fill")
@@ -185,6 +189,65 @@ struct MainView: View {
             )
         )
         .background(.ultraThinMaterial)
+    }
+}
+
+struct TailscaleQuickActionView: View {
+    @ObservedObject var tailscale = TailscaleManager.shared
+    @ObservedObject var languageManager = LanguageManager.shared
+    
+    var body: some View {
+        Menu {
+            if tailscale.availableExitNodes.isEmpty {
+                Text(languageManager.t("tailscale.no_exit_nodes"))
+            } else {
+                Button(action: { tailscale.disableExitNode() }) {
+                    HStack {
+                        Text(languageManager.t("settings.none"))
+                        if tailscale.currentExitNode == nil {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+                
+                Divider()
+                
+                ForEach(tailscale.availableExitNodes) { exitNode in
+                    Button(action: { tailscale.switchExitNode(to: exitNode.node) }) {
+                        HStack {
+                            Text(exitNode.node.hostname)
+                            if let lat = exitNode.latency {
+                                Text("(\(Int(lat))ms)").foregroundStyle(.secondary)
+                            }
+                            if tailscale.currentExitNode?.tailscaleIP == exitNode.node.tailscaleIP {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "network")
+                    .font(.system(size: 12))
+                if let current = tailscale.currentExitNode {
+                    Text(current.hostname)
+                        .font(.system(size: 11, weight: .medium))
+                } else {
+                    Text("Tailscale")
+                        .font(.system(size: 11, weight: .medium))
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                Capsule()
+                    .fill(tailscale.currentExitNode != nil ? Color.blue.opacity(0.15) : Color.gray.opacity(0.1))
+            )
+            .foregroundStyle(tailscale.currentExitNode != nil ? .blue : .primary)
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
     }
 }
 
@@ -255,7 +318,7 @@ struct StatisticsContentView: View {
             var earliestStartTime = Date()
             var hostCount = 0
             
-            for (hostId, stats) in viewModel.hostStats {
+            for (_, stats) in viewModel.hostStats {
                 totalPings += stats.totalPings
                 successfulPings += stats.successfulPings
                 failedPings += stats.failedPings
@@ -320,11 +383,21 @@ struct StatisticsContentView: View {
                 // 操作按钮
                 HStack {
                     if let singleHost = host {
+                        Button(languageManager.t("stats.export_current")) {
+                            viewModel.exportStats(for: singleHost.id)
+                        }
+                        .buttonStyle(.bordered)
+                        
                         Button(languageManager.t("stats.reset_current")) {
                             viewModel.resetStats(for: singleHost.id)
                         }
                         .buttonStyle(.bordered)
                     }
+                    
+                    Button(languageManager.t("stats.export_all")) {
+                        viewModel.exportAllStats()
+                    }
+                    .buttonStyle(.bordered)
                     
                     Button(languageManager.t("stats.reset_all")) {
                         viewModel.resetAllStats()
@@ -446,12 +519,17 @@ struct StatCard: View {
                 .font(.system(.title2, design: .rounded, weight: .bold))
                 .foregroundStyle(.primary)
                 .contentTransition(.numericText())
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
             
             Text(title)
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
         }
         .frame(maxWidth: .infinity)
+        .frame(height: 100)
         .padding(.vertical, 14)
         .padding(.horizontal, 8)
         .background(
@@ -498,10 +576,83 @@ struct LatencyChartView: View {
             }
             
             // Chart
-            GeometryReader { geometry in
-                chartContent(size: geometry.size)
+            if !history.isEmpty {
+                Chart {
+                    ForEach(history) { point in
+                        LineMark(
+                            x: .value("Time", point.timestamp),
+                            y: .value("Latency", point.latency)
+                        )
+                        .interpolationMethod(.monotone)
+                        .foregroundStyle(
+                            .linearGradient(
+                                colors: [.blue, .cyan, .green],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .shadow(color: .blue.opacity(0.35), radius: 3)
+                        
+                        AreaMark(
+                            x: .value("Time", point.timestamp),
+                            y: .value("Latency", point.latency)
+                        )
+                        .interpolationMethod(.monotone)
+                        .foregroundStyle(
+                            .linearGradient(
+                                colors: [.cyan.opacity(0.25), .cyan.opacity(0.0)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                    }
+                    
+                    if let avg = averageLatency(for: history) {
+                        RuleMark(y: .value("Avg", avg))
+                            .foregroundStyle(Color.orange.opacity(0.6))
+                            .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 3]))
+                            .annotation(position: .top, alignment: .trailing) {
+                                Text(String(format: "%.0f ms", avg))
+                                    .font(.system(size: 9, design: .monospaced))
+                                    .foregroundStyle(Color.orange)
+                            }
+                    }
+                }
+                .animation(.easeInOut, value: history.map { $0.latency })
+                .chartYScale(domain: .automatic(includesZero: true))
+                .chartYScale(domain: 0...chartMaxLatency)
+                .chartYAxis {
+                    AxisMarks(position: .leading) { value in
+                        AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [4, 4]))
+                            .foregroundStyle(Color.gray.opacity(0.2))
+                        AxisValueLabel {
+                            if let val = value.as(Double.self) {
+                                Text("\(Int(val))")
+                                    .frame(width: 40, alignment: .trailing)
+                                    .foregroundStyle(Color.gray)
+                                    .font(.system(size: 9))
+                            }
+                        }
+                    }
+                }
+                .chartXAxis {
+                    AxisMarks(values: .automatic(desiredCount: 5)) { value in
+                        if let date = value.as(Date.self) {
+                            AxisValueLabel {
+                                Text(date.formatted(.dateTime.hour().minute().second()))
+                                    .font(.system(size: 8))
+                                    .foregroundStyle(Color.gray)
+                            }
+                        }
+                    }
+                }
+                .frame(height: 180)
+            } else {
+                Text(languageManager.t("dashboard.no_data"))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .frame(height: 180)
             }
-            .frame(height: 180)
             
             // Legend
             HStack(spacing: 16) {
@@ -525,186 +676,14 @@ struct LatencyChartView: View {
             RoundedRectangle(cornerRadius: 16)
                 .stroke(Color.blue.opacity(0.08), lineWidth: 1)
         )
-        .onAppear { animateEndpoint = true }
-    }
-    
-    private func chartContent(size: CGSize) -> some View {
-        let leftPad: CGFloat = 40
-        let rightPad: CGFloat = 10
-        let topPad: CGFloat = 5
-        let bottomPad: CGFloat = 22 // space for X-axis labels
-        let chartWidth = size.width - leftPad - rightPad
-        let chartHeight = size.height - topPad - bottomPad
-        
-        return ZStack(alignment: .topLeading) {
-            // Y-axis labels and grid lines
-            ForEach(yAxisValues(), id: \.self) { value in
-                let normalizedY = (value - chartMinLatency) / (chartMaxLatency - chartMinLatency)
-                let y = topPad + chartHeight - CGFloat(normalizedY) * chartHeight
-                
-                Path { path in
-                    path.move(to: CGPoint(x: leftPad, y: y))
-                    path.addLine(to: CGPoint(x: size.width - rightPad, y: y))
-                }
-                .stroke(Color.gray.opacity(0.12), style: StrokeStyle(lineWidth: 0.5, dash: [4, 4]))
-                
-                Text("\(Int(value))")
-                    .font(.system(size: 9, design: .monospaced))
-                    .foregroundStyle(.tertiary)
-                    .position(x: 18, y: y)
-            }
-            
-            // X-axis time labels
-            ForEach(xAxisIndices(), id: \.self) { index in
-                let point = history[index]
-                let x = leftPad + chartWidth * CGFloat(index) / CGFloat(max(history.count - 1, 1))
-                let y = topPad + chartHeight + 12
-                
-                Text(formatTime(point.timestamp))
-                    .font(.system(size: 8, design: .monospaced))
-                    .foregroundStyle(.tertiary)
-                    .position(x: x, y: y)
-            }
-            
-            // Threshold reference lines
-            ForEach([50.0, 100.0], id: \.self) { threshold in
-                if threshold >= chartMinLatency && threshold <= chartMaxLatency {
-                    let normalizedY = (threshold - chartMinLatency) / (chartMaxLatency - chartMinLatency)
-                    let y = topPad + chartHeight - CGFloat(normalizedY) * chartHeight
-                    
-                    Path { path in
-                        path.move(to: CGPoint(x: leftPad, y: y))
-                        path.addLine(to: CGPoint(x: size.width - rightPad, y: y))
-                    }
-                    .stroke(
-                        threshold == 50 ? Color.green.opacity(0.2) : Color.orange.opacity(0.2),
-                        style: StrokeStyle(lineWidth: 1, dash: [6, 3])
-                    )
-                }
-            }
-            
-            // Gradient fill under curve
-            Path { path in
-                guard history.count > 1 else { return }
-                let points = chartPoints(width: chartWidth, height: chartHeight, leftPad: leftPad, topPad: topPad)
-                path.move(to: CGPoint(x: points.first!.x, y: topPad + chartHeight))
-                path.addLine(to: points.first!)
-                addSmoothCurve(to: &path, points: points)
-                path.addLine(to: CGPoint(x: points.last!.x, y: topPad + chartHeight))
-                path.closeSubpath()
-            }
-            .fill(
-                LinearGradient(
-                    colors: [.blue.opacity(0.15), .cyan.opacity(0.05), .clear],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            )
-            
-            // Gradient colored Bézier line segments
-            Canvas { context, canvasSize in
-                guard history.count > 1 else { return }
-                let points = chartPoints(width: chartWidth, height: chartHeight, leftPad: leftPad, topPad: topPad)
-                
-                // Draw line segments individually with per-point color
-                for i in 1..<points.count {
-                    let p0 = points[i - 1]
-                    let p1 = points[i]
-                    let midX = (p0.x + p1.x) / 2
-                    
-                    var seg = Path()
-                    seg.move(to: p0)
-                    seg.addCurve(to: p1, control1: CGPoint(x: midX, y: p0.y), control2: CGPoint(x: midX, y: p1.y))
-                    
-                    let avgLatency = (history[i-1].latency + history[i].latency) / 2
-                    context.stroke(seg, with: .color(latencyColor(for: avgLatency)), lineWidth: 2.5)
-                }
-                
-                // Data points — draw every Nth for clarity
-                let step = max(1, history.count / 20)
-                for (index, point) in history.enumerated() {
-                    guard index % step == 0 || index == history.count - 1 else { continue }
-                    let pt = points[index]
-                    let isLast = index == history.count - 1
-                    let dotSize: CGFloat = isLast ? 5 : 3
-                    let dotPath = Path(ellipseIn: CGRect(x: pt.x - dotSize, y: pt.y - dotSize, width: dotSize * 2, height: dotSize * 2))
-                    context.fill(dotPath, with: .color(latencyColor(for: point.latency)))
-                    context.stroke(dotPath, with: .color(.white.opacity(0.8)), lineWidth: isLast ? 2 : 1)
-                }
-            }
-            
-            // Pulsing endpoint
-            if let last = history.last {
-                let points = chartPoints(width: chartWidth, height: chartHeight, leftPad: leftPad, topPad: topPad)
-                if let lastPt = points.last {
-                    Circle()
-                        .fill(latencyColor(for: last.latency).opacity(0.3))
-                        .frame(width: 16, height: 16)
-                        .scaleEffect(animateEndpoint ? 1.8 : 1.0)
-                        .opacity(animateEndpoint ? 0 : 0.5)
-                        .animation(.easeOut(duration: 1.5).repeatForever(autoreverses: false), value: animateEndpoint)
-                        .position(lastPt)
-                }
-            }
-        }
     }
     
     // MARK: - Helpers
     
-    private func chartPoints(width: CGFloat, height: CGFloat, leftPad: CGFloat, topPad: CGFloat) -> [CGPoint] {
-        let stepX = width / CGFloat(max(history.count - 1, 1))
-        return history.enumerated().map { index, point in
-            let x = leftPad + CGFloat(index) * stepX
-            let normalizedY = (point.latency - chartMinLatency) / (chartMaxLatency - chartMinLatency)
-            let y = topPad + height - CGFloat(normalizedY) * height
-            return CGPoint(x: x, y: y)
-        }
-    }
-    
-    private func addSmoothCurve(to path: inout Path, points: [CGPoint]) {
-        guard points.count > 1 else { return }
-        for i in 1..<points.count {
-            let p0 = points[i - 1]
-            let p1 = points[i]
-            let midX = (p0.x + p1.x) / 2
-            path.addCurve(to: p1, control1: CGPoint(x: midX, y: p0.y), control2: CGPoint(x: midX, y: p1.y))
-        }
-    }
-    
-    private func yAxisValues() -> [Double] {
-        let range = chartMaxLatency - chartMinLatency
-        guard range > 0 else { return [chartMinLatency] }
-        let step = niceStep(for: range)
-        var values: [Double] = []
-        var v = (chartMinLatency / step).rounded(.down) * step
-        while v <= chartMaxLatency {
-            if v >= chartMinLatency { values.append(v) }
-            v += step
-        }
-        return values
-    }
-    
-    private func xAxisIndices() -> [Int] {
-        guard history.count > 1 else { return history.isEmpty ? [] : [0] }
-        let count = min(5, history.count)
-        let step = Double(history.count - 1) / Double(count - 1)
-        return (0..<count).map { Int(Double($0) * step) }
-    }
-    
-    private func formatTime(_ date: Date) -> String {
-        let f = DateFormatter()
-        f.dateFormat = "HH:mm:ss"
-        return f.string(from: date)
-    }
-    
-    private func niceStep(for range: Double) -> Double {
-        let rough = range / 4.0
-        let mag = pow(10, floor(log10(rough)))
-        let norm = rough / mag
-        if norm <= 1 { return 1 * mag }
-        if norm <= 2 { return 2 * mag }
-        if norm <= 5 { return 5 * mag }
-        return 10 * mag
+    private func averageLatency(for points: [LatencyPoint]) -> Double? {
+        guard !points.isEmpty else { return nil }
+        let total = points.reduce(0) { $0 + $1.latency }
+        return total / Double(points.count)
     }
     
     private func latencyLegend(_ label: String, color: Color) -> some View {
@@ -726,10 +705,16 @@ struct LatencyChartView: View {
     }
     
     var chartMaxLatency: Double {
-        let maxVal = max(history.map { $0.latency }.max() ?? 100, 1)
-        let minVal = history.map { $0.latency }.min() ?? 0
-        let padding = max((maxVal - minVal) * 0.15, 5)
-        return maxVal + padding
+        let values = history.map { $0.latency }
+        let maxVal = values.max() ?? 100
+        let avgVal = values.isEmpty ? 0 : values.reduce(0, +) / Double(values.count)
+        
+        // Cap the display scale to at most 5x the average or a minimum of 200
+        // This prevents a single huge spike from ruining the visibility of normal data
+        let adaptiveCap = max(200, avgVal * 5)
+        let displayMax = min(maxVal, adaptiveCap)
+        
+        return max(10, displayMax * 1.1) // Add 10% padding
     }
 }
 
@@ -816,6 +801,8 @@ struct DetailStatCard: View {
                 Text(label)
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
             Text(value)
                 .font(.system(size: 14, weight: .semibold, design: .monospaced))
@@ -824,6 +811,7 @@ struct DetailStatCard: View {
                 .minimumScaleFactor(0.7)
         }
         .frame(maxWidth: .infinity)
+        .frame(height: 56)
         .padding(.vertical, 10)
         .padding(.horizontal, 6)
         .background(
@@ -852,12 +840,17 @@ struct TrafficCard: View {
                 Text(label)
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
                 Text(value)
                     .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
             Spacer()
         }
         .frame(maxWidth: .infinity)
+        .frame(height: 56)
         .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 10)
@@ -879,6 +872,8 @@ struct MonitorTab: View {
     @State private var newHostAddress = ""
     @State private var newHostCommand = ""
     @State private var newHostRules: [DisplayRule] = []
+    @State private var newHostProbeMode: HostProbeMode = .icmp
+    @State private var newHostTCPPort = 443
     @State private var showingAddHost = false
     @ObservedObject private var languageManager = LanguageManager.shared
 
@@ -922,6 +917,8 @@ struct MonitorTab: View {
                                         newHostAddress = host.address
                                         newHostCommand = host.command
                                         newHostRules = host.displayRules
+                                        newHostProbeMode = host.probeMode
+                                        newHostTCPPort = host.tcpPort
                                     },
                                     onDelete: {
                                         if let index = viewModel.hosts.firstIndex(where: { $0.id == host.id }) {
@@ -972,8 +969,17 @@ struct MonitorTab: View {
                 address: $newHostAddress,
                 command: $newHostCommand,
                 displayRules: $newHostRules,
+                probeMode: $newHostProbeMode,
+                tcpPort: $newHostTCPPort,
                 onSave: {
-                    viewModel.addHost(name: newHostName, address: newHostAddress, command: newHostCommand, displayRules: newHostRules.isEmpty ? nil : newHostRules)
+                    viewModel.addHost(
+                        name: newHostName,
+                        address: newHostAddress,
+                        command: newHostCommand,
+                        displayRules: newHostRules.isEmpty ? nil : newHostRules,
+                        probeMode: newHostProbeMode,
+                        tcpPort: newHostTCPPort
+                    )
                     resetForm()
                 }
             )
@@ -989,13 +995,23 @@ struct MonitorTab: View {
                 address: $newHostAddress,
                 command: $newHostCommand,
                 displayRules: $newHostRules,
+                probeMode: $newHostProbeMode,
+                tcpPort: $newHostTCPPort,
                 onSave: {
                     let trimmedName = newHostName.trimmingCharacters(in: .whitespacesAndNewlines)
                     let trimmedAddress = newHostAddress.trimmingCharacters(in: .whitespacesAndNewlines)
                     let trimmedCommand = newHostCommand.trimmingCharacters(in: .whitespacesAndNewlines)
                     
                     if let index = viewModel.hosts.firstIndex(where: { $0.id == host.id }) {
-                        viewModel.updateHost(at: index, name: trimmedName, address: trimmedAddress, command: trimmedCommand, displayRules: newHostRules)
+                        viewModel.updateHost(
+                            at: index,
+                            name: trimmedName,
+                            address: trimmedAddress,
+                            command: trimmedCommand,
+                            displayRules: newHostRules,
+                            probeMode: newHostProbeMode,
+                            tcpPort: newHostTCPPort
+                        )
                     }
                     editingHost = nil
                 }
@@ -1008,6 +1024,8 @@ struct MonitorTab: View {
         newHostAddress = ""
         newHostCommand = ""
         newHostRules = []
+        newHostProbeMode = .icmp
+        newHostTCPPort = 443
     }
 }
 
@@ -1239,6 +1257,8 @@ struct HostsManagementView: View {
     @State private var newHostAddress = ""
     @State private var newHostCommand = ""
     @State private var newHostRules: [DisplayRule] = []
+    @State private var newHostProbeMode: HostProbeMode = .icmp
+    @State private var newHostTCPPort = 443
     @State private var hoveredHostId: UUID?
     @ObservedObject private var languageManager = LanguageManager.shared
 
@@ -1279,6 +1299,8 @@ struct HostsManagementView: View {
                                     newHostAddress = host.address
                                     newHostCommand = host.command
                                     newHostRules = host.displayRules
+                                    newHostProbeMode = host.probeMode
+                                    newHostTCPPort = host.tcpPort
                                 },
                                 onDelete: {
                                     if let index = viewModel.hosts.firstIndex(where: { $0.id == host.id }) {
@@ -1306,13 +1328,22 @@ struct HostsManagementView: View {
                 address: $newHostAddress,
                 command: $newHostCommand,
                 displayRules: $newHostRules,
+                probeMode: $newHostProbeMode,
+                tcpPort: $newHostTCPPort,
                 onSave: {
                     let trimmedName = newHostName.trimmingCharacters(in: .whitespacesAndNewlines)
                     let trimmedAddress = newHostAddress.trimmingCharacters(in: .whitespacesAndNewlines)
                     let trimmedCommand = newHostCommand.trimmingCharacters(in: .whitespacesAndNewlines)
                     
                     if !trimmedName.isEmpty && !trimmedAddress.isEmpty {
-                        viewModel.addHost(name: trimmedName, address: trimmedAddress, command: trimmedCommand, displayRules: newHostRules.isEmpty ? nil : newHostRules)
+                        viewModel.addHost(
+                            name: trimmedName,
+                            address: trimmedAddress,
+                            command: trimmedCommand,
+                            displayRules: newHostRules.isEmpty ? nil : newHostRules,
+                            probeMode: newHostProbeMode,
+                            tcpPort: newHostTCPPort
+                        )
                         resetForm()
                     }
                 }
@@ -1329,6 +1360,8 @@ struct HostsManagementView: View {
                 address: $newHostAddress,
                 command: $newHostCommand,
                 displayRules: $newHostRules,
+                probeMode: $newHostProbeMode,
+                tcpPort: $newHostTCPPort,
                 onSave: {
                     let trimmedName = newHostName.trimmingCharacters(in: .whitespacesAndNewlines)
                     let trimmedAddress = newHostAddress.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1336,7 +1369,15 @@ struct HostsManagementView: View {
                     
                     if !trimmedName.isEmpty && !trimmedAddress.isEmpty {
                         if let index = viewModel.hosts.firstIndex(where: { $0.id == host.id }) {
-                            viewModel.updateHost(at: index, name: trimmedName, address: trimmedAddress, command: trimmedCommand, displayRules: newHostRules)
+                            viewModel.updateHost(
+                                at: index,
+                                name: trimmedName,
+                                address: trimmedAddress,
+                                command: trimmedCommand,
+                                displayRules: newHostRules,
+                                probeMode: newHostProbeMode,
+                                tcpPort: newHostTCPPort
+                            )
                         }
                     }
                     editingHost = nil
@@ -1353,6 +1394,8 @@ struct HostsManagementView: View {
             DisplayRule(condition: "less", threshold: 50, label: "Direct", enabled: true),
             DisplayRule(condition: "greater", threshold: 100, label: "Relay", enabled: true)
         ]
+        newHostProbeMode = .icmp
+        newHostTCPPort = 443
     }
 }
 
@@ -1421,6 +1464,15 @@ struct HostManagementCard: View {
                             .foregroundStyle(rule.condition == "less" ? .green : .orange)
                     }
                 }
+            }
+
+            HStack(spacing: 4) {
+                Image(systemName: host.probeMode == .tcp ? "cable.connector" : "waveform.path.ecg")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
+                Text(host.probeMode == .tcp ? "TCP \(host.tcpPort)" : "ICMP")
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundStyle(.secondary)
             }
             
             // Custom command
@@ -1661,6 +1713,8 @@ struct HostEditorSheet: View {
     @Binding var address: String
     @Binding var command: String
     @Binding var displayRules: [DisplayRule]
+    @Binding var probeMode: HostProbeMode
+    @Binding var tcpPort: Int
     let onSave: () -> Void
     @State private var showingAddRule = false
     @ObservedObject private var languageManager = LanguageManager.shared
@@ -1676,6 +1730,23 @@ struct HostEditorSheet: View {
                         TextField(languageManager.t("editor.name"), text: $name)
                         TextField(languageManager.t("editor.address"), text: $address)
                             .textContentType(.URL)
+
+                        Picker("Probe", selection: $probeMode) {
+                            Text("ICMP").tag(HostProbeMode.icmp)
+                            Text("TCP").tag(HostProbeMode.tcp)
+                        }
+                        .pickerStyle(.segmented)
+
+                        if probeMode == .tcp {
+                            Stepper(value: $tcpPort, in: 1...65535) {
+                                HStack {
+                                    Text("TCP Port")
+                                    Spacer()
+                                    Text("\(tcpPort)")
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
                         
                         VStack(alignment: .leading, spacing: 4) {
                             TextField(languageManager.t("editor.command"), text: $command)
@@ -2309,6 +2380,7 @@ struct SettingsTab: View {
                                 Text(languageManager.t("settings.interval.3s")).tag(3.0)
                                 Text(languageManager.t("settings.interval.5s")).tag(5.0)
                                 Text(languageManager.t("settings.interval.10s")).tag(10.0)
+                                Text(languageManager.t("settings.interval.15s")).tag(15.0)
                                 Text(languageManager.t("settings.interval.30s")).tag(30.0)
                             }
                             .pickerStyle(.segmented)
@@ -2441,4 +2513,3 @@ struct HostDropDelegate: DropDelegate {
         return DropProposal(operation: .move)
     }
 }
-

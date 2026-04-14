@@ -40,6 +40,7 @@ struct NetworkSpeedTab: View {
                     VStack(spacing: 20) {
                         speedOverviewCard
                         speedChartCard
+                        topProcessesCard
                         trafficStatsCard
                         trafficTrendCard
                         interfaceDetailsCard
@@ -51,19 +52,15 @@ struct NetworkSpeedTab: View {
             }
         }
         .background(Theme.Colors.background)
-        .onAppear { speedManager.startMonitoring() }
+        .onAppear {
+            speedManager.startMonitoring()
+            speedManager.startProcessMonitoring()
+        }
         .onDisappear {
             if !viewModel.showSpeedInMenu {
                 speedManager.stopMonitoring()
             }
             speedManager.stopProcessMonitoring()
-        }
-        .onChange(of: tabMode) { _, newValue in
-            if newValue == .processes {
-                speedManager.startProcessMonitoring()
-            } else {
-                speedManager.stopProcessMonitoring()
-            }
         }
     }
     
@@ -178,6 +175,32 @@ struct NetworkSpeedTab: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .trailing)
                 }
+
+                if speedManager.selectedInterface == "all" {
+                    Divider().opacity(0.15)
+
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Tunnel/VPN")
+                                .font(Theme.Fonts.body(10))
+                                .foregroundStyle(Theme.Colors.textSecondary)
+                            HStack(spacing: 8) {
+                                Text("↓ \(NetworkSpeedManager.formatSpeed(speedManager.tunnelSpeedIn))")
+                                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                    .foregroundStyle(Theme.Colors.accentCyan)
+                                Text("↑ \(NetworkSpeedManager.formatSpeed(speedManager.tunnelSpeedOut))")
+                                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                    .foregroundStyle(Theme.Colors.accentPurple)
+                            }
+                        }
+
+                        Spacer()
+
+                        Text("Physical totals exclude tunnel bytes to avoid double-counting")
+                            .font(.system(size: 10))
+                            .foregroundStyle(Theme.Colors.textTertiary)
+                    }
+                }
             }
         }
     }
@@ -249,7 +272,6 @@ struct NetworkSpeedTab: View {
                             )
                         }
                     }
-                    .animation(.easeInOut, value: samples.map { $0.speedIn + $0.speedOut })
                     .chartYAxis {
                         AxisMarks(position: .leading) { value in
                             AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [4, 4]))
@@ -295,6 +317,81 @@ struct NetworkSpeedTab: View {
     
 
     
+    private var topProcessesCard: some View {
+        ModernCard {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    SectionHeader(title: languageManager.t("netspeed.top_processes"), icon: "apps.ipad.hack")
+                    Spacer()
+                    Button(action: {
+                        withAnimation { tabMode = .processes }
+                    }) {
+                        Text(languageManager.t("monitor.title"))
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(Theme.Colors.accentBlue)
+                    }
+                    .buttonStyle(.plain)
+                }
+                
+                let topProcs = Array(speedManager.processList.prefix(5))
+                
+                if topProcs.isEmpty {
+                    Text(languageManager.t("netspeed.collecting"))
+                        .font(Theme.Fonts.body(11))
+                        .foregroundStyle(Theme.Colors.textTertiary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 10)
+                } else {
+                    VStack(spacing: 8) {
+                        ForEach(topProcs) { proc in
+                            HStack {
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(proc.processName)
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundStyle(Theme.Colors.textPrimary)
+                                        .lineLimit(1)
+                                    Text("PID \(proc.pid)")
+                                        .font(.system(size: 9, design: .monospaced))
+                                        .foregroundStyle(Theme.Colors.textTertiary)
+                                }
+                                
+                                Spacer()
+                                
+                                HStack(spacing: 8) {
+                                    if proc.speedOut > 1024 {
+                                        HStack(spacing: 2) {
+                                            Image(systemName: "arrow.up")
+                                                .font(.system(size: 8, weight: .bold))
+                                                .foregroundStyle(Theme.Colors.accentPurple)
+                                            Text(NetworkSpeedManager.formatSpeed(proc.speedOut))
+                                                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                                                .foregroundStyle(Theme.Colors.accentPurple)
+                                        }
+                                    }
+                                    
+                                    if proc.speedIn > 1024 {
+                                        HStack(spacing: 2) {
+                                            Image(systemName: "arrow.down")
+                                                .font(.system(size: 8, weight: .bold))
+                                                .foregroundStyle(Theme.Colors.accentCyan)
+                                            Text(NetworkSpeedManager.formatSpeed(proc.speedIn))
+                                                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                                                .foregroundStyle(Theme.Colors.accentCyan)
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            if proc.id != topProcs.last?.id {
+                                Divider().opacity(0.05)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
     // MARK: - Interface Details Card
     
     private var interfaceDetailsCard: some View {
@@ -333,6 +430,11 @@ struct NetworkSpeedTab: View {
                         .font(Theme.Fonts.body(12))
                         .foregroundStyle(iface.isActive ? Theme.Colors.textPrimary : Theme.Colors.textTertiary)
                         .lineLimit(1)
+                    if iface.role == .tunnel {
+                        Badge(text: "Tunnel", color: Theme.Colors.accentPurple)
+                    } else if iface.role == .physical {
+                        Badge(text: "Physical", color: Theme.Colors.accentBlue)
+                    }
                 }
                 
                 // Errors
@@ -486,6 +588,19 @@ struct NetworkSpeedTab: View {
                 HStack {
                     SectionHeader(title: languageManager.t("netspeed.traffic_trend"), icon: "waveform.path.ecg.rectangle")
                     Spacer()
+                    
+                    Button {
+                        speedManager.exportTrafficStats(for: trafficRange)
+                    } label: { Image(systemName: "square.and.arrow.up") }
+                    .buttonStyle(.plain)
+                    .help(languageManager.t("stats.export_current"))
+                    
+                    Button {
+                        speedManager.resetTrafficStats()
+                    } label: { Image(systemName: "trash") }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.red)
+                    .help(languageManager.t("stats.reset_current"))
                 }
                 
                 HStack(spacing: 16) {
@@ -584,7 +699,6 @@ struct NetworkSpeedTab: View {
                             )
                         }
                     }
-                    .animation(.easeInOut, value: snapshots.map { $0.speedIn + $0.speedOut })
                     .chartYAxis {
                         AxisMarks(position: .leading) { value in
                             AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [4, 4]))
@@ -799,6 +913,34 @@ struct ProcessListView: View {
                                 .font(.system(size: 9))
                                 .foregroundStyle(Theme.Colors.textTertiary)
                         }
+                    }
+                    
+                    // Real-time Speed
+                    if proc.totalSpeed > 100 { // Only show if more than 100B/s
+                        HStack(spacing: 8) {
+                            if proc.speedOut > 10 {
+                                HStack(spacing: 2) {
+                                    Image(systemName: "arrow.up")
+                                        .font(.system(size: 8, weight: .bold))
+                                        .foregroundStyle(Theme.Colors.accentPurple)
+                                    Text(NetworkSpeedManager.formatSpeed(proc.speedOut))
+                                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                                        .foregroundStyle(Theme.Colors.accentPurple)
+                                }
+                            }
+                            if proc.speedIn > 10 {
+                                HStack(spacing: 2) {
+                                    Image(systemName: "arrow.down")
+                                        .font(.system(size: 8, weight: .bold))
+                                        .foregroundStyle(Theme.Colors.accentCyan)
+                                    Text(NetworkSpeedManager.formatSpeed(proc.speedIn))
+                                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                                        .foregroundStyle(Theme.Colors.accentCyan)
+                                }
+                            }
+                        }
+                        .padding(.leading, 4)
+                        .transition(.opacity)
                     }
                     
                     Spacer()

@@ -3,601 +3,626 @@ import Charts
 
 struct DashboardView: View {
     @ObservedObject var viewModel: PingMonitorViewModel
-    
+    @StateObject private var speedManager = NetworkSpeedManager.shared
+    @State private var selectedWindow: NetworkQualityWindow = .fiveMinutes
+    @ObservedObject private var languageManager = LanguageManager.shared
+
+    private var globalSnapshot: GlobalQualitySnapshot {
+        viewModel.globalQualitySnapshot(window: selectedWindow)
+    }
+
+    private var trendPoints: [QualityTrendPoint] {
+        viewModel.qualityTrend(window: selectedWindow)
+    }
+
     var body: some View {
         ScrollView {
             Grid(horizontalSpacing: Theme.Layout.gridSpacing, verticalSpacing: Theme.Layout.gridSpacing) {
-                // Row 1: Running Status & Network Status
                 GridRow {
-                    RunningStatusCard(viewModel: viewModel)
-                        .gridCellColumns(1)
-                    NetworkStatusCard(viewModel: viewModel)
-                        .gridCellColumns(1)
+                    QualityScoreCard(snapshot: globalSnapshot, selectedWindow: $selectedWindow)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    QualityDimensionsCard(snapshot: globalSnapshot)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                
-                // Row 2: Traffic Stats & Traffic Trend
+
                 GridRow {
-                    TrafficAndLatencyCard(viewModel: viewModel)
-                        .gridCellColumns(1)
-                    TrafficTrendCard(viewModel: viewModel)
-                        .gridCellColumns(1)
+                    QualityTrendCard(snapshot: globalSnapshot, trendPoints: trendPoints)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    RecentEventsCard(events: globalSnapshot.recentEvents)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                
-                // Row 3: Summary & Ranking
+
                 GridRow {
-                    SummaryDonutCard(viewModel: viewModel)
-                        .gridCellColumns(1)
-                    RankingListCard(viewModel: viewModel)
-                        .gridCellColumns(1)
+                    HostHealthCard(
+                        snapshots: globalSnapshot.worstHosts
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    
+                    TrafficContextCard(
+                        speedManager: speedManager,
+                        snapshot: globalSnapshot
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
             .padding(Theme.Layout.cardPadding)
         }
         .background(Theme.Colors.background)
+        .onAppear {
+            speedManager.startMonitoring()
+        }
+        .onDisappear {
+            if !viewModel.showSpeedInMenu {
+                speedManager.stopMonitoring()
+            }
+        }
     }
 }
 
-// MARK: - Components
-
-struct RunningStatusCard: View {
-    @ObservedObject var viewModel: PingMonitorViewModel
+private struct QualityScoreCard: View {
+    let snapshot: GlobalQualitySnapshot
+    @Binding var selectedWindow: NetworkQualityWindow
     @ObservedObject private var languageManager = LanguageManager.shared
-    
-    // Get real memory usage
-    private var memoryUsage: String {
-        var info = mach_task_basic_info()
-        var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size) / 4
-        let result = withUnsafeMutablePointer(to: &info) {
-            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
-                task_info(mach_task_self_, task_flavor_t(MACH_TASK_BASIC_INFO), $0, &count)
-            }
-        }
-        guard result == KERN_SUCCESS else { return "N/A" }
-        let bytes = info.resident_size
-        let mb = Double(bytes) / 1024.0 / 1024.0
-        if mb >= 100 {
-            return String(format: "%.0f MB", mb)
-        }
-        return String(format: "%.1f MB", mb)
-    }
-    
+
     var body: some View {
         ModernCard {
-            VStack(alignment: .leading) {
+            VStack(alignment: .leading, spacing: 16) {
                 HStack {
-                    Image(systemName: "desktopcomputer")
-                        .foregroundStyle(Theme.Colors.accentBlue)
-                    Text(languageManager.t("dashboard.running_status"))
-                        .font(Theme.Fonts.display(14))
-                        .foregroundStyle(Theme.Colors.textPrimary)
+                    SectionHeader(title: languageManager.t("dashboard.quality_score"), icon: "waveform.badge.magnifyingglass")
                     Spacer()
-                    Circle()
-                        .fill(viewModel.isRunning ? Theme.Colors.accentGreen : Theme.Colors.textSecondary)
-                        .frame(width: 8, height: 8)
+                    Picker("", selection: $selectedWindow) {
+                        Text("1m").tag(NetworkQualityWindow.oneMinute)
+                        Text("5m").tag(NetworkQualityWindow.fiveMinutes)
+                        Text("1h").tag(NetworkQualityWindow.oneHour)
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 140)
+                    .controlSize(.small)
                 }
-                .padding(.bottom, 16)
-                
-                HStack(spacing: 0) {
-                    StatItem(
-                        icon: "clock",
-                        label: languageManager.t("dashboard.uptime"),
-                        value: viewModel.isRunning ? languageManager.t("dashboard.running") : languageManager.t("header.stopped"),
+
+                HStack(alignment: .lastTextBaseline, spacing: 10) {
+                    Text("\(snapshot.score)")
+                        .font(.system(size: 40, weight: .bold, design: .rounded))
+                        .foregroundStyle(qualityColor(snapshot.score))
+                    Text("/ 100")
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .foregroundStyle(Theme.Colors.textSecondary)
+                }
+
+                HStack(spacing: 12) {
+                    metricBlock(
+                        title: languageManager.t("dashboard.p95_latency"),
+                        value: snapshot.averageP95Latency.map { String(format: "%.0f ms", $0) } ?? "—",
                         color: Theme.Colors.accentBlue
                     )
-                    Divider().frame(height: 30).padding(.horizontal, 10).opacity(0.3)
-                    StatItem(
-                        icon: "link",
-                        label: languageManager.t("dashboard.hosts_count"),
-                        value: "\(viewModel.hosts.count)",
+                    metricBlock(
+                        title: languageManager.t("dashboard.avg_loss"),
+                        value: String(format: "%.1f%%", snapshot.averagePacketLoss),
+                        color: Theme.Colors.accentRed
+                    )
+                    metricBlock(
+                        title: languageManager.t("dashboard.avg_jitter"),
+                        value: String(format: "%.1f ms", snapshot.averageJitter),
                         color: Theme.Colors.accentOrange
                     )
-                    Divider().frame(height: 30).padding(.horizontal, 10).opacity(0.3)
-                    StatItem(
-                        icon: "memorychip",
-                        label: languageManager.t("dashboard.memory"),
-                        value: memoryUsage,
+                }
+
+                Divider().opacity(0.15)
+
+                HStack(spacing: 12) {
+                    statusPill(
+                        title: languageManager.t("dashboard.healthy_hosts"),
+                        value: "\(snapshot.healthyHostCount)",
                         color: Theme.Colors.accentGreen
                     )
-                    
-                }
-                
-                Spacer()
-                
-                // System Info Placeholder
-                HStack(spacing: 20) {
-                    VStack(alignment: .leading) {
-                        Text(languageManager.t("dashboard.system"))
-                            .font(Theme.Fonts.body(10))
-                            .foregroundStyle(Theme.Colors.textSecondary)
-                        Text("macOS")
-                            .font(Theme.Fonts.body(12))
-                            .foregroundStyle(Theme.Colors.textTertiary)
-                    }
-                    VStack(alignment: .leading) {
-                        Text(languageManager.t("dashboard.version"))
-                            .font(Theme.Fonts.body(10))
-                            .foregroundStyle(Theme.Colors.textSecondary)
-                         if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String {
-                            Text(version)
-                                .font(Theme.Fonts.body(12))
-                                .foregroundStyle(Theme.Colors.textTertiary)
-                        }
-                    }
+                    statusPill(
+                        title: languageManager.t("dashboard.degraded_hosts"),
+                        value: "\(snapshot.degradedHostCount)",
+                        color: Theme.Colors.accentOrange
+                    )
+                    statusPill(
+                        title: languageManager.t("dashboard.critical_hosts"),
+                        value: "\(snapshot.criticalHostCount)",
+                        color: Theme.Colors.accentRed
+                    )
                 }
             }
-            .frame(minHeight: 180, maxHeight: .infinity)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
     }
-}
 
-struct StatItem: View {
-    let icon: String
-    let label: String
-    let value: String
-    let color: Color
-    
-    var body: some View {
+    private func metricBlock(title: String, value: String, color: Color) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 4) {
-                Image(systemName: icon)
-                    .font(.system(size: 10))
-                    .foregroundStyle(Theme.Colors.textSecondary)
-                Text(label)
-                    .font(Theme.Fonts.body(10))
-                    .foregroundStyle(Theme.Colors.textSecondary)
-            }
+            Text(title)
+                .font(Theme.Fonts.body(10))
+                .foregroundStyle(Theme.Colors.textSecondary)
             Text(value)
-                .font(Theme.Fonts.display(18)) // Adjusted font for fit
+                .font(.system(size: 18, weight: .semibold, design: .monospaced))
                 .foregroundStyle(color)
                 .lineLimit(1)
-                .minimumScaleFactor(0.8)
+                .minimumScaleFactor(0.7)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
+
+    private func statusPill(title: String, value: String, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(Theme.Fonts.body(10))
+                .foregroundStyle(Theme.Colors.textSecondary)
+            Text(value)
+                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .foregroundStyle(color)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(color.opacity(0.08))
+        .cornerRadius(10)
+    }
 }
 
-struct NetworkStatusCard: View {
-    @ObservedObject var viewModel: PingMonitorViewModel
+private struct QualityDimensionsCard: View {
+    let snapshot: GlobalQualitySnapshot
     @ObservedObject private var languageManager = LanguageManager.shared
-    
+
     var body: some View {
         ModernCard {
-            VStack(alignment: .leading) {
+            VStack(alignment: .leading, spacing: 12) {
+                SectionHeader(title: languageManager.t("dashboard.dimension_breakdown"), icon: "slider.horizontal.3")
+
+                dimensionRow(languageManager.t("dashboard.latency_trend"), value: snapshot.dimensions.latency, color: Theme.Colors.accentBlue)
+                dimensionRow(languageManager.t("dashboard.network_status"), value: snapshot.dimensions.stability, color: Theme.Colors.accentGreen)
+                dimensionRow(languageManager.t("dashboard.path_health"), value: snapshot.dimensions.path, color: Theme.Colors.accentOrange)
+                dimensionRow(languageManager.t("dashboard.bandwidth_pressure"), value: snapshot.dimensions.bandwidth, color: Theme.Colors.accentPurple)
+                dimensionRow(languageManager.t("dashboard.resolution"), value: snapshot.dimensions.resolution, color: Theme.Colors.accentCyan)
+                dimensionRow(languageManager.t("dashboard.overlay"), value: snapshot.dimensions.overlay, color: Theme.Colors.accentRed)
+
+                Divider().opacity(0.15)
+
                 HStack {
-                    Image(systemName: "globe")
-                        .foregroundStyle(Theme.Colors.accentGreen)
-                    Text(languageManager.t("dashboard.network_status"))
-                        .font(Theme.Fonts.display(14))
-                        .foregroundStyle(Theme.Colors.textPrimary)
-                    Spacer()
-                }
-                .padding(.bottom, 16)
-                
-                // Display avg latencies for top 3 hosts or aggregated
-                let sortedHosts = viewModel.hosts.sorted {
-                    ($0.lastLatency ?? 9999) < ($1.lastLatency ?? 9999)
-                }.prefix(3)
-                
-                HStack(spacing: 0) {
-                    if sortedHosts.isEmpty {
-                        Text(languageManager.t("dashboard.no_data"))
-                            .font(Theme.Fonts.body(12))
-                            .foregroundStyle(Theme.Colors.textSecondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    } else {
-                        ForEach(Array(sortedHosts.enumerated()), id: \.element.id) { index, host in
-                            if index > 0 {
-                                Divider().frame(height: 30).padding(.horizontal, 10).opacity(0.3)
-                            }
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "server.rack")
-                                        .font(.system(size: 10))
-                                        .foregroundStyle(Theme.Colors.textSecondary)
-                                    Text(host.name)
-                                        .font(Theme.Fonts.body(10))
-                                        .foregroundStyle(Theme.Colors.textSecondary)
-                                        .lineLimit(1)
-                                }
-                                if let latency = host.lastLatency {
-                                    Text("\(Int(latency)) ms")
-                                        .font(Theme.Fonts.display(18))
-                                        .foregroundStyle(latency < 100 ? Theme.Colors.accentGreen : (latency < 300 ? Theme.Colors.accentOrange : Theme.Colors.accentRed))
-                                } else {
-                                    Text("---")
-                                        .font(Theme.Fonts.display(18))
-                                        .foregroundStyle(Theme.Colors.textSecondary)
-                                }
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                    }
-                }
-                
-                Spacer()
-                
-                // Network Info Placeholder
-                 HStack {
-                    Image(systemName: "wifi")
-                        .foregroundStyle(Theme.Colors.accentBlue)
-                    Text(languageManager.t("dashboard.network_wifi"))
-                        .font(Theme.Fonts.body(10))
+                    Text(languageManager.t("dashboard.tunnel_ratio"))
+                        .font(Theme.Fonts.body(11))
                         .foregroundStyle(Theme.Colors.textSecondary)
-                    Text("Wi-Fi") // Dynamic implementation would require more extensive networking code
-                         .font(Theme.Fonts.body(12))
-                         .foregroundStyle(Theme.Colors.textTertiary)
+                    Spacer()
+                    Text(String(format: "%.0f%%", snapshot.tunnelShare * 100))
+                        .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(snapshot.tunnelShare > 0.7 ? Theme.Colors.accentOrange : Theme.Colors.textPrimary)
                 }
             }
-            .frame(minHeight: 180, maxHeight: .infinity)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        }
+    }
+
+    private func dimensionRow(_ title: String, value: Int, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(title)
+                    .font(Theme.Fonts.body(11))
+                    .foregroundStyle(Theme.Colors.textSecondary)
+                Spacer()
+                Text("\(value)")
+                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(color)
+            }
+
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Theme.Colors.cardBackground)
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(color)
+                        .frame(width: max(6, geometry.size.width * CGFloat(value) / 100.0))
+                }
+            }
+            .frame(height: 8)
         }
     }
 }
 
-struct TrafficAndLatencyCard: View {
-    @ObservedObject var viewModel: PingMonitorViewModel
+private struct QualityTrendCard: View {
+    let snapshot: GlobalQualitySnapshot
+    let trendPoints: [QualityTrendPoint]
     @ObservedObject private var languageManager = LanguageManager.shared
-    
-    // Aggregate latency history from all hosts to show a trend
-    var avgLatencyHistory: [Double] {
-        // Simplified: take the latency history of the first host for now, or calculate average
-         // In a real app with many hosts, calculating the average of all histories at each point is complex.
-         // Here we'll just use the first available host or empty
-        guard let firstHost = viewModel.hosts.first(where: { viewModel.hostStats[$0.id]?.latencyHistory.isEmpty == false }) else { return [] }
-        return viewModel.hostStats[firstHost.id]?.latencyHistory.suffix(30).map { $0.latency } ?? []
-    }
-    
+
     var body: some View {
         ModernCard {
-            VStack(alignment: .leading) {
+            VStack(alignment: .leading, spacing: 12) {
                 HStack {
-                    Image(systemName: "chart.xyaxis.line")
-                        .foregroundStyle(Theme.Colors.accentBlue)
-                    Text(languageManager.t("dashboard.latency_trend"))
-                        .font(Theme.Fonts.display(14))
-                        .foregroundStyle(Theme.Colors.textPrimary)
+                    SectionHeader(title: languageManager.t("dashboard.latency_trend"), icon: "chart.xyaxis.line")
                     Spacer()
-                }
-                
-                Spacer()
-                
-                if avgLatencyHistory.isEmpty {
-                     Text(languageManager.t("dashboard.no_data"))
+                    Text(languageManager.t("dashboard.samples"))
+                        .font(Theme.Fonts.body(10))
                         .foregroundStyle(Theme.Colors.textSecondary)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+
+                if trendPoints.isEmpty {
+                    Text(languageManager.t("dashboard.no_data"))
+                        .font(Theme.Fonts.body(12))
+                        .foregroundStyle(Theme.Colors.textSecondary)
+                        .frame(maxWidth: .infinity, minHeight: 180)
                 } else {
                     Chart {
-                         ForEach(Array(avgLatencyHistory.enumerated()), id: \.offset) { index, latency in
-                            LineMark(
-                                x: .value("Index", index),
-                                y: .value("Latency", latency)
-                            )
-                            .interpolationMethod(.monotone)
-                            .foregroundStyle(
-                                .linearGradient(
-                                    colors: [Theme.Colors.accentBlue, Theme.Colors.accentPurple],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                            
+                        ForEach(trendPoints) { point in
                             AreaMark(
-                                x: .value("Index", index),
-                                y: .value("Latency", latency)
+                                x: .value("Time", point.timestamp),
+                                y: .value("Score", point.score)
                             )
                             .interpolationMethod(.monotone)
                             .foregroundStyle(
                                 .linearGradient(
-                                    colors: [Theme.Colors.accentBlue.opacity(0.3), Theme.Colors.accentBlue.opacity(0.0)],
+                                    colors: [Theme.Colors.accentBlue.opacity(0.28), Theme.Colors.accentBlue.opacity(0.02)],
                                     startPoint: .top,
                                     endPoint: .bottom
                                 )
                             )
-                        }
-                    }
-                    .animation(.easeInOut, value: avgLatencyHistory)
-                    .chartYAxis {
-                        AxisMarks(position: .leading) { value in
-                            AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [5, 5]))
-                                .foregroundStyle(Color.white.opacity(0.1))
-                            AxisValueLabel()
-                                .foregroundStyle(Theme.Colors.textSecondary)
-                                .font(.system(size: 9))
-                        }
-                    }
-                     .chartXAxis {
-                         AxisMarks { _ in
-                             // Hide X axis labels for clean look
-                         }
-                     }
-                }
-            }
-            .frame(minHeight: 220, maxHeight: .infinity)
-        }
-    }
-}
 
-struct TrafficTrendCard: View {
-    @ObservedObject var viewModel: PingMonitorViewModel
-    @ObservedObject private var languageManager = LanguageManager.shared
-    
-    // Improved Mock data for visual consistency
-    let data: [Double] = [50, 60, 45, 80, 70, 65, 55]
-    let days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-    
-    var body: some View {
-        ModernCard {
-             VStack(alignment: .leading) {
-                HStack {
-                    Image(systemName: "calendar")
-                        .foregroundStyle(Theme.Colors.accentOrange)
-                    Text(languageManager.t("dashboard.seven_day_trend")) // Mock title
-                        .font(Theme.Fonts.display(14))
-                        .foregroundStyle(Theme.Colors.textPrimary)
-                    Spacer()
-                }
-                 
-                 VStack(alignment: .leading) {
-                      Text(languageManager.t("dashboard.daily_avg"))
-                         .font(Theme.Fonts.body(10))
-                         .foregroundStyle(Theme.Colors.textSecondary)
-                      Text("45.2 ms") // Mock value
-                         .font(Theme.Fonts.display(24))
-                         .foregroundStyle(Theme.Colors.textPrimary)
-                 }
-                 .padding(.vertical, 8)
-                
-                Spacer()
-                
-                Chart {
-                     ForEach(0..<data.count, id: \.self) { index in
-                        BarMark(
-                            x: .value("Day", days[index]),
-                            y: .value("Value", data[index])
-                        )
-                        .foregroundStyle(
-                            .linearGradient(
-                                colors: [Theme.Colors.accentOrange, Theme.Colors.accentRed],
-                                startPoint: .bottom,
-                                endPoint: .top
+                            LineMark(
+                                x: .value("Time", point.timestamp),
+                                y: .value("Score", point.score)
                             )
-                        )
-                        .cornerRadius(4)
-                    }
-                    
-                    RuleMark(y: .value("Average", 55))
-                        .foregroundStyle(Theme.Colors.accentBlue)
-                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 3]))
-                        .annotation(position: .top, alignment: .leading) {
-                            Text("Avg")
-                                .font(.system(size: 8))
-                                .foregroundStyle(Theme.Colors.accentBlue)
+                            .interpolationMethod(.monotone)
+                            .foregroundStyle(Theme.Colors.accentBlue)
+                            .lineStyle(StrokeStyle(lineWidth: 2))
                         }
-                }
-                .animation(.easeInOut, value: data)
-                 .chartYAxis(.hidden)
-                 .chartXAxis {
-                     AxisMarks { value in
-                         AxisValueLabel()
-                             .foregroundStyle(Theme.Colors.textSecondary)
-                             .font(.system(size: 9))
-                     }
-                 }
-            }
-            .frame(minHeight: 220, maxHeight: .infinity)
-        }
-    }
-}
-
-struct SummaryDonutCard: View {
-     @ObservedObject var viewModel: PingMonitorViewModel
-     @ObservedObject private var languageManager = LanguageManager.shared
-    
-    // Compute real stats
-    private var totalPings: Int {
-        viewModel.hostStats.values.reduce(0) { $0 + $1.totalPings }
-    }
-    private var successPings: Int {
-        viewModel.hostStats.values.reduce(0) { $0 + $1.successfulPings }
-    }
-    private var failedPings: Int {
-        viewModel.hostStats.values.reduce(0) { $0 + $1.failedPings }
-    }
-    private var timeoutPings: Int {
-        max(0, totalPings - successPings - failedPings)
-    }
-    
-    private var slices: [(label: String, count: Int, value: Double, color: Color)] {
-        let total = Double(max(totalPings, 1))
-        return [
-            (languageManager.t("dashboard.success"), successPings, Double(successPings) / total, Theme.Colors.accentGreen),
-            (languageManager.t("dashboard.failed"), failedPings, Double(failedPings) / total, Theme.Colors.accentRed),
-            (languageManager.t("dashboard.timeout"), timeoutPings, Double(timeoutPings) / total, Theme.Colors.accentOrange),
-        ]
-    }
-    
-    var body: some View {
-        ModernCard {
-             VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Image(systemName: "chart.pie.fill")
-                        .foregroundStyle(Theme.Colors.accentPurple)
-                    Text(languageManager.t("dashboard.ping_summary"))
-                        .font(Theme.Fonts.display(14))
-                        .foregroundStyle(Theme.Colors.textPrimary)
-                    Spacer()
-                }
-                
-                // Flat Donut Chart
-                ZStack {
-                    Chart(Array(slices.enumerated()), id: \.offset) { index, slice in
-                        SectorMark(
-                            angle: .value(slice.label, slice.value),
-                            innerRadius: .ratio(0.6),
-                            angularInset: 1.5
-                        )
-                        .foregroundStyle(slice.color)
-                        .cornerRadius(3)
                     }
-                    .animation(.easeInOut, value: slices.map { $0.count })
-                    .chartLegend(.hidden)
-                    .frame(height: 120)
-                    
-                    // Center label
-                    VStack(spacing: 2) {
-                        Text(languageManager.t("dashboard.total"))
-                            .font(Theme.Fonts.body(9))
-                            .foregroundStyle(Theme.Colors.textSecondary)
-                        Text("\(totalPings)")
-                            .font(Theme.Fonts.display(16))
-                            .foregroundStyle(Theme.Colors.textPrimary)
-                    }
-                }
-                .frame(maxWidth: .infinity)
-                
-                // Stats below chart
-                HStack(spacing: 0) {
-                    ForEach(Array(slices.enumerated()), id: \.offset) { index, slice in
-                        if index > 0 {
-                            Divider().frame(height: 28).padding(.horizontal, 8).opacity(0.3)
-                        }
-                        VStack(spacing: 4) {
-                            HStack(spacing: 4) {
-                                Circle()
-                                    .fill(slice.color)
-                                    .frame(width: 6, height: 6)
-                                Text(slice.label)
-                                    .font(Theme.Fonts.body(10))
-                                    .foregroundStyle(Theme.Colors.textSecondary)
-                            }
-                            Text("\(slice.count)")
-                                .font(Theme.Fonts.display(13))
-                                .foregroundStyle(Theme.Colors.textPrimary)
-                            Text(String(format: "%.1f%%", slice.value * 100))
-                                .font(Theme.Fonts.body(9))
-                                .foregroundStyle(Theme.Colors.textSecondary)
-                        }
-                        .frame(maxWidth: .infinity)
-                    }
-                }
-                
-                Spacer(minLength: 0)
-            }
-            .frame(minHeight: 220, maxHeight: .infinity)
-        }
-    }
-}
-
-struct LegendItem: View {
-    let color: Color
-    let label: String
-    let value: String
-    var isHovered: Bool = false
-    
-    var body: some View {
-        HStack {
-            Circle()
-                .fill(color)
-                .frame(width: isHovered ? 8 : 6, height: isHovered ? 8 : 6)
-                .animation(.easeInOut(duration: 0.2), value: isHovered)
-            Text(label)
-                .font(Theme.Fonts.body(11))
-                .foregroundStyle(isHovered ? Theme.Colors.textPrimary : Theme.Colors.textSecondary)
-            Spacer()
-            Text(value)
-                .font(Theme.Fonts.body(11))
-                .foregroundStyle(Theme.Colors.textPrimary)
-                .fontWeight(isHovered ? .bold : .regular)
-        }
-        .scaleEffect(isHovered ? 1.05 : 1.0)
-        .animation(.easeInOut(duration: 0.2), value: isHovered)
-    }
-}
-
-
-struct RankingListCard: View {
-    @ObservedObject var viewModel: PingMonitorViewModel
-    @ObservedObject private var languageManager = LanguageManager.shared
-    
-    var body: some View {
-        ModernCard {
-            VStack(alignment: .leading) {
-                 HStack {
-                    Image(systemName: "list.number")
-                        .foregroundStyle(Theme.Colors.accentRed)
-                    Text(languageManager.t("dashboard.latency_ranking"))
-                        .font(Theme.Fonts.display(14))
-                        .foregroundStyle(Theme.Colors.textPrimary)
-                    Spacer()
-                }
-                .padding(.bottom, 8)
-                
-                VStack(spacing: 12) {
-                     // Sort hosts by latency
-                    let sorted = viewModel.hosts.sorted { ($0.lastLatency ?? 9999) < ($1.lastLatency ?? 9999) }.prefix(5)
-                    
-                    if sorted.isEmpty {
-                        Text(languageManager.t("dashboard.no_data"))
-                            .font(Theme.Fonts.body(12))
-                            .foregroundStyle(Theme.Colors.textSecondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    } else {
-                        Grid(horizontalSpacing: 8, verticalSpacing: 12) {
-                            ForEach(Array(sorted.enumerated()), id: \.element.id) { index, host in
-                                GridRow {
-                                    Text("\(index + 1)")
-                                        .font(Theme.Fonts.number(12))
-                                        .foregroundStyle(.white)
-                                        .frame(width: 16, height: 16)
-                                        .background(Theme.Colors.accentBlue)
-                                        .cornerRadius(4)
-                                        .gridColumnAlignment(.leading)
-                                    
-                                    Text(host.name)
-                                        .font(Theme.Fonts.body(12))
-                                        .foregroundStyle(Theme.Colors.textPrimary)
-                                        .lineLimit(1)
-                                        .truncationMode(.tail)
-                                        .frame(maxWidth: 80, alignment: .leading)
-                                        .gridColumnAlignment(.leading)
-                                    
-                                    // Visualization Bar
-                                    GeometryReader { geometry in
-                                        ZStack(alignment: .leading) {
-                                            RoundedRectangle(cornerRadius: 2)
-                                                .fill(Theme.Colors.cardBackground.opacity(0.5))
-                                            
-                                            if let latency = host.lastLatency {
-                                                RoundedRectangle(cornerRadius: 2)
-                                                    .fill(
-                                                        LinearGradient(
-                                                            colors: [Theme.Colors.accentBlue, Theme.Colors.accentPurple],
-                                                            startPoint: .leading,
-                                                            endPoint: .trailing
-                                                        )
-                                                    )
-                                                     .frame(width: min(CGFloat(latency) / 200.0 * geometry.size.width, geometry.size.width))
-                                            }
-                                        }
-                                    }
-                                    .frame(height: 4)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.horizontal, 4)
-                                    
-                                    Text(String(format: "%.0f ms", host.lastLatency ?? 0))
-                                        .font(Theme.Fonts.number(12))
-                                        .foregroundStyle(Theme.Colors.textSecondary)
-                                        .lineLimit(1)
-                                        .truncationMode(.tail)
-                                        .frame(width: 50, alignment: .trailing)
-                                        .gridColumnAlignment(.trailing)
+                    .chartYScale(domain: 0...100)
+                    .chartXAxis {
+                        AxisMarks(values: .automatic(desiredCount: 4)) { value in
+                            AxisValueLabel {
+                                if let date = value.as(Date.self) {
+                                    Text(date.formatted(.dateTime.hour().minute()))
+                                        .font(.system(size: 9))
+                                        .foregroundStyle(Theme.Colors.textTertiary)
                                 }
                             }
                         }
                     }
+                    .chartYAxis {
+                        AxisMarks(position: .leading) { value in
+                            AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [4, 4]))
+                                .foregroundStyle(Color.white.opacity(0.06))
+                            AxisValueLabel {
+                                if let score = value.as(Double.self) {
+                                    Text("\(Int(score))")
+                                        .font(.system(size: 9, design: .monospaced))
+                                        .foregroundStyle(Theme.Colors.textTertiary)
+                                }
+                            }
+                        }
+                    }
+                    .frame(height: 180)
+
+                    HStack(spacing: 16) {
+                        summaryTag(
+                            title: languageManager.t("dashboard.quality_score"),
+                            value: "\(snapshot.score)",
+                            color: qualityColor(snapshot.score)
+                        )
+                        summaryTag(
+                            title: languageManager.t("dashboard.p95_latency"),
+                            value: snapshot.averageP95Latency.map { String(format: "%.0f ms", $0) } ?? "—",
+                            color: Theme.Colors.accentBlue
+                        )
+                        summaryTag(
+                            title: languageManager.t("dashboard.avg_loss"),
+                            value: String(format: "%.1f%%", snapshot.averagePacketLoss),
+                            color: Theme.Colors.accentRed
+                        )
+                    }
                 }
-                Spacer(minLength: 0)
             }
-            .frame(minHeight: 220, maxHeight: .infinity)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
+    }
+
+    private func summaryTag(title: String, value: String, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(Theme.Fonts.body(10))
+                .foregroundStyle(Theme.Colors.textSecondary)
+            Text(value)
+                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                .foregroundStyle(color)
+        }
+    }
+}
+
+private struct RecentEventsCard: View {
+    let events: [NetworkQualityEvent]
+    @ObservedObject private var languageManager = LanguageManager.shared
+
+    var body: some View {
+        ModernCard {
+            VStack(alignment: .leading, spacing: 12) {
+                SectionHeader(title: languageManager.t("dashboard.recent_events"), icon: "exclamationmark.bubble")
+
+                if events.isEmpty {
+                    Text(languageManager.t("dashboard.no_events"))
+                        .font(Theme.Fonts.body(12))
+                        .foregroundStyle(Theme.Colors.textSecondary)
+                        .frame(maxWidth: .infinity, minHeight: 180, alignment: .leading)
+                } else {
+                    VStack(spacing: 10) {
+                        ForEach(events) { event in
+                            HStack(alignment: .top, spacing: 10) {
+                                Circle()
+                                    .fill(eventColor(event.severity))
+                                    .frame(width: 8, height: 8)
+                                    .padding(.top, 5)
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    HStack {
+                                        Text(event.title)
+                                            .font(.system(size: 12, weight: .semibold))
+                                            .foregroundStyle(Theme.Colors.textPrimary)
+                                        Spacer()
+                                        Text(event.timestamp.formatted(date: .omitted, time: .shortened))
+                                            .font(.system(size: 10, design: .monospaced))
+                                            .foregroundStyle(Theme.Colors.textTertiary)
+                                    }
+
+                                    if let hostName = event.hostName {
+                                        Text(hostName)
+                                            .font(.system(size: 10, weight: .medium))
+                                            .foregroundStyle(eventColor(event.severity))
+                                    }
+
+                                    Text(event.detail)
+                                        .font(Theme.Fonts.body(11))
+                                        .foregroundStyle(Theme.Colors.textSecondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                            }
+                            .padding(10)
+                            .background(Theme.Colors.cardBackground.opacity(0.65))
+                            .cornerRadius(10)
+                        }
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        }
+    }
+
+    private func eventColor(_ severity: QualityEventSeverity) -> Color {
+        switch severity {
+        case .info:
+            return Theme.Colors.accentBlue
+        case .warning:
+            return Theme.Colors.accentOrange
+        case .critical:
+            return Theme.Colors.accentRed
+        }
+    }
+}
+
+private struct HostHealthCard: View {
+    let snapshots: [HostQualitySnapshot]
+    @ObservedObject private var languageManager = LanguageManager.shared
+
+    var body: some View {
+        ModernCard {
+            VStack(alignment: .leading, spacing: 12) {
+                SectionHeader(title: languageManager.t("dashboard.host_health"), icon: "server.rack")
+
+                if snapshots.isEmpty {
+                    Text(languageManager.t("dashboard.no_data"))
+                        .font(Theme.Fonts.body(12))
+                        .foregroundStyle(Theme.Colors.textSecondary)
+                        .frame(maxWidth: .infinity, minHeight: 180, alignment: .leading)
+                } else {
+                    VStack(spacing: 8) {
+                        HStack(spacing: 10) {
+                            headerCell(languageManager.t("traceroute.ip"), width: 140, alignment: .leading)
+                            headerCell(languageManager.t("dashboard.quality_score"), width: 52, alignment: .trailing)
+                            headerCell(languageManager.t("dashboard.p95_latency"), width: 68, alignment: .trailing)
+                            headerCell(languageManager.t("host_detail.jitter"), width: 58, alignment: .trailing)
+                            headerCell(languageManager.t("stats.loss_rate"), width: 58, alignment: .trailing)
+                            headerCell(languageManager.t("host_detail.path"), width: 60, alignment: .trailing)
+                        }
+
+                        ForEach(snapshots) { snapshot in
+                            HStack(spacing: 10) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(snapshot.hostName)
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundStyle(Theme.Colors.textPrimary)
+                                        .lineLimit(1)
+                                    if let failure = snapshot.lastFailureText {
+                                        Text(failure)
+                                            .font(.system(size: 10))
+                                            .foregroundStyle(Theme.Colors.textTertiary)
+                                            .lineLimit(1)
+                                    }
+                                }
+                                .frame(width: 140, alignment: .leading)
+
+                                valueCell("\(snapshot.score)", width: 52, color: qualityColor(snapshot.score))
+                                valueCell(snapshot.p95Latency.map { String(format: "%.0f", $0) } ?? "—", width: 68, suffix: "ms")
+                                valueCell(String(format: "%.1f", snapshot.jitter), width: 58, suffix: "ms")
+                                valueCell(String(format: "%.1f", snapshot.packetLoss), width: 58, suffix: "%", color: snapshot.packetLoss > 3 ? Theme.Colors.accentRed : Theme.Colors.textPrimary)
+                                valueCell(pathLabel(snapshot.pathKind), width: 60, color: pathColor(snapshot.pathKind))
+                            }
+                            .padding(.vertical, 6)
+
+                            if snapshot.id != snapshots.last?.id {
+                                Divider().opacity(0.08)
+                            }
+                        }
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        }
+    }
+
+    private func headerCell(_ text: String, width: CGFloat, alignment: Alignment = .leading) -> some View {
+        Text(text)
+            .font(.system(size: 10, weight: .medium))
+            .foregroundStyle(Theme.Colors.textSecondary)
+            .frame(width: width, alignment: alignment)
+    }
+
+    private func valueCell(_ value: String, width: CGFloat, suffix: String = "", color: Color = Theme.Colors.textPrimary) -> some View {
+        Text("\(value)\(suffix)")
+            .font(.system(size: 11, weight: .semibold, design: .monospaced))
+            .foregroundStyle(color)
+            .frame(width: width, alignment: .trailing)
+            .lineLimit(1)
+    }
+
+    private func pathLabel(_ kind: ProbePathKind) -> String {
+        switch kind {
+        case .direct:
+            return languageManager.t("diagnostics.path.direct")
+        case .relay:
+            return languageManager.t("diagnostics.path.relay")
+        case .unknown:
+            return "—"
+        }
+    }
+
+    private func pathColor(_ kind: ProbePathKind) -> Color {
+        switch kind {
+        case .direct:
+            return Theme.Colors.accentGreen
+        case .relay:
+            return Theme.Colors.accentOrange
+        case .unknown:
+            return Theme.Colors.textTertiary
+        }
+    }
+}
+
+private struct TrafficContextCard: View {
+    @ObservedObject var speedManager: NetworkSpeedManager
+    let snapshot: GlobalQualitySnapshot
+    @ObservedObject private var languageManager = LanguageManager.shared
+
+    private var topProcess: ProcessSummary? {
+        speedManager.processList.first
+    }
+
+    var body: some View {
+        ModernCard {
+            VStack(alignment: .leading, spacing: 14) {
+                SectionHeader(title: languageManager.t("netspeed.title"), icon: "chart.line.uptrend.xyaxis")
+
+                HStack(spacing: 12) {
+                    trafficPanel(
+                        title: languageManager.t("dashboard.physical_traffic"),
+                        down: NetworkSpeedManager.formatSpeed(speedManager.totalSpeedIn),
+                        up: NetworkSpeedManager.formatSpeed(speedManager.totalSpeedOut),
+                        accent: Theme.Colors.accentBlue
+                    )
+                    trafficPanel(
+                        title: languageManager.t("dashboard.tunnel_traffic"),
+                        down: NetworkSpeedManager.formatSpeed(speedManager.tunnelSpeedIn),
+                        up: NetworkSpeedManager.formatSpeed(speedManager.tunnelSpeedOut),
+                        accent: Theme.Colors.accentPurple
+                    )
+                }
+
+                Divider().opacity(0.15)
+
+                HStack {
+                    Text(languageManager.t("dashboard.tunnel_ratio"))
+                        .font(Theme.Fonts.body(11))
+                        .foregroundStyle(Theme.Colors.textSecondary)
+                    Spacer()
+                    Text(String(format: "%.0f%%", snapshot.tunnelShare * 100))
+                        .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(snapshot.tunnelShare > 0.7 ? Theme.Colors.accentOrange : Theme.Colors.textPrimary)
+                }
+
+                GeometryReader { geometry in
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(Theme.Colors.cardBackground)
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(snapshot.tunnelShare > 0.7 ? Theme.Colors.accentOrange : Theme.Colors.accentBlue)
+                            .frame(width: geometry.size.width * CGFloat(snapshot.tunnelShare))
+                    }
+                }
+                .frame(height: 10)
+
+                Divider().opacity(0.15)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(languageManager.t("dashboard.top_consumer"))
+                        .font(Theme.Fonts.body(10))
+                        .foregroundStyle(Theme.Colors.textSecondary)
+                    if let topProcess {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(topProcess.processName)
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(Theme.Colors.textPrimary)
+                                Text("PID \(topProcess.pid)")
+                                    .font(.system(size: 10, design: .monospaced))
+                                    .foregroundStyle(Theme.Colors.textTertiary)
+                            }
+                            Spacer()
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text("↓ \(NetworkSpeedManager.formatSpeed(topProcess.speedIn))")
+                                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                    .foregroundStyle(Theme.Colors.accentCyan)
+                                Text("↑ \(NetworkSpeedManager.formatSpeed(topProcess.speedOut))")
+                                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                    .foregroundStyle(Theme.Colors.accentPurple)
+                            }
+                        }
+                    } else {
+                        Text(languageManager.t("dashboard.no_data"))
+                            .font(Theme.Fonts.body(12))
+                            .foregroundStyle(Theme.Colors.textSecondary)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        }
+    }
+
+    private func trafficPanel(title: String, down: String, up: String, accent: Color) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(Theme.Fonts.body(10))
+                .foregroundStyle(Theme.Colors.textSecondary)
+            Text("↓ \(down)")
+                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                .foregroundStyle(accent)
+            Text("↑ \(up)")
+                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                .foregroundStyle(accent.opacity(0.85))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(accent.opacity(0.08))
+        .cornerRadius(10)
+    }
+}
+
+private func scoreBadge(_ score: Int) -> some View {
+    Text("\(score)")
+        .font(.system(size: 12, weight: .bold, design: .monospaced))
+        .foregroundStyle(qualityColor(score))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(qualityColor(score).opacity(0.12))
+        .cornerRadius(999)
+}
+
+private func qualityColor(_ score: Int) -> Color {
+    switch score {
+    case 90...:
+        return Theme.Colors.accentGreen
+    case 75..<90:
+        return Theme.Colors.accentBlue
+    case 60..<75:
+        return Theme.Colors.accentOrange
+    case 40..<60:
+        return Color.orange
+    default:
+        return Theme.Colors.accentRed
     }
 }

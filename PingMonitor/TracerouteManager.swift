@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import SwiftUI
 
@@ -12,6 +13,7 @@ struct TracerouteHop: Identifiable, Sendable {
     var avgLatency: Double?
     var packetLoss: Double     // 0.0 - 100.0
     var isTimeout: Bool
+    var isTailscaleHop: Bool = false
     
     // GeoLocation Data
     var geoLocation: GeoLocation?
@@ -45,6 +47,29 @@ struct TracerouteHop: Identifiable, Sendable {
         }
         return String(format: "%.0f%%", packetLoss)
     }
+}
+
+struct TraceRouteContext: Sendable {
+    let targetHost: String
+    let resolvedAddress: String?
+    let interfaceName: String?
+    let sourceAddress: String?
+    let gateway: String?
+    let isTunnelInterface: Bool
+}
+
+struct NSLookupRecord: Identifiable, Sendable {
+    let id = UUID()
+    let label: String
+    let value: String
+}
+
+struct NSLookupResult: Sendable {
+    let query: String
+    let server: String?
+    let records: [NSLookupRecord]
+    let rawOutput: String
+    let createdAt: Date
 }
 
 // MARK: - Hop Line Parser (nonisolated, Sendable-safe)
@@ -162,6 +187,7 @@ func parseHopLine(_ line: String) -> TracerouteHop? {
         avgLatency: avg,
         packetLoss: loss,
         isTimeout: validLatencies.isEmpty,
+        isTailscaleHop: ip.starts(with: "100."),
         geoLocation: nil,
         sent: latencies.count,
         received: validLatencies.count,
@@ -180,6 +206,10 @@ class TracerouteManager: ObservableObject {
     @Published var isMTRMode = false
     @Published var targetHost: String = ""
     @Published var maxHops: Int = 30
+    @Published var routeContext: TraceRouteContext?
+    @Published var nsLookupResult: NSLookupResult?
+    @Published var isNSLookupRunning = false
+    @Published var nsLookupError: String?
     
     private var process: Process?
     private var mtrRound: Int = 0
@@ -196,9 +226,7 @@ class TracerouteManager: ObservableObject {
         hops = []
         isRunning = true
         progress = String(format: LanguageManager.shared.t("traceroute.tracing"), trimmedHost)
-        
-        // Fetch origin location (Hop 0)
-        fetchOriginLocation()
+        routeContext = resolveRouteContext(for: trimmedHost)
         
         LogManager.shared.info("Starting traceroute to \(trimmedHost)")
         
@@ -215,12 +243,6 @@ class TracerouteManager: ObservableObject {
             LogManager.shared.info("Traceroute tail process terminated")
         }
         
-        // Ensure any running traceroute process spawned by osascript is killed
-        let killProc = Process()
-        killProc.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
-        killProc.arguments = ["-9", "-f", "traceroute -I"]
-        try? killProc.run()
-        
         process = nil
         mtrRound = 0
         isRunning = false
@@ -234,75 +256,52 @@ class TracerouteManager: ObservableObject {
         hops.removeAll()
         targetHost = ""
         progress = ""
+        routeContext = nil
+        nsLookupResult = nil
+        nsLookupError = nil
     }
     
     // MARK: - Single Traceroute
     
     private func startSingleTrace(host: String) {
-        let proc = Process()
+        let traceProcess = Process()
         let pipe = Pipe()
         
-        proc.standardOutput = pipe
-        proc.standardError = pipe
-        // On macOS, ICMP traceroute (-I) requires root.
-        // We'll use osascript to run it with administrator privileges and pipe output to a file, then tail it
-        let scriptFile = "/tmp/pm_trace_\(UUID().uuidString.prefix(8)).sh"
-        let outFile = "/tmp/pm_trace_\(UUID().uuidString.prefix(8)).out"
-        let traceCmd = "/usr/sbin/traceroute -I -m \(maxHops) -q 3 -w 1 \(host) > \(outFile) 2>&1"
-        
-        let scriptContent = "#!/bin/bash\n\(traceCmd)\n"
-        try? scriptContent.write(toFile: scriptFile, atomically: true, encoding: .utf8)
-        let chmodProc = Process()
-        chmodProc.executableURL = URL(fileURLWithPath: "/bin/chmod")
-        chmodProc.arguments = ["+x", scriptFile]
-        try? chmodProc.run()
-        chmodProc.waitUntilExit()
-
-        // Create empty output file
-        FileManager.default.createFile(atPath: outFile, contents: nil)
-        
-        // Start the privileged traceroute in the background
-        let osaProc = Process()
-        osaProc.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-        osaProc.arguments = ["-e", "do shell script \"\(scriptFile)\" with administrator privileges"]
-        
-        do {
-            try osaProc.run()
-            
-            // Tail the output file to read results in real-time
-            proc.executableURL = URL(fileURLWithPath: "/usr/bin/tail")
-            proc.arguments = ["-f", outFile]
-            self.process = proc
-        } catch {
-            LogManager.shared.error("Failed to start privileged traceroute: \(error)")
-            isRunning = false
-            progress = "Error: \(error.localizedDescription)"
-        }
+        traceProcess.standardOutput = pipe
+        traceProcess.standardError = pipe
+        traceProcess.executableURL = URL(fileURLWithPath: "/usr/bin/script")
+        traceProcess.arguments = ["-q", "/dev/null"] + tracerouteArguments(for: host, queryCount: 3)
+        self.process = traceProcess
         
         pipe.fileHandleForReading.readabilityHandler = { @Sendable handle in
             let data = handle.availableData
             guard let output = String(data: data, encoding: .utf8),
                   !output.isEmpty else { return }
             
-            // Process each line
             output.enumerateLines { line, _ in
-                if let hop = parseHopLine(line) {
+                let sanitizedLine = Self.sanitizeOutputLine(line)
+                guard !sanitizedLine.isEmpty else { return }
+                if let hop = parseHopLine(sanitizedLine) {
                     Task { @MainActor [weak self] in
                         self?.addOrUpdateHop(hop)
+                    }
+                } else if let errorLine = Self.parseTracerouteError(sanitizedLine) {
+                    Task { @MainActor [weak self] in
+                        self?.progress = errorLine
                     }
                 }
             }
         }
         
         do {
-            try proc.run()
+            try traceProcess.run()
         } catch {
             LogManager.shared.error("Failed to start traceroute: \(error)")
             isRunning = false
             progress = "Error: \(error.localizedDescription)"
         }
         
-        proc.terminationHandler = { [weak self] _ in
+        traceProcess.terminationHandler = { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self = self else { return }
                 self.isRunning = false
@@ -310,10 +309,7 @@ class TracerouteManager: ObservableObject {
                     self.progress = String(format: LanguageManager.shared.t("traceroute.complete"), self.hops.count)
                 }
                 LogManager.shared.info("Traceroute completed with \(self.hops.count) hops")
-                
-                // Cleanup
-                try? FileManager.default.removeItem(atPath: scriptFile)
-                try? FileManager.default.removeItem(atPath: outFile)
+                pipe.fileHandleForReading.readabilityHandler = nil
             }
         }
     }
@@ -321,55 +317,21 @@ class TracerouteManager: ObservableObject {
     // MARK: - MTR Mode (continuous traceroute loop)
     
     private func startMTRTrace(host: String) {
-        let proc = Process()
+        let traceProcess = Process()
         let pipe = Pipe()
         
-        proc.standardOutput = pipe
-        proc.standardError = pipe
-        
-        let scriptFile = "/tmp/pm_mtr_\(UUID().uuidString.prefix(8)).sh"
-        let outFile = "/tmp/pm_mtr_\(UUID().uuidString.prefix(8)).out"
-        
-        // MTR mode: quick probes (-q 1), wait 1s (-w 1), continuous loop in bash
-        // To separate rounds in output parsing, we echo a marker line (---MTR-ROUND---)
-        let traceCmd = "/usr/sbin/traceroute -I -m \(maxHops) -q 1 -w 1 \(host) >> \(outFile) 2>&1"
-        
-        let scriptContent = """
-        #!/bin/bash
+        traceProcess.standardOutput = pipe
+        traceProcess.standardError = pipe
+        let mtrLoop = """
         while true; do
-            echo "---MTR-ROUND---" >> \(outFile)
-            \(traceCmd)
+            echo "---MTR-ROUND---"
+            \(tracerouteCommand(for: host, queryCount: 1))
             sleep 1
         done
         """
-        
-        try? scriptContent.write(toFile: scriptFile, atomically: true, encoding: .utf8)
-        let chmodProc = Process()
-        chmodProc.executableURL = URL(fileURLWithPath: "/bin/chmod")
-        chmodProc.arguments = ["+x", scriptFile]
-        try? chmodProc.run()
-        chmodProc.waitUntilExit()
-
-        FileManager.default.createFile(atPath: outFile, contents: nil)
-        
-        // Start the infinite loop script with privileges
-        let osaProc = Process()
-        osaProc.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-        osaProc.arguments = ["-e", "do shell script \"\(scriptFile)\" with administrator privileges"]
-        
-        do {
-            try osaProc.run()
-            
-            // Tail the output file
-            proc.executableURL = URL(fileURLWithPath: "/usr/bin/tail")
-            proc.arguments = ["-f", outFile]
-            self.process = proc
-        } catch {
-            LogManager.shared.error("Failed to start MTR privileges root process: \(error)")
-            isRunning = false
-            progress = "Error: \(error.localizedDescription)"
-            return
-        }
+        traceProcess.executableURL = URL(fileURLWithPath: "/usr/bin/script")
+        traceProcess.arguments = ["-q", "/dev/null", "/bin/bash", "-lc", mtrLoop]
+        self.process = traceProcess
         
         let currentRoundHops = LockedArray<TracerouteHop>()
         
@@ -378,7 +340,9 @@ class TracerouteManager: ObservableObject {
             guard let output = String(data: data, encoding: .utf8), !output.isEmpty else { return }
             
             output.enumerateLines { line, _ in
-                if line.contains("---MTR-ROUND---") {
+                let sanitizedLine = Self.sanitizeOutputLine(line)
+                guard !sanitizedLine.isEmpty else { return }
+                if sanitizedLine.contains("---MTR-ROUND---") {
                     // Flush previous round if we have any hops
                     let collectedHops = currentRoundHops.values
                     if !collectedHops.isEmpty {
@@ -387,22 +351,26 @@ class TracerouteManager: ObservableObject {
                         }
                         currentRoundHops.clear()
                     }
-                } else if let hop = parseHopLine(line) {
+                } else if let hop = parseHopLine(sanitizedLine) {
                     currentRoundHops.append(hop)
+                } else if let errorLine = Self.parseTracerouteError(sanitizedLine) {
+                    Task { @MainActor [weak self] in
+                        self?.progress = errorLine
+                    }
                 }
             }
         }
         
         do {
-            try proc.run()
+            try traceProcess.run()
         } catch {
-            LogManager.shared.error("Failed to start MTR tail process: \(error)")
+            LogManager.shared.error("Failed to start MTR process: \(error)")
             isRunning = false
             progress = "Error: \(error.localizedDescription)"
             return
         }
         
-        proc.terminationHandler = { [weak self] _ in
+        traceProcess.terminationHandler = { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self = self else { return }
                 self.isRunning = false
@@ -417,16 +385,7 @@ class TracerouteManager: ObservableObject {
                     self.progress = String(format: LanguageManager.shared.t("traceroute.complete"), self.hops.count)
                 }
                 LogManager.shared.info("MTR trace completed")
-                
-                // Cleanup
-                // Clean up the running script loop using pkill
-                let killProc = Process()
-                killProc.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
-                killProc.arguments = ["-9", "-f", scriptFile]
-                try? killProc.run()
-                
-                try? FileManager.default.removeItem(atPath: scriptFile)
-                try? FileManager.default.removeItem(atPath: outFile)
+                pipe.fileHandleForReading.readabilityHandler = nil
             }
         }
     }
@@ -445,27 +404,58 @@ class TracerouteManager: ObservableObject {
         fetchGeoLocation(for: hop.hopNumber, ip: hop.ip)
     }
     
-    private func fetchOriginLocation() {
-        Task {
-            if let loc = await GeoIPCache.shared.fetchLocalLocation() {
-                await MainActor.run {
-                    // Check if we already have Hop 0 (edge case where it fetches very fast)
-                    if !self.hops.contains(where: { $0.hopNumber == 0 }) {
-                        let origin = TracerouteHop(
-                            hopNumber: 0,
-                            hostName: LanguageManager.shared.t("traceroute.your_location"),
-                            ip: "",
-                            latencies: [],
-                            avgLatency: nil,
-                            packetLoss: 0,
-                            isTimeout: false,
-                            geoLocation: loc
-                        )
-                        self.hops.insert(origin, at: 0)
-                    }
-                }
-            }
+    private func tracerouteCommand(for host: String, queryCount: Int) -> String {
+        tracerouteArguments(for: host, queryCount: queryCount).map(shellEscape).joined(separator: " ")
+    }
+
+    private func tracerouteArguments(for host: String, queryCount: Int) -> [String] {
+        var args = [
+            "/usr/sbin/traceroute",
+            "-n",
+            "-I",
+            "-m", "\(maxHops)",
+            "-q", "\(queryCount)",
+            "-w", "1"
+        ]
+
+        if let routeContext, let interfaceName = routeContext.interfaceName, !interfaceName.isEmpty {
+            args.append(contentsOf: ["-i", interfaceName])
         }
+        if let routeContext, let sourceAddress = routeContext.sourceAddress, !sourceAddress.isEmpty {
+            args.append(contentsOf: ["-s", sourceAddress])
+        }
+
+        args.append(host)
+        return args
+    }
+
+    nonisolated private static func parseTracerouteError(_ line: String) -> String? {
+        let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let lowered = trimmed.lowercased()
+
+        if lowered.hasPrefix("traceroute to ") {
+            return nil
+        }
+        if lowered.contains("cannot assign requested address") ||
+            lowered.contains("network is unreachable") ||
+            lowered.contains("no route to host") ||
+            lowered.contains("unknown host") ||
+            lowered.contains("can't resolve") {
+            return trimmed
+        }
+        return nil
+    }
+
+    nonisolated private static func sanitizeOutputLine(_ line: String) -> String {
+        let filteredScalars = line.unicodeScalars.filter { scalar in
+            if scalar == "\t" || scalar == "\n" || scalar == "\r" {
+                return true
+            }
+            return scalar.value >= 0x20
+        }
+        return String(String.UnicodeScalarView(filteredScalars))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
     
     private func fetchGeoLocation(for hopNumber: Int, ip: String) {
@@ -477,6 +467,38 @@ class TracerouteManager: ObservableObject {
                 await MainActor.run {
                     if let idx = self.hops.firstIndex(where: { $0.hopNumber == hopNumber }) {
                         self.hops[idx].geoLocation = loc
+                    }
+                }
+            } else if ip.starts(with: "100.") || ip.starts(with: "fd7a:115c:a1e0:") {
+                // Tailscale IP lookup
+                await MainActor.run {
+                    if let idx = self.hops.firstIndex(where: { $0.hopNumber == hopNumber }) {
+                        let nodes = TailscaleManager.shared.nodes
+                        if let node = nodes.first(where: { $0.tailscaleIP == ip }) {
+                            self.hops[idx].isTailscaleHop = true
+                            self.hops[idx].hostName = node.hostname
+                            if let relay = node.currentNode {
+                                self.hops[idx].geoLocation = GeoLocation(
+                                    status: "success",
+                                    country: "Relay: \(relay)",
+                                    city: node.os,
+                                    lat: nil,
+                                    lon: nil,
+                                    isp: "Tailscale (\(node.connectionType.rawValue))",
+                                    as: nil
+                                )
+                            } else {
+                                self.hops[idx].geoLocation = GeoLocation(
+                                    status: "success",
+                                    country: "Tailscale Node",
+                                    city: node.os,
+                                    lat: nil,
+                                    lon: nil,
+                                    isp: "Tailscale",
+                                    as: nil
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -559,6 +581,358 @@ class TracerouteManager: ObservableObject {
             }
         }
     }
+
+    func runNSLookup(host: String) {
+        let trimmedHost = host.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedHost.isEmpty else { return }
+
+        isNSLookupRunning = true
+        nsLookupError = nil
+
+        Task.detached { [trimmedHost] in
+            let process = Process()
+            let outputPipe = Pipe()
+            let errorPipe = Pipe()
+
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/nslookup")
+            process.arguments = [trimmedHost]
+            process.standardOutput = outputPipe
+            process.standardError = errorPipe
+
+            do {
+                try process.run()
+                process.waitUntilExit()
+
+                let stdout = String(data: outputPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+                let stderr = String(data: errorPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+                let mergedOutput = [stdout, stderr]
+                    .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+                    .joined(separator: "\n")
+
+                await MainActor.run {
+                    self.isNSLookupRunning = false
+                    if process.terminationStatus == 0 {
+                        self.nsLookupResult = Self.parseNSLookupOutput(mergedOutput, query: trimmedHost)
+                    } else {
+                        self.nsLookupResult = nil
+                        self.nsLookupError = mergedOutput.isEmpty ? LanguageManager.shared.t("traceroute.lookup_failed") : mergedOutput
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    self.isNSLookupRunning = false
+                    self.nsLookupResult = nil
+                    self.nsLookupError = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    private func resolveRouteContext(for host: String) -> TraceRouteContext {
+        let interfaceAddresses = Self.collectInterfaceAddresses()
+        let defaultLANContext = Self.resolveDefaultLANContext(from: interfaceAddresses)
+        var interfaceName: String?
+        var sourceAddress: String?
+        var gateway: String?
+        var resolvedAddress: String?
+
+        if let output = Self.runCommand("/sbin/route", arguments: ["-n", "get", host]), !output.isEmpty {
+            let fields = Self.parseColonSeparatedOutput(output)
+            interfaceName = fields["interface"]
+            gateway = fields["gateway"]
+            resolvedAddress = fields["destination"] ?? fields["route to"]
+            sourceAddress = fields["if address"] ?? fields["source"] ?? fields["source address"] ?? fields["local addr"] ?? fields["local address"]
+        }
+
+        if sourceAddress == nil, let interfaceName {
+            sourceAddress = Self.addressForInterface(named: interfaceName, preferIPv4: true, from: interfaceAddresses)
+                ?? Self.addressForInterface(named: interfaceName, preferIPv4: false, from: interfaceAddresses)
+        }
+
+        if interfaceName == nil || sourceAddress == nil {
+            let fallback = Self.bestFallbackInterface(for: host, from: interfaceAddresses, defaultLANContext: defaultLANContext)
+            interfaceName = interfaceName ?? fallback?.interfaceName
+            sourceAddress = sourceAddress ?? fallback?.address
+        }
+
+        if Self.shouldPreferPhysicalInterface(for: host, resolvedAddress: resolvedAddress, interfaceName: interfaceName),
+           let defaultLANContext {
+            interfaceName = defaultLANContext.interfaceName
+            sourceAddress = defaultLANContext.sourceAddress
+            gateway = defaultLANContext.gateway
+        }
+
+        return TraceRouteContext(
+            targetHost: host,
+            resolvedAddress: resolvedAddress,
+            interfaceName: interfaceName,
+            sourceAddress: sourceAddress,
+            gateway: gateway,
+            isTunnelInterface: Self.isTunnelInterface(interfaceName)
+        )
+    }
+
+    private func shellEscape(_ value: String) -> String {
+        "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
+    }
+
+    private static func runCommand(_ launchPath: String, arguments: [String]) -> String? {
+        let process = Process()
+        let outputPipe = Pipe()
+        let errorPipe = Pipe()
+
+        process.executableURL = URL(fileURLWithPath: launchPath)
+        process.arguments = arguments
+        process.standardOutput = outputPipe
+        process.standardError = errorPipe
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+        } catch {
+            return nil
+        }
+
+        let stdout = String(data: outputPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        let stderr = String(data: errorPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        let merged = [stdout, stderr]
+            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            .joined(separator: "\n")
+        return merged.isEmpty ? nil : merged
+    }
+
+    private static func parseColonSeparatedOutput(_ output: String) -> [String: String] {
+        var fields: [String: String] = [:]
+
+        output.enumerateLines { line, _ in
+            guard let separatorIndex = line.firstIndex(of: ":") else { return }
+            let key = line[..<separatorIndex]
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+            let value = line[line.index(after: separatorIndex)...]
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if !key.isEmpty, !value.isEmpty {
+                fields[key] = value
+            }
+        }
+
+        return fields
+    }
+
+    private static func parseNSLookupOutput(_ output: String, query: String) -> NSLookupResult {
+        let lines = output.components(separatedBy: .newlines)
+        var server: String?
+        var records: [NSLookupRecord] = []
+        var sawAnswerSection = false
+        var currentName: String?
+
+        for rawLine in lines {
+            let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !line.isEmpty else { continue }
+
+            if line.hasPrefix("Server:") {
+                server = line.replacingOccurrences(of: "Server:", with: "").trimmingCharacters(in: .whitespaces)
+                continue
+            }
+
+            if line.lowercased().contains("non-authoritative answer") || line.lowercased().contains("authoritative answers") {
+                sawAnswerSection = true
+                continue
+            }
+
+            if line.hasPrefix("Name:") {
+                currentName = line.replacingOccurrences(of: "Name:", with: "").trimmingCharacters(in: .whitespaces)
+                sawAnswerSection = true
+                continue
+            }
+
+            if line.contains("canonical name =") {
+                let value = line.components(separatedBy: "=").last?.trimmingCharacters(in: .whitespaces) ?? line
+                records.append(NSLookupRecord(label: "CNAME", value: value))
+                sawAnswerSection = true
+                continue
+            }
+
+            if line.hasPrefix("Address:") || line.hasPrefix("Addresses:") {
+                let value = line
+                    .replacingOccurrences(of: "Addresses:", with: "")
+                    .replacingOccurrences(of: "Address:", with: "")
+                    .trimmingCharacters(in: .whitespaces)
+                if sawAnswerSection || currentName != nil {
+                    let label = currentName?.isEmpty == false ? currentName! : "Address"
+                    records.append(NSLookupRecord(label: label, value: value))
+                }
+            }
+        }
+
+        return NSLookupResult(
+            query: query,
+            server: server,
+            records: records,
+            rawOutput: output,
+            createdAt: Date()
+        )
+    }
+
+    private static func resolveDefaultLANContext(from addresses: [InterfaceAddress]) -> TraceRouteContext? {
+        guard let output = runCommand("/sbin/route", arguments: ["-n", "get", "0.0.0.0"]), !output.isEmpty else {
+            return nil
+        }
+
+        let fields = parseColonSeparatedOutput(output)
+        guard let interfaceName = fields["interface"], !interfaceName.isEmpty else {
+            return nil
+        }
+
+        let gateway = fields["gateway"]
+        let sourceAddress = runCommand("/usr/sbin/ipconfig", arguments: ["getifaddr", interfaceName])?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .nonEmpty
+            ?? addressForInterface(named: interfaceName, preferIPv4: true, from: addresses)
+            ?? addressForInterface(named: interfaceName, preferIPv4: false, from: addresses)
+
+        return TraceRouteContext(
+            targetHost: "0.0.0.0",
+            resolvedAddress: "0.0.0.0",
+            interfaceName: interfaceName,
+            sourceAddress: sourceAddress,
+            gateway: gateway,
+            isTunnelInterface: isTunnelInterface(interfaceName)
+        )
+    }
+
+    private static func collectInterfaceAddresses() -> [InterfaceAddress] {
+        var results: [InterfaceAddress] = []
+        var interfacePointer: UnsafeMutablePointer<ifaddrs>?
+        guard getifaddrs(&interfacePointer) == 0, let first = interfacePointer else {
+            return results
+        }
+        defer { freeifaddrs(interfacePointer) }
+
+        var pointer: UnsafeMutablePointer<ifaddrs>? = first
+        while let current = pointer {
+            let interface = current.pointee
+            let flags = Int32(interface.ifa_flags)
+
+            if let addressPointer = interface.ifa_addr {
+                let family = Int32(addressPointer.pointee.sa_family)
+                if family == AF_INET || family == AF_INET6 {
+                    var hostBuffer = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+                    let result = getnameinfo(
+                        addressPointer,
+                        socklen_t(addressPointer.pointee.sa_len),
+                        &hostBuffer,
+                        socklen_t(hostBuffer.count),
+                        nil,
+                        0,
+                        NI_NUMERICHOST
+                    )
+                    if result == 0 {
+                        let address = String(decoding: hostBuffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
+                        results.append(
+                            InterfaceAddress(
+                                interfaceName: String(cString: interface.ifa_name),
+                                address: address,
+                                family: family,
+                                flags: flags
+                            )
+                        )
+                    }
+                }
+            }
+
+            pointer = interface.ifa_next
+        }
+
+        return results
+    }
+
+    private static func addressForInterface(named interfaceName: String, preferIPv4: Bool, from addresses: [InterfaceAddress]) -> String? {
+        let preferredFamily = preferIPv4 ? AF_INET : AF_INET6
+        if let exact = addresses.first(where: { $0.interfaceName == interfaceName && $0.family == preferredFamily && $0.isUsable }) {
+            return exact.address
+        }
+        return addresses.first(where: { $0.interfaceName == interfaceName && $0.isUsable })?.address
+    }
+
+    private static func bestFallbackInterface(for host: String, from addresses: [InterfaceAddress], defaultLANContext: TraceRouteContext?) -> InterfaceAddress? {
+        let preferTunnel = host.hasPrefix("100.") || host.lowercased().hasPrefix("fd7a:115c:a1e0:")
+
+        if !preferTunnel,
+           let defaultLANContext,
+           let interfaceName = defaultLANContext.interfaceName,
+           let sourceAddress = defaultLANContext.sourceAddress {
+            return InterfaceAddress(interfaceName: interfaceName, address: sourceAddress, family: AF_INET, flags: IFF_UP | IFF_RUNNING)
+        }
+
+        let usableAddresses = addresses.filter { $0.isUsable }
+
+        let sorted = usableAddresses.sorted { lhs, rhs in
+            let lhsScore = interfacePriority(for: lhs.interfaceName, preferTunnel: preferTunnel)
+            let rhsScore = interfacePriority(for: rhs.interfaceName, preferTunnel: preferTunnel)
+            if lhsScore != rhsScore {
+                return lhsScore < rhsScore
+            }
+            if lhs.family != rhs.family {
+                return lhs.family == AF_INET
+            }
+            return lhs.interfaceName < rhs.interfaceName
+        }
+
+        return sorted.first
+    }
+
+    private static func interfacePriority(for name: String, preferTunnel: Bool) -> Int {
+        if preferTunnel {
+            if isTunnelInterface(name) { return 0 }
+            if name.hasPrefix("en") { return 1 }
+            if name.hasPrefix("bridge") { return 2 }
+            return 3
+        }
+
+        if name.hasPrefix("en") { return 0 }
+        if name.hasPrefix("bridge") { return 1 }
+        if isTunnelInterface(name) { return 2 }
+        return 3
+    }
+
+    private static func shouldPreferPhysicalInterface(for host: String, resolvedAddress: String?, interfaceName: String?) -> Bool {
+        guard isTunnelInterface(interfaceName) else { return false }
+        let target = ((resolvedAddress?.isEmpty == false ? resolvedAddress : nil) ?? host).lowercased()
+        return !isInternalTarget(target)
+    }
+
+    private static func isInternalTarget(_ target: String) -> Bool {
+        if target.hasPrefix("10.") ||
+            target.hasPrefix("192.168.") ||
+            target.hasPrefix("127.") ||
+            target.hasPrefix("169.254.") ||
+            target.hasPrefix("100.") ||
+            target.hasPrefix("fd7a:115c:a1e0:") ||
+            target.hasPrefix("fc") ||
+            target.hasPrefix("fd") {
+            return true
+        }
+
+        if target.hasPrefix("172.") {
+            let parts = target.split(separator: ".")
+            if parts.count == 4, let secondOctet = Int(parts[1]), secondOctet >= 16 && secondOctet <= 31 {
+                return true
+            }
+        }
+
+        return false
+    }
+
+    private static func isTunnelInterface(_ name: String?) -> Bool {
+        guard let name else { return false }
+        return name.hasPrefix("utun") ||
+            name.hasPrefix("tun") ||
+            name.hasPrefix("tap") ||
+            name.hasPrefix("ppp") ||
+            name.hasPrefix("ipsec") ||
+            name.hasPrefix("wg")
+    }
     
     // MARK: - Export
     
@@ -588,6 +962,33 @@ class TracerouteManager: ObservableObject {
 // MARK: - Thread-safe array for collecting hops in background
 
 // MARK: - Thread-safe array for collecting hops in background
+
+private struct InterfaceAddress: Sendable {
+    let interfaceName: String
+    let address: String
+    let family: Int32
+    let flags: Int32
+
+    var isUsable: Bool {
+        let isUp = (flags & IFF_UP) != 0
+        let isRunning = (flags & IFF_RUNNING) != 0
+        let isLoopback = (flags & IFF_LOOPBACK) != 0
+
+        if !isUp || !isRunning || isLoopback {
+            return false
+        }
+        if family == AF_INET6 && address.hasPrefix("fe80:") {
+            return false
+        }
+        return true
+    }
+}
+
+private extension String {
+    var nonEmpty: String? {
+        isEmpty ? nil : self
+    }
+}
 
 final class LockedArray<T: Sendable>: @unchecked Sendable {
     private var array: [T] = []
@@ -709,6 +1110,7 @@ actor GeoIPCache: Sendable {
     private func isPrivateOrInvalidIP(_ ip: String) -> Bool {
         if ip == "127.0.0.1" || ip == "*" || ip.isEmpty { return true }
         // Simple prefix checks for private IPv4
+        // ALLOW 100.x.y.z for Tailscale processing
         if ip.hasPrefix("10.") || ip.hasPrefix("192.168.") { return true }
         if ip.hasPrefix("172.") {
             // Check 172.16.x.x - 172.31.x.x
