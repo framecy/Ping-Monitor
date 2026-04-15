@@ -17,6 +17,8 @@ build/
 
 ## Local scratch and cache
 .local/
+scratch/
+.claude/
 
 ## Reproduction Scripts
 repro_*.swift
