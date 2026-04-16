@@ -4,59 +4,22 @@ set -e
 
 cd "$(dirname "$0")"
 
-BUMP_TYPE="none"
-for arg in "$@"; do
-    if [ "$arg" == "--feature" ]; then BUMP_TYPE="feature"; fi
-    if [ "$arg" == "--bug" ]; then BUMP_TYPE="bug"; fi
-done
+# 自动增加版本号
+./scripts/bump_build.sh "$@"
 
 INFO_PLIST="PingMonitor/Info.plist"
-WIDGET_PLIST="PingMonitorWidget/Info.plist"
-CURRENT_VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "$INFO_PLIST" 2>/dev/null || echo "2.1.0-r31")
-CURRENT_BUILD=$(/usr/libexec/PlistBuddy -c "Print CFBundleVersion" "$INFO_PLIST" 2>/dev/null || echo "91")
-
-NEW_VERSION="$CURRENT_VERSION"
-NEW_BUILD="$CURRENT_BUILD"
-
-if [ "$BUMP_TYPE" == "feature" ]; then
-    BASE=$(echo "$CURRENT_VERSION" | sed 's/r[0-9]*//')
-    IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE"
-    NEW_MINOR=$((MINOR + 1))
-    NEW_VERSION="$MAJOR.$NEW_MINOR.0"
-    NEW_BUILD=$((CURRENT_BUILD + 1))
-elif [ "$BUMP_TYPE" == "bug" ]; then
-    if [[ "$CURRENT_VERSION" == *r* ]]; then
-        BASE_VERSION=${CURRENT_VERSION%%r*}
-        R_NUM=${CURRENT_VERSION##*r}
-        NEW_R=$((R_NUM + 1))
-        NEW_VERSION="${BASE_VERSION}r${NEW_R}"
-    else
-        NEW_VERSION="${CURRENT_VERSION}r1"
-    fi
-    NEW_BUILD=$((CURRENT_BUILD + 1))
-fi
-
-if [ "$BUMP_TYPE" != "none" ]; then
-    echo "📦 升级版本: $CURRENT_VERSION -> $NEW_VERSION (Build $NEW_BUILD)"
-    /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $NEW_VERSION" "$INFO_PLIST"
-    /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $NEW_BUILD" "$INFO_PLIST"
-    /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $NEW_VERSION" "$WIDGET_PLIST" 2>/dev/null || true
-    /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $NEW_BUILD" "$WIDGET_PLIST" 2>/dev/null || true
-    
-    sed -i '' "s/MARKETING_VERSION: \".*\"/MARKETING_VERSION: \"$NEW_VERSION\"/" project.yml
-    sed -i '' "s/CURRENT_PROJECT_VERSION: \".*\"/CURRENT_PROJECT_VERSION: \"$NEW_BUILD\"/" project.yml
-else
-    echo "📦 使用当前版本: $NEW_VERSION (Build $NEW_BUILD)"
-fi
+NEW_VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "$INFO_PLIST")
+NEW_BUILD=$(/usr/libexec/PlistBuddy -c "Print CFBundleVersion" "$INFO_PLIST")
 
 # 生成 Xcode 项目
 echo "🔧 生成 Xcode 项目..."
 xcodegen generate
 
-# 清理并构建
+# 开始构建
 echo "🚀 开始构建..."
 rm -rf ~/Library/Developer/Xcode/DerivedData/PingMonitor-*
 
+export SKIP_VERSION_BUMP=1
 xcodebuild -scheme PingMonitor -configuration Release \
     -derivedDataPath ~/Library/Developer/Xcode/DerivedData/PingMonitor \
     CODE_SIGN_IDENTITY="-" \
@@ -70,9 +33,9 @@ APP_PATH="$HOME/Library/Developer/Xcode/DerivedData/PingMonitor/Build/Products/R
 echo "🔐 修复签名..."
 WIDGET_PATH="$APP_PATH/Contents/PlugIns/PingMonitorWidget.appex"
 if [ -d "$WIDGET_PATH" ]; then
-    codesign --force -s "Apple Development" --entitlements PingMonitorWidget/PingMonitorWidget.entitlements "$WIDGET_PATH"
+    codesign --force -s "-" --entitlements PingMonitorWidget/PingMonitorWidget.entitlements "$WIDGET_PATH"
 fi
-codesign --force -s "Apple Development" --entitlements PingMonitor/PingMonitor.entitlements "$APP_PATH"
+codesign --force -s "-" --entitlements PingMonitor/PingMonitor.entitlements "$APP_PATH"
 
 # 验证构建
 if [ ! -d "$APP_PATH" ]; then

@@ -1,6 +1,7 @@
 
 import SwiftUI
 import UniformTypeIdentifiers
+import Charts
 
 // MARK: - Sidebar Navigation Item
 enum SidebarItem: String, CaseIterable, Identifiable {
@@ -13,9 +14,9 @@ enum SidebarItem: String, CaseIterable, Identifiable {
     case hosts
     case logs
     case settings
-
+    
     var id: String { rawValue }
-
+    
     @MainActor var title: String {
         switch self {
         case .monitor: return LanguageManager.shared.t("sidebar.monitor")
@@ -29,7 +30,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .settings: return LanguageManager.shared.t("sidebar.settings")
         }
     }
-
+    
     var icon: String {
         switch self {
         case .monitor: return "waveform.path.ecg"
@@ -43,7 +44,7 @@ enum SidebarItem: String, CaseIterable, Identifiable {
         case .settings: return "gearshape.fill"
         }
     }
-
+    
     var activeColor: Color {
         switch self {
         case .monitor: return .green
@@ -69,14 +70,14 @@ struct MainView: View {
             SidebarView(selectedItem: $selectedItem)
                 .frame(width: 220)
                 .background(Theme.Colors.sidebarBackground)
-
+            
             Rectangle()
                 .fill(Theme.Colors.separator)
                 .frame(width: 1)
-
+            
             VStack(spacing: 0) {
                 headerView
-
+                
                 detailContent
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -88,7 +89,7 @@ struct MainView: View {
             viewModel.syncToWidget()
         }
     }
-
+    
     // MARK: - Detail Content
     @ViewBuilder
     private var detailContent: some View {
@@ -155,6 +156,9 @@ struct MainView: View {
             .buttonStyle(.plain)
             .help("Switch Language")
 
+            // Tailscale Quick Action
+            TailscaleQuickActionView()
+
             Button(action: { viewModel.toggle() }) {
                 HStack(spacing: 6) {
                     Image(systemName: viewModel.isRunning ? "stop.fill" : "play.fill")
@@ -188,23 +192,2312 @@ struct MainView: View {
     }
 }
 
+struct TailscaleQuickActionView: View {
+    @ObservedObject var tailscale = TailscaleManager.shared
+    @ObservedObject var languageManager = LanguageManager.shared
+    
+    var body: some View {
+        Menu {
+            if tailscale.availableExitNodes.isEmpty {
+                Text(languageManager.t("tailscale.no_exit_nodes"))
+            } else {
+                Button(action: { tailscale.disableExitNode() }) {
+                    HStack {
+                        Text(languageManager.t("settings.none"))
+                        if tailscale.currentExitNode == nil {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+                
+                Divider()
+                
+                ForEach(tailscale.availableExitNodes) { exitNode in
+                    Button(action: { tailscale.switchExitNode(to: exitNode.node) }) {
+                        HStack {
+                            Text(exitNode.node.hostname)
+                            if let lat = exitNode.latency {
+                                Text("(\(Int(lat))ms)").foregroundStyle(.secondary)
+                            }
+                            if tailscale.currentExitNode?.tailscaleIP == exitNode.node.tailscaleIP {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "network")
+                    .font(.system(size: 12))
+                if let current = tailscale.currentExitNode {
+                    Text(current.hostname)
+                        .font(.system(size: 11, weight: .medium))
+                } else {
+                    Text("Tailscale")
+                        .font(.system(size: 11, weight: .medium))
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                Capsule()
+                    .fill(tailscale.currentExitNode != nil ? Color.blue.opacity(0.15) : Color.gray.opacity(0.1))
+            )
+            .foregroundStyle(tailscale.currentExitNode != nil ? .blue : .primary)
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+    }
+}
+
+// MARK: - 统计 Tab
+struct StatisticsTab: View {
+    @ObservedObject var viewModel: PingMonitorViewModel
+    @State private var selectedHost: HostConfig?
+    @ObservedObject private var languageManager = LanguageManager.shared
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // 主机选择器
+            if viewModel.hosts.count > 1 {
+                Picker(languageManager.t("stats.select_host"), selection: $selectedHost) {
+                    Text(languageManager.t("stats.all_hosts")).tag(nil as HostConfig?)
+                    ForEach(viewModel.hosts) { host in
+                        Text(host.name).tag(host as HostConfig?)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .padding()
+            }
+            
+            if viewModel.hosts.isEmpty {
+                ContentUnavailableView(languageManager.t("monitor.no_hosts"), systemImage: "network", description: Text(languageManager.t("monitor.add_host_hint")))
+            } else {
+                StatisticsContentView(host: selectedHost, viewModel: viewModel)
+            }
+        }
+    }
+}
+
+struct StatisticsContentView: View {
+    let host: HostConfig?
+    @ObservedObject var viewModel: PingMonitorViewModel
+    @ObservedObject private var languageManager = LanguageManager.shared
+    
+    // 聚合所有主机的统计数据
+    var aggregatedStats: AggregatedStats {
+        if let singleHost = host {
+            // 单个主机模式
+            let stats = viewModel.hostStats[singleHost.id]
+            return AggregatedStats(
+                totalPings: stats?.totalPings ?? 0,
+                successfulPings: stats?.successfulPings ?? 0,
+                failedPings: stats?.failedPings ?? 0,
+                totalBytesSent: stats?.totalBytesSent ?? 0,
+                totalBytesReceived: stats?.totalBytesReceived ?? 0,
+                minLatency: stats?.minLatency,
+                maxLatency: stats?.maxLatency,
+                avgLatency: stats?.avgLatency ?? 0,
+                latencyHistory: stats?.latencyHistory ?? [],
+                startTime: stats?.startTime ?? Date(),
+                isAggregated: false,
+                hostCount: 1
+            )
+        } else {
+            // 全部主机聚合模式
+            var totalPings = 0
+            var successfulPings = 0
+            var failedPings = 0
+            var totalBytesSent: Int64 = 0
+            var totalBytesReceived: Int64 = 0
+            var minLatency: Double?
+            var maxLatency: Double?
+            var totalAvgLatency: Double = 0
+            var allLatencyHistory: [LatencyPoint] = []
+            var earliestStartTime = Date()
+            var hostCount = 0
+            
+            for (_, stats) in viewModel.hostStats {
+                totalPings += stats.totalPings
+                successfulPings += stats.successfulPings
+                failedPings += stats.failedPings
+                totalBytesSent += stats.totalBytesSent
+                totalBytesReceived += stats.totalBytesReceived
+                
+                if let hostMinLatency = stats.minLatency {
+                    minLatency = minLatency == nil ? hostMinLatency : Swift.min(minLatency!, hostMinLatency)
+                }
+                if let hostMaxLatency = stats.maxLatency {
+                    maxLatency = maxLatency == nil ? hostMaxLatency : Swift.max(maxLatency!, hostMaxLatency)
+                }
+                
+                totalAvgLatency += stats.avgLatency
+                allLatencyHistory.append(contentsOf: stats.latencyHistory)
+                
+                if stats.startTime < earliestStartTime {
+                    earliestStartTime = stats.startTime
+                }
+                
+                hostCount += 1
+            }
+            
+            // 按时间排序历史记录
+            allLatencyHistory.sort { $0.timestamp < $1.timestamp }
+            // 限制总数
+            if allLatencyHistory.count > 100 {
+                allLatencyHistory = Array(allLatencyHistory.suffix(100))
+            }
+            
+            return AggregatedStats(
+                totalPings: totalPings,
+                successfulPings: successfulPings,
+                failedPings: failedPings,
+                totalBytesSent: totalBytesSent,
+                totalBytesReceived: totalBytesReceived,
+                minLatency: minLatency,
+                maxLatency: maxLatency,
+                avgLatency: hostCount > 0 ? totalAvgLatency / Double(hostCount) : 0,
+                latencyHistory: allLatencyHistory,
+                startTime: earliestStartTime,
+                isAggregated: true,
+                hostCount: hostCount
+            )
+        }
+    }
+    
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                // 概览卡片
+                OverviewCardsView(stats: aggregatedStats)
+                
+                // 延迟图表
+                if !aggregatedStats.latencyHistory.isEmpty {
+                    LatencyChartView(history: aggregatedStats.latencyHistory)
+                }
+                
+                // 详细统计
+                DetailedStatsView(stats: aggregatedStats)
+                
+                // 操作按钮
+                HStack {
+                    if let singleHost = host {
+                        Button(languageManager.t("stats.export_current")) {
+                            viewModel.exportStats(for: singleHost.id)
+                        }
+                        .buttonStyle(.bordered)
+                        
+                        Button(languageManager.t("stats.reset_current")) {
+                            viewModel.resetStats(for: singleHost.id)
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                    
+                    Button(languageManager.t("stats.export_all")) {
+                        viewModel.exportAllStats()
+                    }
+                    .buttonStyle(.bordered)
+                    
+                    Button(languageManager.t("stats.reset_all")) {
+                        viewModel.resetAllStats()
+                    }
+                    .buttonStyle(.bordered)
+                    .foregroundStyle(.red)
+                }
+                .padding(.top)
+            }
+            .padding()
+        }
+    }
+}
+
+// 聚合统计数据结构
+struct AggregatedStats {
+    var totalPings: Int
+    var successfulPings: Int
+    var failedPings: Int
+    var totalBytesSent: Int64
+    var totalBytesReceived: Int64
+    var minLatency: Double?
+    var maxLatency: Double?
+    var avgLatency: Double
+    var latencyHistory: [LatencyPoint]
+    var startTime: Date
+    var isAggregated: Bool
+    var hostCount: Int
+    
+    var packetLossRate: Double {
+        guard totalPings > 0 else { return 0 }
+        return Double(failedPings) / Double(totalPings) * 100
+    }
+    
+    var successRate: Double {
+        guard totalPings > 0 else { return 0 }
+        return Double(successfulPings) / Double(totalPings) * 100
+    }
+    
+    var totalTraffic: String {
+        let total = totalBytesSent + totalBytesReceived
+        return formatBytes(total)
+    }
+    
+    private func formatBytes(_ bytes: Int64) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.allowedUnits = [.useBytes, .useKB, .useMB, .useGB]
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: bytes)
+    }
+}
+
+struct OverviewCardsView: View {
+    let stats: AggregatedStats
+    @ObservedObject private var languageManager = LanguageManager.shared
+    
+    var body: some View {
+        LazyVGrid(columns: [
+            GridItem(.flexible()),
+            GridItem(.flexible()),
+            GridItem(.flexible()),
+            GridItem(.flexible())
+        ], spacing: 16) {
+            StatCard(
+                title: stats.isAggregated ? languageManager.t("dashboard.total") : languageManager.t("stats.requests"),
+                value: "\(stats.totalPings)",
+                icon: "number.circle.fill",
+                color: .blue
+            )
+            
+            StatCard(
+                title: languageManager.t("stats.success_rate"),
+                value: String(format: "%.1f%%", stats.successRate),
+                icon: "checkmark.circle.fill",
+                color: .green
+            )
+            
+            StatCard(
+                title: languageManager.t("stats.loss_rate"),
+                value: String(format: "%.1f%%", stats.packetLossRate),
+                icon: "xmark.circle.fill",
+                color: stats.packetLossRate > 5 ? .red : .orange
+            )
+            
+            StatCard(
+                title: languageManager.t("stats.traffic"),
+                value: stats.totalTraffic,
+                icon: "arrow.up.arrow.down.circle.fill",
+                color: .purple
+            )
+        }
+    }
+}
+
+struct StatCard: View {
+    let title: String
+    let value: String
+    let icon: String
+    let color: Color
+    
+    var body: some View {
+        VStack(spacing: 10) {
+            ZStack {
+                Circle()
+                    .fill(
+                        .linearGradient(
+                            colors: [color.opacity(0.25), color.opacity(0.1)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 40, height: 40)
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(color)
+            }
+            
+            Text(value)
+                .font(.system(.title2, design: .rounded, weight: .bold))
+                .foregroundStyle(.primary)
+                .contentTransition(.numericText())
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+            
+            Text(title)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 100)
+        .padding(.vertical, 14)
+        .padding(.horizontal, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(.ultraThinMaterial)
+                .shadow(color: color.opacity(0.08), radius: 8, y: 3)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(color.opacity(0.1), lineWidth: 1)
+        )
+    }
+}
+
+struct LatencyChartView: View {
+    let history: [LatencyPoint]
+    @State private var animateEndpoint = false
+    @ObservedObject private var languageManager = LanguageManager.shared
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Header
+            HStack {
+                HStack(spacing: 6) {
+                    Image(systemName: "chart.xyaxis.line")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.blue)
+                    Text(languageManager.t("dashboard.latency_trend"))
+                        .font(.system(size: 14, weight: .semibold))
+                }
+                
+                Spacer()
+                
+                if let last = history.last {
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(latencyColor(for: last.latency))
+                            .frame(width: 6, height: 6)
+                        Text("\(languageManager.t("stats.chart.current")) \(Int(last.latency))ms")
+                            .font(.system(size: 11, weight: .medium, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            
+            // Chart
+            if !history.isEmpty {
+                Chart {
+                    ForEach(history) { point in
+                        LineMark(
+                            x: .value("Time", point.timestamp),
+                            y: .value("Latency", point.latency)
+                        )
+                        .interpolationMethod(.monotone)
+                        .foregroundStyle(
+                            .linearGradient(
+                                colors: [.blue, .cyan, .green],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .shadow(color: .blue.opacity(0.35), radius: 3)
+                        
+                        AreaMark(
+                            x: .value("Time", point.timestamp),
+                            y: .value("Latency", point.latency)
+                        )
+                        .interpolationMethod(.monotone)
+                        .foregroundStyle(
+                            .linearGradient(
+                                colors: [.cyan.opacity(0.25), .cyan.opacity(0.0)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                    }
+                    
+                    if let avg = averageLatency(for: history) {
+                        RuleMark(y: .value("Avg", avg))
+                            .foregroundStyle(Color.orange.opacity(0.6))
+                            .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 3]))
+                            .annotation(position: .top, alignment: .trailing) {
+                                Text(String(format: "%.0f ms", avg))
+                                    .font(.system(size: 9, design: .monospaced))
+                                    .foregroundStyle(Color.orange)
+                            }
+                    }
+                }
+                .animation(.easeInOut, value: history.map { $0.latency })
+                .chartYScale(domain: .automatic(includesZero: true))
+                .chartYScale(domain: 0...chartMaxLatency)
+                .chartYAxis {
+                    AxisMarks(position: .leading) { value in
+                        AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [4, 4]))
+                            .foregroundStyle(Color.gray.opacity(0.2))
+                        AxisValueLabel {
+                            if let val = value.as(Double.self) {
+                                Text("\(Int(val))")
+                                    .frame(width: 40, alignment: .trailing)
+                                    .foregroundStyle(Color.gray)
+                                    .font(.system(size: 9))
+                            }
+                        }
+                    }
+                }
+                .chartXAxis {
+                    AxisMarks(values: .automatic(desiredCount: 5)) { value in
+                        if let date = value.as(Date.self) {
+                            AxisValueLabel {
+                                Text(date.formatted(.dateTime.hour().minute().second()))
+                                    .font(.system(size: 8))
+                                    .foregroundStyle(Color.gray)
+                            }
+                        }
+                    }
+                }
+                .frame(height: 180)
+            } else {
+                Text(languageManager.t("dashboard.no_data"))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .frame(height: 180)
+            }
+            
+            // Legend
+            HStack(spacing: 16) {
+                latencyLegend(languageManager.t("stats.legend.excellent"), color: .green)
+                latencyLegend(languageManager.t("stats.legend.good"), color: .orange)
+                latencyLegend(languageManager.t("stats.legend.poor"), color: .red)
+                Spacer()
+                Text(String(format: languageManager.t("stats.chart.count"), history.count))
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+            }
+            .font(.system(size: 10))
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(.ultraThinMaterial)
+                .shadow(color: .black.opacity(0.05), radius: 8, y: 3)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.blue.opacity(0.08), lineWidth: 1)
+        )
+    }
+    
+    // MARK: - Helpers
+    
+    private func averageLatency(for points: [LatencyPoint]) -> Double? {
+        guard !points.isEmpty else { return nil }
+        let total = points.reduce(0) { $0 + $1.latency }
+        return total / Double(points.count)
+    }
+    
+    private func latencyLegend(_ label: String, color: Color) -> some View {
+        HStack(spacing: 4) {
+            Circle().fill(color).frame(width: 6, height: 6)
+            Text(label).foregroundStyle(.secondary)
+        }
+    }
+    
+    private func latencyColor(for latency: Double) -> Color {
+        if latency < 50 { return .green }
+        if latency < 100 { return .orange }
+        return .red
+    }
+    
+    var chartMinLatency: Double {
+        let minVal = history.map { $0.latency }.min() ?? 0
+        return max(0, minVal - (chartMaxLatency - minVal) * 0.1)
+    }
+    
+    var chartMaxLatency: Double {
+        let values = history.map { $0.latency }
+        let maxVal = values.max() ?? 100
+        let avgVal = values.isEmpty ? 0 : values.reduce(0, +) / Double(values.count)
+        
+        // Cap the display scale to at most 5x the average or a minimum of 200
+        // This prevents a single huge spike from ruining the visibility of normal data
+        let adaptiveCap = max(200, avgVal * 5)
+        let displayMax = min(maxVal, adaptiveCap)
+        
+        return max(10, displayMax * 1.1) // Add 10% padding
+    }
+}
+
+struct DetailedStatsView: View {
+    let stats: AggregatedStats
+    @ObservedObject private var languageManager = LanguageManager.shared
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 6) {
+                Image(systemName: "list.bullet.rectangle.fill")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.indigo)
+                Text(stats.isAggregated ? "\(languageManager.t("stats.detailed")) (\(stats.hostCount))" : languageManager.t("stats.detailed"))
+                    .font(.system(size: 14, weight: .semibold))
+            }
+            
+            LazyVGrid(columns: [
+                GridItem(.flexible()),
+                GridItem(.flexible()),
+                GridItem(.flexible())
+            ], spacing: 12) {
+                DetailStatCard(icon: "checkmark.circle", color: .green, label: languageManager.t("stats.success"), value: "\(stats.successfulPings)")
+                DetailStatCard(icon: "xmark.circle", color: .red, label: languageManager.t("stats.failed"), value: "\(stats.failedPings)")
+                DetailStatCard(icon: "timer", color: .blue, label: languageManager.t("dashboard.uptime"), value: formatDuration(stats.startTime))
+                DetailStatCard(icon: "arrow.down.to.line", color: .cyan, label: languageManager.t("stats.min_latency"), value: stats.minLatency != nil ? String(format: "%.1fms", stats.minLatency!) : "N/A")
+                DetailStatCard(icon: "arrow.up.to.line", color: .orange, label: languageManager.t("stats.max_latency"), value: stats.maxLatency != nil ? String(format: "%.1fms", stats.maxLatency!) : "N/A")
+                DetailStatCard(icon: "equal.circle", color: .purple, label: languageManager.t("stats.avg_latency"), value: String(format: "%.1fms", stats.avgLatency))
+            }
+            
+            // Traffic cards
+            HStack(spacing: 12) {
+                TrafficCard(icon: "arrow.up.circle.fill", color: .blue, label: languageManager.t("stats.sent"), value: formatBytes(stats.totalBytesSent))
+                TrafficCard(icon: "arrow.down.circle.fill", color: .green, label: languageManager.t("stats.received"), value: formatBytes(stats.totalBytesReceived))
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(.ultraThinMaterial)
+                .shadow(color: .black.opacity(0.05), radius: 8, y: 3)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.indigo.opacity(0.08), lineWidth: 1)
+        )
+    }
+    
+    private func formatBytes(_ bytes: Int64) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.allowedUnits = [.useBytes, .useKB, .useMB, .useGB]
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: bytes)
+    }
+    
+    private func formatDuration(_ startDate: Date) -> String {
+        let interval = Date().timeIntervalSince(startDate)
+        let hours = Int(interval) / 3600
+        let minutes = Int(interval) / 60 % 60
+        let seconds = Int(interval) % 60
+        
+        if hours > 0 {
+            return String(format: languageManager.t("stats.time.hours"), hours, minutes)
+        } else if minutes > 0 {
+            return String(format: languageManager.t("stats.time.minutes"), minutes, seconds)
+        } else {
+            return String(format: languageManager.t("stats.time.seconds"), seconds)
+        }
+    }
+}
+
+struct DetailStatCard: View {
+    let icon: String
+    let color: Color
+    let label: String
+    let value: String
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 5) {
+                Image(systemName: icon)
+                    .font(.system(size: 10))
+                    .foregroundStyle(color)
+                Text(label)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            Text(value)
+                .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 56)
+        .padding(.vertical, 10)
+        .padding(.horizontal, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(color.opacity(0.06))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(color.opacity(0.1), lineWidth: 0.5)
+        )
+    }
+}
+
+struct TrafficCard: View {
+    let icon: String
+    let color: Color
+    let label: String
+    let value: String
+    
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 18))
+                .foregroundStyle(color)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Text(value)
+                    .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+            Spacer()
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 56)
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(color.opacity(0.06))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(color.opacity(0.1), lineWidth: 0.5)
+        )
+    }
+}
+
+// MARK: - 监控 Tab
+struct MonitorTab: View {
+    @ObservedObject var viewModel: PingMonitorViewModel
+    @State private var editingHost: HostConfig?
+    @State private var selectedHost: HostConfig?
+    @State private var newHostName = ""
+    @State private var newHostAddress = ""
+    @State private var newHostCommand = ""
+    @State private var newHostRules: [DisplayRule] = []
+    @State private var newHostProbeMode: HostProbeMode = .icmp
+    @State private var newHostTCPPort = 443
+    @State private var showingAddHost = false
+    @ObservedObject private var languageManager = LanguageManager.shared
+
+    var body: some View {
+        ZStack {
+            VStack(spacing: 0) {
+                // 工具栏
+                HStack {
+                    Text("\(languageManager.t("monitor.title")) (\(viewModel.hosts.count))")
+                        .font(.headline)
+                    Spacer()
+                    Button {
+                        showingAddHost = true
+                    } label: {
+                        Label(languageManager.t("monitor.add"), systemImage: "plus")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                }
+                .padding()
+                .background(.ultraThinMaterial)
+                
+                if viewModel.hosts.isEmpty {
+                    ContentUnavailableView(languageManager.t("monitor.no_hosts"), systemImage: "network", description: Text(languageManager.t("monitor.add_host_hint")))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    ScrollView {
+                        // Insert Quick Access Services Ribbon here
+                        QuickAccessServicesRibbon(viewModel: viewModel)
+                        
+                        LazyVGrid(columns: [
+                            GridItem(.adaptive(minimum: 280, maximum: .infinity), spacing: 12)
+                        ], spacing: 12) {
+                            ForEach(viewModel.hosts) { host in
+                                EditableHostCard(
+                                    host: host,
+                                    viewModel: viewModel,
+                                    onEdit: {
+                                        editingHost = host
+                                        newHostName = host.name
+                                        newHostAddress = host.address
+                                        newHostCommand = host.command
+                                        newHostRules = host.displayRules
+                                        newHostProbeMode = host.probeMode
+                                        newHostTCPPort = host.tcpPort
+                                    },
+                                    onDelete: {
+                                        if let index = viewModel.hosts.firstIndex(where: { $0.id == host.id }) {
+                                            viewModel.removeHost(at: index)
+                                        }
+                                    }
+                                )
+                                .onTapGesture {
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                        selectedHost = host
+                                    }
+                                }
+                                .onDrag {
+                                    NSItemProvider(object: host.id.uuidString as NSString)
+                                }
+                                .onDrop(of: [.text], delegate: HostDropDelegate(item: host, viewModel: viewModel))
+                            }
+                        }
+                        .padding()
+                    }
+                }
+            }
+            .blur(radius: selectedHost != nil ? 2 : 0)
+            
+            // Detail Overlay
+            if let host = selectedHost {
+                Color.black.opacity(0.001) // Invisible backdrop to catch taps if needed, or just let view take full space
+                    .onTapGesture {
+                        withAnimation { selectedHost = nil }
+                    }
+                
+                HostDetailView(
+                    viewModel: viewModel,
+                    host: host,
+                    onClose: {
+                        withAnimation { selectedHost = nil }
+                    }
+                )
+                .transition(.move(edge: .trailing))
+                .zIndex(1)
+            }
+        }
+        .sheet(isPresented: $showingAddHost) {
+            HostEditorSheet(
+                isPresented: $showingAddHost,
+                title: languageManager.t("editor.add_host"),
+                name: $newHostName,
+                address: $newHostAddress,
+                command: $newHostCommand,
+                displayRules: $newHostRules,
+                probeMode: $newHostProbeMode,
+                tcpPort: $newHostTCPPort,
+                onSave: {
+                    viewModel.addHost(
+                        name: newHostName,
+                        address: newHostAddress,
+                        command: newHostCommand,
+                        displayRules: newHostRules.isEmpty ? nil : newHostRules,
+                        probeMode: newHostProbeMode,
+                        tcpPort: newHostTCPPort
+                    )
+                    resetForm()
+                }
+            )
+        }
+        .sheet(item: $editingHost) { host in
+            HostEditorSheet(
+                isPresented: Binding(
+                    get: { editingHost != nil },
+                    set: { if !$0 { editingHost = nil } }
+                ),
+                title: languageManager.t("editor.edit_host"),
+                name: $newHostName,
+                address: $newHostAddress,
+                command: $newHostCommand,
+                displayRules: $newHostRules,
+                probeMode: $newHostProbeMode,
+                tcpPort: $newHostTCPPort,
+                onSave: {
+                    let trimmedName = newHostName.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let trimmedAddress = newHostAddress.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let trimmedCommand = newHostCommand.trimmingCharacters(in: .whitespacesAndNewlines)
+                    
+                    if let index = viewModel.hosts.firstIndex(where: { $0.id == host.id }) {
+                        viewModel.updateHost(
+                            at: index,
+                            name: trimmedName,
+                            address: trimmedAddress,
+                            command: trimmedCommand,
+                            displayRules: newHostRules,
+                            probeMode: newHostProbeMode,
+                            tcpPort: newHostTCPPort
+                        )
+                    }
+                    editingHost = nil
+                }
+            )
+        }
+    }
+    
+    private func resetForm() {
+        newHostName = ""
+        newHostAddress = ""
+        newHostCommand = ""
+        newHostRules = []
+        newHostProbeMode = .icmp
+        newHostTCPPort = 443
+    }
+}
+
+// MARK: - Quick Access Services Ribbon
+struct QuickAccessServicesRibbon: View {
+    @ObservedObject var viewModel: PingMonitorViewModel
+    
+    var allShortcuts: [(host: HostConfig, shortcut: ServiceShortcut)] {
+        viewModel.hosts.flatMap { host in
+            host.serviceShortcuts.map { (host: host, shortcut: $0) }
+        }
+    }
+    
+    var body: some View {
+        if !allShortcuts.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Image(systemName: "bolt.fill")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Theme.Colors.accentOrange)
+                    Text("Quick Access")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Theme.Colors.textSecondary)
+                }
+                .padding(.horizontal)
+                
+                LazyVGrid(columns: [
+                    GridItem(.adaptive(minimum: 140, maximum: .infinity), spacing: 12)
+                ], spacing: 12) {
+                    ForEach(allShortcuts, id: \.shortcut.id) { item in
+                        Button(action: {
+                            openService(item.shortcut, host: item.host)
+                        }) {
+                            HStack(spacing: 8) {
+                                Image(systemName: item.shortcut.icon)
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(serviceColor(for: item.shortcut.type))
+                                    .frame(width: 24, height: 24)
+                                    .background(serviceColor(for: item.shortcut.type).opacity(0.12))
+                                    .cornerRadius(6)
+                                
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(item.shortcut.name)
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundStyle(Theme.Colors.textPrimary)
+                                        .lineLimit(1)
+                                    Text(item.host.name)
+                                        .font(.system(size: 9))
+                                        .foregroundStyle(Theme.Colors.textTertiary)
+                                        .lineLimit(1)
+                                }
+                                Spacer(minLength: 0)
+                            }
+                            .padding(8)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Theme.Colors.cardBackground)
+                            .cornerRadius(8)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal)
+            }
+            .padding(.vertical, 8)
+            .background(Theme.Colors.cardBackground.opacity(0.5))
+        }
+    }
+    
+    private func serviceColor(for type: ServiceShortcut.ServiceType) -> Color {
+        switch type {
+        case .web: return Theme.Colors.accentBlue
+        case .ssh: return Theme.Colors.accentGreen
+        case .custom: return Theme.Colors.accentOrange
+        }
+    }
+    
+    private func openService(_ shortcut: ServiceShortcut, host: HostConfig) {
+        switch shortcut.type {
+        case .web:
+            if let url = URL(string: shortcut.url) {
+                NSWorkspace.shared.open(url)
+            }
+        case .ssh:
+            let cmdFile = "/tmp/pm_ssh_\(UUID().uuidString.prefix(8)).command"
+            let scriptContent = "#!/bin/bash\nrm -f \"\(cmdFile)\"\n\(shortcut.sshCommand)\n"
+            do {
+                try scriptContent.write(toFile: cmdFile, atomically: true, encoding: .utf8)
+                let chmod = Process()
+                chmod.executableURL = URL(fileURLWithPath: "/bin/chmod")
+                chmod.arguments = ["+x", cmdFile]
+                try chmod.run()
+                chmod.waitUntilExit()
+                NSWorkspace.shared.open(URL(fileURLWithPath: cmdFile))
+            } catch {
+                LogManager.shared.error("Failed to create SSH script: \(error)")
+            }
+        case .custom:
+            if let url = URL(string: shortcut.url) {
+                NSWorkspace.shared.open(url)
+            }
+        }
+        LogManager.shared.info("Opened service: \(shortcut.name)", host: host.name)
+    }
+}
+
+// MARK: - Mini Sparkline
+struct MiniSparkline: View {
+    let points: [LatencyPoint]
+    let color: Color
+    
+    var body: some View {
+        GeometryReader { geo in
+            let w = geo.size.width
+            let h = geo.size.height
+            let minV = points.map { $0.latency }.min() ?? 0
+            let maxV = max(points.map { $0.latency }.max() ?? 1, minV + 1)
+            
+            Path { path in
+                for (i, pt) in points.enumerated() {
+                    let x = w * CGFloat(i) / CGFloat(max(points.count - 1, 1))
+                    let y = h - (CGFloat(pt.latency - minV) / CGFloat(maxV - minV)) * h
+                    if i == 0 { path.move(to: CGPoint(x: x, y: y)) }
+                    else {
+                        let prev = points[i - 1]
+                        let px = w * CGFloat(i - 1) / CGFloat(max(points.count - 1, 1))
+                        let py = h - (CGFloat(prev.latency - minV) / CGFloat(maxV - minV)) * h
+                        let mx = (px + x) / 2
+                        path.addCurve(to: CGPoint(x: x, y: y), control1: CGPoint(x: mx, y: py), control2: CGPoint(x: mx, y: y))
+                    }
+                }
+            }
+            .stroke(color.opacity(0.5), lineWidth: 1.5)
+            
+            // Fill under
+            Path { path in
+                for (i, pt) in points.enumerated() {
+                    let x = w * CGFloat(i) / CGFloat(max(points.count - 1, 1))
+                    let y = h - (CGFloat(pt.latency - minV) / CGFloat(maxV - minV)) * h
+                    if i == 0 {
+                        path.move(to: CGPoint(x: 0, y: h))
+                        path.addLine(to: CGPoint(x: x, y: y))
+                    } else {
+                        let prev = points[i - 1]
+                        let px = w * CGFloat(i - 1) / CGFloat(max(points.count - 1, 1))
+                        let py = h - (CGFloat(prev.latency - minV) / CGFloat(maxV - minV)) * h
+                        let mx = (px + x) / 2
+                        path.addCurve(to: CGPoint(x: x, y: y), control1: CGPoint(x: mx, y: py), control2: CGPoint(x: mx, y: y))
+                    }
+                }
+                path.addLine(to: CGPoint(x: w, y: h))
+                path.closeSubpath()
+            }
+            .fill(
+                LinearGradient(
+                    colors: [color.opacity(0.15), color.opacity(0.02)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+        }
+    }
+}
+
+// MARK: - 主机管理 Tab
+struct HostManagementTab: View {
+    @ObservedObject var viewModel: PingMonitorViewModel
+    @State private var selectedSection = 0
+    @ObservedObject private var languageManager = LanguageManager.shared
+    @Namespace private var animation
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Custom Segmented Control
+            HStack(spacing: 0) {
+                customTabButton(title: "\(languageManager.t("host.manage.section.saved")) (\(viewModel.hosts.count))", section: 0)
+                customTabButton(title: "\(languageManager.t("host.manage.section.presets")) (\(viewModel.presets.count))", section: 1)
+            }
+            .padding(4)
+            .background(Theme.Colors.cardBackground)
+            .cornerRadius(8)
+            .padding()
+            
+            if selectedSection == 0 {
+                HostsManagementView(viewModel: viewModel)
+            } else {
+                PresetsManagementView(viewModel: viewModel)
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func customTabButton(title: String, section: Int) -> some View {
+        Button {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                selectedSection = section
+            }
+        } label: {
+            Text(title)
+                .font(Theme.Fonts.body(12))
+                .fontWeight(selectedSection == section ? .medium : .regular)
+                .foregroundStyle(selectedSection == section ? Color.white : Theme.Colors.textSecondary)
+                .padding(.vertical, 6)
+                .padding(.horizontal, 16)
+                .frame(maxWidth: .infinity)
+                .background(
+                    ZStack {
+                        if selectedSection == section {
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(Theme.Colors.accentBlue)
+                                .matchedGeometryEffect(id: "HostManageTabBackground", in: animation)
+                        }
+                    }
+                )
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+struct HostsManagementView: View {
+    @ObservedObject var viewModel: PingMonitorViewModel
+    @State private var showingAddHost = false
+    @State private var editingHost: HostConfig?
+    @State private var newHostName = ""
+    @State private var newHostAddress = ""
+    @State private var newHostCommand = ""
+    @State private var newHostRules: [DisplayRule] = []
+    @State private var newHostProbeMode: HostProbeMode = .icmp
+    @State private var newHostTCPPort = 443
+    @State private var hoveredHostId: UUID?
+    @ObservedObject private var languageManager = LanguageManager.shared
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text(languageManager.t("sidebar.hosts"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button {
+                    showingAddHost = true
+                } label: {
+                    Label(languageManager.t("host.manage.add"), systemImage: "plus")
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 12)
+            
+            if viewModel.hosts.isEmpty {
+                ContentUnavailableView(languageManager.t("host.manage.no_hosts"), systemImage: "server.rack", description: Text(languageManager.t("host.manage.add_hint")))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    LazyVGrid(columns: [
+                        GridItem(.flexible(), spacing: 12),
+                        GridItem(.flexible(), spacing: 12)
+                    ], spacing: 12) {
+                        ForEach(viewModel.hosts) { host in
+                            HostManagementCard(
+                                host: host,
+                                isHovered: hoveredHostId == host.id,
+                                onEdit: {
+                                    editingHost = host
+                                    newHostName = host.name
+                                    newHostAddress = host.address
+                                    newHostCommand = host.command
+                                    newHostRules = host.displayRules
+                                    newHostProbeMode = host.probeMode
+                                    newHostTCPPort = host.tcpPort
+                                },
+                                onDelete: {
+                                    if let index = viewModel.hosts.firstIndex(where: { $0.id == host.id }) {
+                                        viewModel.removeHost(at: index)
+                                    }
+                                }
+                            )
+                            .onHover { isHovered in
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    hoveredHostId = isHovered ? host.id : nil
+                                }
+                            }
+                        }
+                    }
+                    .padding(.horizontal)
+                    .padding(.bottom)
+                }
+            }
+        }
+        .sheet(isPresented: $showingAddHost) {
+            HostEditorSheet(
+                isPresented: $showingAddHost,
+                title: languageManager.t("editor.add_host"),
+                name: $newHostName,
+                address: $newHostAddress,
+                command: $newHostCommand,
+                displayRules: $newHostRules,
+                probeMode: $newHostProbeMode,
+                tcpPort: $newHostTCPPort,
+                onSave: {
+                    let trimmedName = newHostName.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let trimmedAddress = newHostAddress.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let trimmedCommand = newHostCommand.trimmingCharacters(in: .whitespacesAndNewlines)
+                    
+                    if !trimmedName.isEmpty && !trimmedAddress.isEmpty {
+                        viewModel.addHost(
+                            name: trimmedName,
+                            address: trimmedAddress,
+                            command: trimmedCommand,
+                            displayRules: newHostRules.isEmpty ? nil : newHostRules,
+                            probeMode: newHostProbeMode,
+                            tcpPort: newHostTCPPort
+                        )
+                        resetForm()
+                    }
+                }
+            )
+        }
+        .sheet(item: $editingHost) { host in
+            HostEditorSheet(
+                isPresented: Binding(
+                    get: { editingHost != nil },
+                    set: { if !$0 { editingHost = nil } }
+                ),
+                title: languageManager.t("editor.edit_host"),
+                name: $newHostName,
+                address: $newHostAddress,
+                command: $newHostCommand,
+                displayRules: $newHostRules,
+                probeMode: $newHostProbeMode,
+                tcpPort: $newHostTCPPort,
+                onSave: {
+                    let trimmedName = newHostName.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let trimmedAddress = newHostAddress.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let trimmedCommand = newHostCommand.trimmingCharacters(in: .whitespacesAndNewlines)
+                    
+                    if !trimmedName.isEmpty && !trimmedAddress.isEmpty {
+                        if let index = viewModel.hosts.firstIndex(where: { $0.id == host.id }) {
+                            viewModel.updateHost(
+                                at: index,
+                                name: trimmedName,
+                                address: trimmedAddress,
+                                command: trimmedCommand,
+                                displayRules: newHostRules,
+                                probeMode: newHostProbeMode,
+                                tcpPort: newHostTCPPort
+                            )
+                        }
+                    }
+                    editingHost = nil
+                }
+            )
+        }
+    }
+    
+    private func resetForm() {
+        newHostName = ""
+        newHostAddress = ""
+        newHostCommand = ""
+        newHostRules = [
+            DisplayRule(condition: "less", threshold: 50, label: "Direct", enabled: true),
+            DisplayRule(condition: "greater", threshold: 100, label: "Relay", enabled: true)
+        ]
+        newHostProbeMode = .icmp
+        newHostTCPPort = 443
+    }
+}
+
+struct HostManagementCard: View {
+    let host: HostConfig
+    let isHovered: Bool
+    let onEdit: () -> Void
+    let onDelete: () -> Void
+    @ObservedObject private var languageManager = LanguageManager.shared
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            // Header: name + actions
+            HStack {
+                Image(systemName: "server.rack")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.blue)
+                Text(host.name)
+                    .font(.system(size: 14, weight: .semibold))
+                    .lineLimit(1)
+                Spacer()
+                
+                HStack(spacing: 6) {
+                    Button { onEdit() } label: {
+                        Image(systemName: "pencil.circle.fill")
+                            .font(.system(size: 16))
+                            .foregroundStyle(.blue.opacity(0.7))
+                    }
+                    .buttonStyle(.plain)
+                    .help(languageManager.t("menu.edit"))
+                    
+                    Button { onDelete() } label: {
+                        Image(systemName: "trash.circle.fill")
+                            .font(.system(size: 16))
+                            .foregroundStyle(.red.opacity(0.6))
+                    }
+                    .buttonStyle(.plain)
+                    .help(languageManager.t("menu.delete"))
+                }
+                .opacity(isHovered ? 1 : 0.3)
+            }
+            
+            // Address
+            HStack(spacing: 4) {
+                Image(systemName: "globe")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
+                Text(host.address)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            
+            // Display rules
+            if !host.displayRules.filter({ $0.enabled }).isEmpty {
+                HStack(spacing: 4) {
+                    ForEach(host.displayRules.filter { $0.enabled }.prefix(3)) { rule in
+                        Text("\(rule.condition == "less" ? "<" : ">")\(Int(rule.threshold))ms→\(rule.label)")
+                            .font(.system(size: 9, weight: .medium))
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(
+                                Capsule()
+                                    .fill(rule.condition == "less" ? Color.green.opacity(0.15) : Color.orange.opacity(0.15))
+                            )
+                            .foregroundStyle(rule.condition == "less" ? .green : .orange)
+                    }
+                }
+            }
+
+            HStack(spacing: 4) {
+                Image(systemName: host.probeMode == .tcp ? "cable.connector" : "waveform.path.ecg")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
+                Text(host.probeMode == .tcp ? "TCP \(host.tcpPort)" : "ICMP")
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundStyle(.secondary)
+            }
+            
+            // Custom command
+            if !host.command.isEmpty {
+                HStack(spacing: 4) {
+                    Image(systemName: "terminal")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.purple.opacity(0.7))
+                    Text(host.command)
+                        .font(.system(size: 9, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+        }
+        .frame(maxHeight: .infinity, alignment: .top)
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(.ultraThinMaterial)
+                .shadow(color: .black.opacity(isHovered ? 0.08 : 0.03), radius: isHovered ? 8 : 4, y: 2)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(isHovered ? Color.blue.opacity(0.15) : Color.gray.opacity(0.08), lineWidth: 1)
+        )
+        .scaleEffect(isHovered ? 1.01 : 1.0)
+        .contextMenu {
+            Button { onEdit() } label: { Label(languageManager.t("menu.edit"), systemImage: "pencil") }
+            Divider()
+            Button(role: .destructive) { onDelete() } label: { Label(languageManager.t("menu.delete"), systemImage: "trash") }
+        }
+    }
+}
+
+// MARK: - Presets Management View
+struct PresetsManagementView: View {
+    @ObservedObject var viewModel: PingMonitorViewModel
+    @State private var showingAddPreset = false
+    @State private var editingPreset: HostPreset?
+    @State private var newPresetName = ""
+    @State private var newPresetAddress = ""
+    @State private var newPresetCommand = ""
+    @State private var hoveredPresetId: UUID?
+    @ObservedObject private var languageManager = LanguageManager.shared
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text(languageManager.t("host.manage.quick_add"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button {
+                    showingAddPreset = true
+                } label: {
+                    Label(languageManager.t("host.manage.add_preset"), systemImage: "plus")
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 12)
+            
+            if viewModel.presets.isEmpty {
+                ContentUnavailableView(languageManager.t("host.manage.no_presets"), systemImage: "bookmark", description: Text(languageManager.t("host.manage.add_preset_hint")))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    LazyVGrid(columns: [
+                        GridItem(.flexible(), spacing: 12),
+                        GridItem(.flexible(), spacing: 12)
+                    ], spacing: 12) {
+                        ForEach(viewModel.presets) { preset in
+                            PresetManagementCard(
+                                preset: preset,
+                                isHovered: hoveredPresetId == preset.id,
+                                onAdd: { viewModel.addHostFromPreset(preset) },
+                                onEdit: {
+                                    editingPreset = preset
+                                    newPresetName = preset.name
+                                    newPresetAddress = preset.address
+                                    newPresetCommand = preset.command
+                                },
+                                onDelete: {
+                                    if let index = viewModel.presets.firstIndex(where: { $0.id == preset.id }) {
+                                        viewModel.removePreset(at: index)
+                                    }
+                                }
+                            )
+                            .onHover { isHovered in
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    hoveredPresetId = isHovered ? preset.id : nil
+                                }
+                            }
+                        }
+                    }
+                    .padding(.horizontal)
+                    .padding(.bottom)
+                }
+            }
+        }
+        .sheet(isPresented: $showingAddPreset) {
+            PresetEditorSheet(
+                isPresented: $showingAddPreset,
+                title: languageManager.t("editor.add_preset"),
+                name: $newPresetName,
+                address: $newPresetAddress,
+                command: $newPresetCommand,
+                onSave: {
+                    viewModel.addPreset(name: newPresetName, address: newPresetAddress, command: newPresetCommand)
+                    resetForm()
+                }
+            )
+        }
+        .sheet(item: $editingPreset) { preset in
+            PresetEditorSheet(
+                isPresented: Binding(
+                    get: { editingPreset != nil },
+                    set: { if !$0 { editingPreset = nil } }
+                ),
+                title: languageManager.t("editor.edit_preset"),
+                name: $newPresetName,
+                address: $newPresetAddress,
+                command: $newPresetCommand,
+                onSave: {
+                    if let index = viewModel.presets.firstIndex(where: { $0.id == preset.id }) {
+                        viewModel.updatePreset(at: index, name: newPresetName, address: newPresetAddress, command: newPresetCommand)
+                    }
+                    editingPreset = nil
+                }
+            )
+        }
+    }
+    
+    private func resetForm() {
+        newPresetName = ""
+        newPresetAddress = ""
+        newPresetCommand = ""
+    }
+}
+
+struct PresetManagementCard: View {
+    let preset: HostPreset
+    let isHovered: Bool
+    let onAdd: () -> Void
+    let onEdit: () -> Void
+    let onDelete: () -> Void
+    @ObservedObject private var languageManager = LanguageManager.shared
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Image(systemName: "bookmark.fill")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.orange)
+                Text(preset.name)
+                    .font(.system(size: 14, weight: .semibold))
+                    .lineLimit(1)
+                Spacer()
+                
+                Button { onAdd() } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 18))
+                        .foregroundStyle(.green)
+                }
+                .buttonStyle(.plain)
+                .help(languageManager.t("menu.add_to_monitor"))
+            }
+            
+            HStack(spacing: 4) {
+                Image(systemName: "globe")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
+                Text(preset.address)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            
+            if !preset.command.isEmpty {
+                HStack(spacing: 4) {
+                    Image(systemName: "terminal")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.purple.opacity(0.7))
+                    Text(preset.command)
+                        .font(.system(size: 9, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            
+            // Action buttons
+            HStack(spacing: 8) {
+                Spacer()
+                Button { onEdit() } label: {
+                    Image(systemName: "pencil.circle.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.blue.opacity(0.6))
+                }
+                .buttonStyle(.plain)
+                
+                Button { onDelete() } label: {
+                    Image(systemName: "trash.circle.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.red.opacity(0.5))
+                }
+                .buttonStyle(.plain)
+            }
+            .opacity(isHovered ? 1 : 0.2)
+        }
+        .padding(14)
+        .frame(height: 110, alignment: .top)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(.ultraThinMaterial)
+                .shadow(color: .black.opacity(isHovered ? 0.08 : 0.03), radius: isHovered ? 8 : 4, y: 2)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(isHovered ? Color.orange.opacity(0.15) : Color.gray.opacity(0.08), lineWidth: 1)
+        )
+        .scaleEffect(isHovered ? 1.01 : 1.0)
+        .contextMenu {
+            Button { onAdd() } label: { Label(languageManager.t("menu.add_to_monitor"), systemImage: "plus.circle") }
+            Button { onEdit() } label: { Label(languageManager.t("menu.edit"), systemImage: "pencil") }
+            Divider()
+            Button(role: .destructive) { onDelete() } label: { Label(languageManager.t("menu.delete"), systemImage: "trash") }
+        }
+    }
+}
+
+// MARK: - Editor Sheets
+struct HostEditorSheet: View {
+    @Binding var isPresented: Bool
+    let title: String
+    @Binding var name: String
+    @Binding var address: String
+    @Binding var command: String
+    @Binding var displayRules: [DisplayRule]
+    @Binding var probeMode: HostProbeMode
+    @Binding var tcpPort: Int
+    let onSave: () -> Void
+    @State private var showingAddRule = false
+    @ObservedObject private var languageManager = LanguageManager.shared
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text(title)
+                .font(.headline)
+
+            ScrollView {
+                Form {
+                    Section(languageManager.t("editor.section.basic")) {
+                        TextField(languageManager.t("editor.name"), text: $name)
+                        TextField(languageManager.t("editor.address"), text: $address)
+                            .textContentType(.URL)
+
+                        Picker("Probe", selection: $probeMode) {
+                            Text("ICMP").tag(HostProbeMode.icmp)
+                            Text("TCP").tag(HostProbeMode.tcp)
+                        }
+                        .pickerStyle(.segmented)
+
+                        if probeMode == .tcp {
+                            Stepper(value: $tcpPort, in: 1...65535) {
+                                HStack {
+                                    Text("TCP Port")
+                                    Spacer()
+                                    Text("\(tcpPort)")
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            TextField(languageManager.t("editor.command"), text: $command)
+                            Text(languageManager.t("editor.command_hint"))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    
+                    Section(languageManager.t("editor.section.rules")) {
+                        ForEach($displayRules) { $rule in
+                            RuleEditorRow(rule: $rule, onDelete: {
+                                if let index = displayRules.firstIndex(where: { $0.id == rule.id }) {
+                                    displayRules.remove(at: index)
+                                }
+                            })
+                        }
+                        
+                        Button {
+                            showingAddRule = true
+                        } label: {
+                            Label(languageManager.t("editor.add_rule"), systemImage: "plus.circle")
+                        }
+                        .buttonStyle(.borderless)
+                    }
+                }
+                .formStyle(.grouped)
+            }
+
+            HStack {
+                Button(languageManager.t("common.cancel")) {
+                    isPresented = false
+                }
+                .buttonStyle(.bordered)
+
+                Spacer()
+
+                Button(languageManager.t("common.save")) {
+                    onSave()
+                    isPresented = false
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(name.isEmpty || address.isEmpty)
+            }
+        }
+        .padding()
+        .frame(width: 420, height: 500)
+        .sheet(isPresented: $showingAddRule) {
+            AddRuleSheet(isPresented: $showingAddRule, rules: $displayRules)
+        }
+    }
+}
+
+struct RuleEditorRow: View {
+    @Binding var rule: DisplayRule
+    let onDelete: () -> Void
+    @ObservedObject private var languageManager = LanguageManager.shared
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            // Row 1: Enable toggle + Delete
+            HStack {
+                Toggle(languageManager.t("editor.rule.enable"), isOn: $rule.enabled)
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                Spacer()
+                Button(role: .destructive, action: onDelete) {
+                    Image(systemName: "trash")
+                        .font(.caption)
+                }
+                .buttonStyle(.borderless)
+            }
+            
+            // Row 2: Condition + Threshold + Label (properly spaced)
+            HStack(spacing: 8) {
+                // Condition picker
+                Picker("", selection: $rule.condition) {
+                    Text(languageManager.t("editor.rule.less")).tag("less")
+                    Text(languageManager.t("editor.rule.greater")).tag("greater")
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 90)
+                
+                // Threshold
+                HStack(spacing: 4) {
+                    TextField("", value: $rule.threshold, format: .number)
+                        .textFieldStyle(.roundedBorder)
+                        .multilineTextAlignment(.center)
+                        .frame(width: 45)
+                    Text("ms")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Theme.Colors.textSecondary)
+                }
+                
+                Spacer(minLength: 4)
+                
+                // Static Label "显示文本"
+                Text(languageManager.t("editor.rule.label"))
+                    .font(.system(size: 11))
+                    .foregroundStyle(Theme.Colors.textSecondary)
+                
+                // Label TextField
+                TextField(languageManager.t("editor.rule.label_placeholder"), text: $rule.label)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 70)
+            }
+            .frame(height: 28) // Force consistent height to fix vertical alignment
+        }
+        .padding(.vertical, 8)
+    }
+}
+
+struct AddRuleSheet: View {
+    @Binding var isPresented: Bool
+    @Binding var rules: [DisplayRule]
+    @State private var condition = "less"
+    @State private var threshold: Double = 100
+    @State private var label = ""
+    @ObservedObject private var languageManager = LanguageManager.shared
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            Text(languageManager.t("editor.add_rule"))
+                .font(.headline)
+            
+            Form {
+                Picker(languageManager.t("editor.rule.condition"), selection: $condition) {
+                    Text(languageManager.t("editor.rule.less")).tag("less")
+                    Text(languageManager.t("editor.rule.greater")).tag("greater")
+                }
+                .pickerStyle(.segmented)
+                
+                HStack {
+                    Text(languageManager.t("editor.rule.threshold"))
+                    Spacer()
+                    TextField("ms", value: $threshold, format: .number)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 100)
+                }
+                
+                TextField(languageManager.t("editor.rule.label_placeholder"), text: $label)
+            }
+            .formStyle(.grouped)
+            
+            HStack {
+                Button(languageManager.t("common.cancel")) {
+                    isPresented = false
+                }
+                .buttonStyle(.bordered)
+                
+                Spacer()
+                
+                Button(languageManager.t("common.add")) {
+                    let finalLabel = label.isEmpty ? "\(condition == "less" ? "<" : ">") \(Int(threshold))ms" : label
+                    rules.append(DisplayRule(condition: condition, threshold: threshold, label: finalLabel, enabled: true))
+                    isPresented = false
+                }
+                .buttonStyle(.borderedProminent)
+            }
+        }
+        .padding()
+        .frame(width: 350)
+    }
+}
+
+struct PresetEditorSheet: View {
+    @Binding var isPresented: Bool
+    let title: String
+    @Binding var name: String
+    @Binding var address: String
+    @Binding var command: String
+    let onSave: () -> Void
+    @ObservedObject private var languageManager = LanguageManager.shared
+
+    var body: some View {
+        VStack(spacing: 20) {
+            Text(title)
+                .font(.headline)
+
+            Form {
+                TextField(languageManager.t("editor.name"), text: $name)
+                TextField(languageManager.t("editor.address"), text: $address)
+                    .textContentType(.URL)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    TextField(languageManager.t("editor.command"), text: $command)
+                    Text(languageManager.t("editor.command_hint"))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .formStyle(.grouped)
+
+            HStack {
+                Button(languageManager.t("common.cancel")) {
+                    isPresented = false
+                }
+                .buttonStyle(.bordered)
+
+                Spacer()
+
+                Button(languageManager.t("common.save")) {
+                    onSave()
+                    isPresented = false
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(name.isEmpty || address.isEmpty)
+            }
+        }
+        .padding()
+        .frame(width: 380)
+    }
+}
+
+// MARK: - Logs Tab
+struct LogsTab: View {
+    @StateObject private var logManager = LogManager.shared
+    @State private var selectedLevel: LogManager.LogLevel?
+    @State private var showingExportSheet = false
+    @State private var exportURL: URL?
+    @ObservedObject private var languageManager = LanguageManager.shared
+    
+    var filteredLogs: [LogManager.LogEntry] {
+        if let level = selectedLevel {
+            return logManager.logs.filter { $0.level == level }
+        }
+        return logManager.logs
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Picker(languageManager.t("logs.level"), selection: $selectedLevel) {
+                    Text(languageManager.t("logs.level.all")).tag(nil as LogManager.LogLevel?)
+                    ForEach(LogManager.LogLevel.allCases, id: \.self) { level in
+                        Text(languageManager.t("logs.level.\(level.rawValue.lowercased())")).tag(level as LogManager.LogLevel?)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .fixedSize()
+                
+                Spacer()
+                
+                Button(action: {
+                    logManager.clear()
+                }) {
+                    Label(languageManager.t("logs.clear"), systemImage: "trash")
+                }
+                .buttonStyle(.borderless)
+                
+                Button(action: {
+                    if let url = logManager.exportToFile() {
+                        exportURL = url
+                        showingExportSheet = true
+                    }
+                }) {
+                    Label(languageManager.t("logs.export"), systemImage: "square.and.arrow.up")
+                }
+                .buttonStyle(.borderless)
+            }
+            .padding()
+            .background(.ultraThinMaterial)
+            
+            List(filteredLogs.reversed()) { entry in
+                LogRow(entry: entry)
+                    .listRowSeparator(.visible)
+            }
+            .listStyle(.plain)
+        }
+        .fileExporter(
+            isPresented: $showingExportSheet,
+            document: LogFileDocument(url: exportURL),
+            contentType: .plainText,
+            defaultFilename: "PingMonitor_Logs.txt"
+        ) { result in
+            if case .success = result {
+                print("Log exported successfully")
+            }
+        }
+    }
+}
+
+struct LogRow: View {
+    let entry: LogManager.LogEntry
+    @ObservedObject private var languageManager = LanguageManager.shared
+    
+    var levelColor: Color {
+        switch entry.level {
+        case .debug: return .gray
+        case .info: return .blue
+        case .warning: return .orange
+        case .error: return .red
+        }
+    }
+    
+    var body: some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(levelColor)
+                .frame(width: 6, height: 6)
+            
+            HStack(alignment: .top, spacing: 12) {
+                Text(entry.formattedTimestamp)
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(.tertiary)
+                    .frame(width: 130, alignment: .leading)
+                
+                Text(languageManager.t("logs.level.\(entry.level.rawValue.lowercased())"))
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(levelColor)
+                    .frame(width: 50, alignment: .leading)
+                
+                VStack(alignment: .leading, spacing: 3) {
+                    if let host = entry.host {
+                        Text(host)
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    Text(entry.message)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.primary)
+                        .textSelection(.enabled)
+                }
+            }
+        }
+        .padding(.vertical, 3)
+    }
+}
+
+struct LogFileDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.plainText] }
+    
+    var url: URL?
+    
+    init(url: URL?) {
+        self.url = url
+    }
+    
+    init(configuration: ReadConfiguration) throws {
+        self.url = nil
+    }
+    
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        guard let url = url,
+              let data = try? Data(contentsOf: url) else {
+            return FileWrapper(regularFileWithContents: Data())
+        }
+        return FileWrapper(regularFileWithContents: data)
+    }
+}
+
+// MARK: - Settings Tab
+struct SettingsTab: View {
+    @ObservedObject var viewModel: PingMonitorViewModel
+    @ObservedObject private var languageManager = LanguageManager.shared
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                // MARK: - General
+                ModernCard {
+                    VStack(alignment: .leading, spacing: 16) {
+                        SectionHeader(title: languageManager.t("settings.section.system"), icon: "gear")
+                        
+                        HStack {
+                            Text(languageManager.t("settings.language"))
+                            Spacer()
+                            Picker("", selection: $languageManager.currentLanguage) {
+                                Text("中文").tag(Language.zh)
+                                Text("English").tag(Language.en)
+                            }
+                            .pickerStyle(.segmented)
+                            .frame(width: 220, alignment: .trailing)
+                            .onChange(of: languageManager.currentLanguage) { _, newValue in
+                                LogManager.shared.info("Language changed to \(newValue.rawValue)")
+                                languageManager.languageString = newValue.rawValue
+                            }
+                        }
+                        
+                        Divider()
+                        
+                        HStack {
+                            Text(languageManager.t("settings.appearance"))
+                            Spacer()
+                            Picker("", selection: $viewModel.appAppearance) {
+                                Text(languageManager.t("settings.appearance.light")).tag("light")
+                                Text(languageManager.t("settings.appearance.system")).tag("system")
+                                Text(languageManager.t("settings.appearance.dark")).tag("dark")
+                            }
+                            .pickerStyle(.segmented)
+                            .frame(width: 220, alignment: .trailing)
+                            .onChange(of: viewModel.appAppearance) { _, newValue in
+                                LogManager.shared.info("Appearance changed to \(newValue)")
+                                viewModel.saveSettings()
+                            }
+                        }
+                        
+                        Divider()
+                        
+                        Toggle(languageManager.t("settings.auto_start"), isOn: $viewModel.autoStart)
+                            .onChange(of: viewModel.autoStart) { _, newValue in
+                                viewModel.toggleAutoStart(newValue)
+                            }
+                        
+                        Divider()
+                        
+                        HStack {
+                            Text(languageManager.t("settings.version"))
+                            Spacer()
+                            Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "2.0") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"))")
+                                .foregroundStyle(.secondary)
+                                .frame(width: 220, alignment: .trailing)
+                        }
+                    }
+                }
+                
+                // MARK: - Display (Status Bar & Widget)
+                ModernCard {
+                    VStack(alignment: .leading, spacing: 16) {
+                        SectionHeader(title: languageManager.t("settings.section.status_bar"), icon: "menubar.rectangle")
+                        
+                        HStack {
+                            Text(languageManager.t("settings.display_mode"))
+                            Spacer()
+                            Picker("", selection: $viewModel.statusBarDisplayMode) {
+                                Text(languageManager.t("settings.display.average")).tag(StatusBarDisplayMode.average)
+                                Text(languageManager.t("settings.display.worst")).tag(StatusBarDisplayMode.worst)
+                                Text(languageManager.t("settings.display.best")).tag(StatusBarDisplayMode.best)
+                                Text(languageManager.t("settings.display.first")).tag(StatusBarDisplayMode.first)
+                            }
+                            .pickerStyle(.segmented)
+                            .frame(width: 220, alignment: .trailing)
+                            .onChange(of: viewModel.statusBarDisplayMode) { _, newValue in
+                                LogManager.shared.info("Display mode changed to \(newValue.rawValue)")
+                                viewModel.saveSettings()
+                            }
+                        }
+                        
+                        Text(statusBarDescription)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.top, -8)
+                        
+                        let activeMenuCount = [viewModel.showIconInMenu, viewModel.showLatencyInMenu, viewModel.showLabelsInMenu, viewModel.showSpeedInMenu].filter { $0 }.count
+                        
+                        Divider()
+                        
+                        HStack(spacing: 24) {
+                            Toggle(languageManager.t("settings.show_icon"), isOn: $viewModel.showIconInMenu)
+                                .disabled((viewModel.showIconInMenu && activeMenuCount <= 1) || (!viewModel.showIconInMenu && activeMenuCount >= 3))
+                                .onChange(of: viewModel.showIconInMenu) { _, newValue in
+                                    LogManager.shared.info("Show icon in menu toggled to \(newValue)")
+                                    viewModel.saveSettings()
+                                }
+                            
+                            Toggle(languageManager.t("settings.show_latency"), isOn: $viewModel.showLatencyInMenu)
+                                .disabled((viewModel.showLatencyInMenu && activeMenuCount <= 1) || (!viewModel.showLatencyInMenu && activeMenuCount >= 3))
+                                .onChange(of: viewModel.showLatencyInMenu) { _, newValue in
+                                    LogManager.shared.info("Show latency in menu toggled to \(newValue)")
+                                    viewModel.saveSettings()
+                                }
+    
+                            Toggle(languageManager.t("settings.show_labels"), isOn: $viewModel.showLabelsInMenu)
+                                .disabled((viewModel.showLabelsInMenu && activeMenuCount <= 1) || (!viewModel.showLabelsInMenu && activeMenuCount >= 3))
+                                .onChange(of: viewModel.showLabelsInMenu) { _, newValue in
+                                    LogManager.shared.info("Show labels in menu toggled to \(newValue)")
+                                    viewModel.saveSettings()
+                                }
+                            
+                            Toggle(languageManager.t("settings.show_speed"), isOn: $viewModel.showSpeedInMenu)
+                                .disabled((viewModel.showSpeedInMenu && activeMenuCount <= 1) || (!viewModel.showSpeedInMenu && activeMenuCount >= 3))
+                                .onChange(of: viewModel.showSpeedInMenu) { _, newValue in
+                                    LogManager.shared.info("Show speed in menu toggled to \(newValue)")
+                                    viewModel.saveSettings()
+                                }
+                        }
+                        
+                        if viewModel.showSpeedInMenu {
+                            Divider()
+                            HStack {
+                                Text(languageManager.t("settings.speed_unit"))
+                                Spacer()
+                                Picker("", selection: $viewModel.speedUnit) {
+                                    Text(languageManager.t("settings.speed_unit.auto")).tag("auto")
+                                    Text("KB/s").tag("KB")
+                                    Text("MB/s").tag("MB")
+                                }
+                                .pickerStyle(.segmented)
+                                .frame(width: 220, alignment: .trailing)
+                                .onChange(of: viewModel.speedUnit) { _, newValue in
+                                    LogManager.shared.info("Speed unit changed to \(newValue)")
+                                    viewModel.saveSettings()
+                                }
+                            }
+                            
+                            Divider()
+                            
+                            HStack {
+                                Text(languageManager.t("settings.bar_width"))
+                                Spacer()
+                                HStack(spacing: 8) {
+                                    Button {
+                                        if viewModel.statusBarWidth > 50 {
+                                            viewModel.statusBarWidth -= 10
+                                            viewModel.saveSettings()
+                                        }
+                                    } label: {
+                                        Image(systemName: "minus.circle")
+                                            .font(.system(size: 16))
+                                    }
+                                    .buttonStyle(.borderless)
+                                    .disabled(viewModel.statusBarWidth <= 50)
+                                    
+                                    Text("\(viewModel.statusBarWidth)")
+                                        .font(.system(.body, design: .monospaced))
+                                        .frame(width: 36, alignment: .center)
+                                    
+                                    Button {
+                                        if viewModel.statusBarWidth < 250 {
+                                            viewModel.statusBarWidth += 10
+                                            viewModel.saveSettings()
+                                        }
+                                    } label: {
+                                        Image(systemName: "plus.circle")
+                                            .font(.system(size: 16))
+                                    }
+                                    .buttonStyle(.borderless)
+                                    .disabled(viewModel.statusBarWidth >= 250)
+                                }
+                                .frame(width: 220, alignment: .trailing)
+                            }
+                            Divider()
+                            
+                            HStack {
+                                Text(languageManager.t("settings.font_size"))
+                                Spacer()
+                                HStack(spacing: 8) {
+                                    Button {
+                                        if viewModel.statusBarFontSize > 6 {
+                                            viewModel.statusBarFontSize -= 1
+                                            viewModel.saveSettings()
+                                        }
+                                    } label: { Image(systemName: "minus.circle").font(.system(size: 16)) }
+                                    .buttonStyle(.borderless)
+                                    .disabled(viewModel.statusBarFontSize <= 6)
+                                    
+                                    Text("\(viewModel.statusBarFontSize)")
+                                        .font(.system(.body, design: .monospaced))
+                                        .frame(width: 36, alignment: .center)
+                                    
+                                    Button {
+                                        if viewModel.statusBarFontSize < 18 {
+                                            viewModel.statusBarFontSize += 1
+                                            viewModel.saveSettings()
+                                        }
+                                    } label: { Image(systemName: "plus.circle").font(.system(size: 16)) }
+                                    .buttonStyle(.borderless)
+                                    .disabled(viewModel.statusBarFontSize >= 18)
+                                }
+                                .frame(width: 220, alignment: .trailing)
+                            }
+                            
+                            Divider()
+                            
+                            HStack {
+                                Text(languageManager.t("settings.font_weight"))
+                                Spacer()
+                                Picker("", selection: $viewModel.statusBarFontWeight) {
+                                    Text(languageManager.t("settings.font_weight.regular")).tag("regular")
+                                    Text(languageManager.t("settings.font_weight.medium")).tag("medium")
+                                    Text(languageManager.t("settings.font_weight.bold")).tag("bold")
+                                }
+                                .pickerStyle(.segmented)
+                                .frame(width: 220, alignment: .trailing)
+                                .onChange(of: viewModel.statusBarFontWeight) { _, newValue in
+                                    LogManager.shared.info("Status bar font weight changed to \(newValue)")
+                                    viewModel.saveSettings()
+                                }
+                            }
+                        }
+                        
+                        Divider()
+                        
+                        HStack {
+                            Text(languageManager.t("settings.widget.mode"))
+                            Spacer()
+                            Picker("", selection: $viewModel.widgetDisplayMode) {
+                                Text(languageManager.t("settings.widget.auto")).tag("auto")
+                                Text(languageManager.t("settings.widget.specific")).tag("specific")
+                            }
+                            .pickerStyle(.segmented)
+                            .frame(width: 220, alignment: .trailing)
+                            .onChange(of: viewModel.widgetDisplayMode) { _, newValue in
+                                LogManager.shared.info("Widget display mode changed to \(newValue)")
+                                viewModel.syncToWidget()
+                            }
+                        }
+                        
+                        if viewModel.widgetDisplayMode == "specific" {
+                            Divider()
+                            HStack {
+                                Text(languageManager.t("settings.widget.select_host"))
+                                Spacer()
+                                Picker("", selection: $viewModel.widgetSelectedHostId) {
+                                    Text(languageManager.t("settings.widget.none")).tag("")
+                                    ForEach(viewModel.hosts) { host in
+                                        Text(host.name).tag(host.id.uuidString)
+                                    }
+                                }
+                                .pickerStyle(.menu)
+                                .frame(width: 220, alignment: .trailing)
+                                .onChange(of: viewModel.widgetSelectedHostId) { _, newValue in
+                                    LogManager.shared.info("Widget host changed to \(newValue)")
+                                    viewModel.syncToWidget()
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // MARK: - Monitor & Logs
+                ModernCard {
+                    VStack(alignment: .leading, spacing: 16) {
+                        SectionHeader(title: languageManager.t("settings.section.monitor"), icon: "waveform.path.ecg")
+                        
+                        HStack {
+                            Text(languageManager.t("settings.interval"))
+                            Spacer()
+                            Picker("", selection: $viewModel.pingInterval) {
+                                Text(languageManager.t("settings.interval.3s")).tag(3.0)
+                                Text(languageManager.t("settings.interval.5s")).tag(5.0)
+                                Text(languageManager.t("settings.interval.10s")).tag(10.0)
+                                Text(languageManager.t("settings.interval.15s")).tag(15.0)
+                                Text(languageManager.t("settings.interval.30s")).tag(30.0)
+                            }
+                            .pickerStyle(.segmented)
+                            .frame(width: 220, alignment: .trailing)
+                            .onChange(of: viewModel.pingInterval) { _, newValue in
+                                LogManager.shared.info("Ping interval changed to \(Int(newValue))s")
+                                viewModel.saveSettings()
+                                if viewModel.isRunning {
+                                    viewModel.stopAll()
+                                    viewModel.startAll()
+                                }
+                            }
+                        }
+                        
+                        Divider()
+                        
+                        HStack {
+                            Text(languageManager.t("logs.level"))
+                            Spacer()
+                            Picker("", selection: $viewModel.logLevel) {
+                                ForEach(LogManager.LogLevel.allCases, id: \.self) { level in
+                                    Text(languageManager.t("logs.level.\(level.rawValue.lowercased())")).tag(level)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                            .frame(width: 220, alignment: .trailing)
+                            .onChange(of: viewModel.logLevel) { _, newValue in
+                                LogManager.shared.info("Log level changed to \(newValue.rawValue)")
+                                viewModel.saveSettings()
+                            }
+                        }
+                    }
+                }
+                
+                // MARK: - Notifications
+                ModernCard {
+                    VStack(alignment: .leading, spacing: 16) {
+                        SectionHeader(title: languageManager.t("settings.section.notify"), icon: "bell.badge.fill")
+                        
+                        Toggle(languageManager.t("settings.notify.enable"), isOn: $viewModel.notificationEnabled)
+                            .onChange(of: viewModel.notificationEnabled) { _, newValue in
+                                LogManager.shared.info("Notifications enabled: \(newValue)")
+                                viewModel.saveSettings()
+                            }
+                        
+                        if viewModel.notificationEnabled {
+                            Divider()
+                            
+                            HStack {
+                                Text(languageManager.t("settings.notify.type"))
+                                Spacer()
+                                Picker("", selection: $viewModel.notificationType) {
+                                    Text(languageManager.t("settings.notify.system")).tag("system")
+                                    Text(languageManager.t("settings.notify.bark")).tag("bark")
+                                }
+                                .pickerStyle(.segmented)
+                                .frame(width: 220, alignment: .trailing)
+                                .onChange(of: viewModel.notificationType) { _, newValue in
+                                    LogManager.shared.info("Notification type changed to \(newValue)")
+                                    viewModel.saveSettings()
+                                }
+                            }
+                            
+                            if viewModel.notificationType == "bark" {
+                                Divider()
+                                HStack {
+                                    Text("Bark URL")
+                                    Spacer()
+                                    TextField("https://api.day.app/...", text: $viewModel.barkURL)
+                                        .textFieldStyle(.roundedBorder)
+                                        .frame(width: 220, alignment: .trailing)
+                                        .onChange(of: viewModel.barkURL) { _, _ in
+                                            viewModel.saveSettings()
+                                        }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(Theme.Layout.cardPadding)
+        }
+        .background(Theme.Colors.background)
+        .padding()
+    }
+    
+    private var statusBarDescription: String {
+        switch viewModel.statusBarDisplayMode {
+        case .average:
+            return languageManager.t("settings.desc.average")
+        case .worst:
+            return languageManager.t("settings.desc.worst")
+        case .best:
+            return languageManager.t("settings.desc.best")
+        case .first:
+            return languageManager.t("settings.desc.first")
+        }
+    }
+}
+
 // MARK: - Draggable Sorting Delegate
 struct HostDropDelegate: DropDelegate {
     let item: HostConfig
     @ObservedObject var viewModel: PingMonitorViewModel
-
+    
     func performDrop(info: DropInfo) -> Bool {
         return true
     }
-
+    
     func dropEntered(info: DropInfo) {
         guard let itemProvider = info.itemProviders(for: [.text]).first else { return }
-
+        
         itemProvider.loadObject(ofClass: NSString.self) { string, error in
             guard let idString = string as? String,
                   let draggingId = UUID(uuidString: idString),
                   draggingId != item.id else { return }
-
+            
             Task { @MainActor in
                 if let fromIndex = viewModel.hosts.firstIndex(where: { $0.id == draggingId }),
                    let toIndex = viewModel.hosts.firstIndex(where: { $0.id == item.id }) {
@@ -215,7 +2508,7 @@ struct HostDropDelegate: DropDelegate {
             }
         }
     }
-
+    
     func dropUpdated(info: DropInfo) -> DropProposal? {
         return DropProposal(operation: .move)
     }

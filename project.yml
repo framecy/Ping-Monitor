@@ -8,8 +8,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "6.0"
-    MARKETING_VERSION: "2.1.1-R9"
-    CURRENT_PROJECT_VERSION: "109"
+    MARKETING_VERSION: "2.1.2-R12"
+    CURRENT_PROJECT_VERSION: "112"
 
 targets:
   PingMonitor:
@@ -44,6 +44,12 @@ targets:
     dependencies:
       - target: PingMonitorWidget
         embed: true
+    preBuildScripts:
+      - name: Auto Increment Build Number
+        script: |
+          if [ "${CONFIGURATION}" == "Release" ]; then
+            "${PROJECT_DIR}/scripts/bump_build.sh"
+          fi
 
   PingMonitorWidget:
     type: app-extension
@@ -69,3 +75,17 @@ targets:
         #   - group.com.pingmonitor.shared
         # Sandbox disabled: allows shared file access without App Groups
         com.apple.security.app-sandbox: false
+
+  PingMonitorTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: PingMonitorTests
+    dependencies:
+      - target: PingMonitor
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.pingmonitor.tests
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: ""

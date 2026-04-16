@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>macOS 菜单栏网络延迟监控工具</strong><br>
-  多主机监控 · Tailscale 集成 · 服务快捷方式 · 实时统计 · 桌面小组件
+  多主机监控 · Tailscale 集成 · 路由追踪 · 实时网速 · 桌面小组件
 </p>
 
 <p align="center">
@@ -17,122 +17,47 @@
 </p>
 
 <p align="center">
-  🚀 <strong>Official Site: <a href="https://ping.diswant.space">ping.diswant.space</a></strong>
+  🌐 <strong><a href="https://ping.diswant.space">ping.diswant.space</a></strong>　·　
+  📦 <strong><a href="https://github.com/framecy/Ping-Monitor/releases/latest">立即下载</a></strong>
 </p>
 
 ---
 
 ## ✨ 功能一览
 
-### 🖥 侧边栏导航
+### 核心监控与可视化
 
-原生 macOS `NavigationSplitView` 侧边栏，配合 SF Symbols 图标，快速切换六大模块：监控、统计、网速、追踪、主机管理、服务快捷、历史日志。
+- **侧边栏导航**：原生 macOS NavigationSplitView，配合 SF Symbols 图标快速切换七大功能模块
+- **多主机监控**：自适应网格布局，支持连续 Ping（3/5/10/30 秒间隔）；绿/橙/红三色及呼吸灯动画展示延迟状态，卡片内嵌迷你趋势图
+- **数据统计**：请求数、丢包率、流量统计；Bézier 延迟趋势曲线、3D 环形统计图及实时延迟排行榜
+- **主机详情**：独立高刷延迟曲线、抖动值（Jitter）、标准差分析；支持导出单主机 Ping 日志
 
-### 📡 多主机监控
+### 状态栏与网速监控
 
-- 同时监控多个网络地址，自适应网格布局
-- 实时连续 Ping 模式，可配置 3/5/10/30 秒间隔
-- 绿（<50ms）/ 橙（<100ms）/ 红（>100ms）三色延迟状态
-- 每张主机卡片内嵌 **迷你趋势图**，一眼掌握近期波动
-- 呼吸灯动画状态指示 + 悬浮放大交互效果
+- **动态状态栏**：平均/最差/最快/首个主机多种显示策略，等宽数字字体对齐
+- **实时网速**：上下行速率自动换算（KB/s、MB/s），字号与模块显隐可自由定制
+- **流量深度分析**：1–10s 动态刷新活跃网卡；60 秒动态折线图与 7 天累积流量趋势
 
-### 📊 数据统计
+### 进阶网络工具
 
-- **概览卡片** — 请求数、成功率、丢包率、发送/接收流量、运行时长
-- **延迟趋势图** — 实时刷新曲线，支持 Bézier 平滑与区域填充
-- **详细指标** — 单主机或全部主机的最小/最大/平均延迟
-- **环形统计图** — 全新精致设计的环状统计图表，直观展示请求成功/失败/超时占比与数量
-- **排行榜** — 实时对齐网格布局显现延迟最低/最高的主机
+- **路由追踪**：逐跳展示 IP、延迟与丢包率；MTR 持续追踪模式；地图可视化本地→目标完整路径
+- **Tailscale 集成**：自动发现私网节点、一键批量导入；Exit Node 切换与延迟批量测试；NAT 类型检测
+- **特权管理器**：FIFO 持久化授权会话，彻底消除 Traceroute/MTR 的重复授权弹窗
 
-### 📈 状态栏扩展与网速监控
+### 服务快捷方式与定制
 
-- **可选网速显示** — 在系统菜单栏直接显示上行/下行实时网速（支持自动单位计算 KB/s、MB/s）
-- **高自由定制** — 支持调整占用总宽度、选择显隐地球图标、并支持 6-18 字号及粗细的完美垂直居中布局
-- **网速详情页** — 提供 1s–10s 多档刷新率，自动前置有流量的活跃网卡
-- **流量统计与图表** — 全新加入昨日/今日累积流量统计，并配合 30分钟/1小时/24小时/7天 的交互式历史趋势折线图
+- **统一快捷面板**：为每台主机配置 Web/SSH/自定义服务跳转，支持 16 种 SF Symbols 图标
+- **SSH 自动认证**：基于密钥或密码，支持自定义端口；expect 脚本绕过 AppleScript 授权限制
+- **自定义显示规则**：延迟阈值标签（如 `<50ms → 直连`）；`{host}` 占位符自定义 Ping 命令
+- **Keep-Alive 策略**：Passive/Intensive/Adaptive 三档，SSH 主机自动升频，空闲主机自动降频
 
-### 🔍 主机详情视图
+### 更多特性
 
-点击任意主机卡片即可进入详情页：
-- **实时图表** — 独立的高刷新率延迟曲线
-- **扩展统计** — 抖动值 (Jitter)、标准差
-- **丢包分析** — 详细的成功/失败计数与百分比
-- **流量监控** — 该主机的实时上传/下载流量统计
-- **专项历史日志** — 在详情页中直接展示当前主机的专项操作与 Ping 延迟日志，支持一键导出 `.txt` 到本地目录
-
-### 🛣 路由追踪 (Traceroute)
-
-- **可视化追踪** — 输入目标地址，直观展示每一跳的 IP、延迟与丢包率
-- **MTR 模式** — 持续追踪模式，像 MTR 工具一样实时更新每一跳的统计数据
-- **地图追踪** — 自动获取当前公网 IP 位置作为起点（Hop 0），在地图上完整绘制从本地到目标的每一跳地理路径
-- **快速复制** — 一键复制追踪结果到剪贴板
-
-### 🏷 自定义显示规则
-
-为每个主机设置延迟阈值规则，满足条件时在状态栏和卡片上显示自定义标签：
-
-```
-<50ms  → 直连       # 延迟低于 50ms 显示「直连」
->100ms → 转发       # 延迟高于 100ms 显示「转发」
-```
-
-### 🌍 多语言支持 (Localization)
-
-- **中英切换** — 完整的界面汉化与英文支持
-- **动态切换** — 顶部菜单栏一键切换语言，即时生效
-- **持久化** — 自动记忆语言偏好设置
-
-### 🔔 智能通知
-
-- 延迟超过阈值或连接失败时自动推送
-- 支持 **系统通知** 和 **Bark 远程推送** 两种方式
-
-### 📋 全局审计与日志系统
-
-- 分级日志（Debug / Info / Warning / Error），彩色圆点指示器，快速区分日志级别
-- **操作审计日志** — 追踪设置变更（语言、间隔、通知类型）及主机增删改查
-- 按级别与主机名筛选功能，支持导出全局日志为文本文件
-
-### 🧩 桌面小组件
-
-三款尺寸（小 / 中 / 大），渐变背景设计，实时显示延迟状态：
-
-| 尺寸 | 显示内容 |
-|------|---------|
-| 小 | 延迟数值 + 状态图标 + 主机地址 |
-| 中 | 延迟数值 + 主机名 + 运行状态 |
-| 大 | 完整面板：图标 + 延迟 + 主机 + 状态 + 更新时间 |
-
-### 🔗 Tailscale 集成
-
-- **自动节点发现** — 自动检测 Tailscale CLI，一键读取私有网络中所有设备
-- **智能导入** — 将 Tailscale 节点导入为监控主机，支持单台或批量导入
-- **状态面板** — 实时显示 Tailscale 连接状态、本机 IP、网络节点在线情况
-
-### 🚀 统一服务快捷与网速监控
-
-- **实时网速监控** — 上传/下载速度追踪，支持按应用/网卡分类（60秒动态折线图）
-- **多接口数据统计** — 一键切换全部网卡与单张网卡，显示包量与错误率
-- **服务快捷面板** — 统一管理所有主机的 Web/SSH 服务跳转
-- **SSH 密码与密钥认证** — 支持自定义端口与自动登录模式
-- **开机自启动** — 保留数据设置并在应用重启时自动恢复运行状态
-
-### 🚀 服务快捷方式
-
-- 为每个主机配置多个 **Web / SSH / 自定义** 服务快捷入口
-- 点击即可在浏览器打开 Web 服务或在终端中发起 SSH 连接
-- 全局 **服务面板** 汇总展示所有主机的快捷方式
-- 16 种 SF Symbols 图标可选，支持右键删除
-
-### ⚙️ 更多特性
-
-- **卡片式设置页** — 全新 `ModernCard` 与 `ScrollView` 相结合的卡片分组设计设置面板，逻辑清晰明了
-- **智能 Dock 图标** — 主窗口关闭时自动隐藏 Dock 图标，纯净驻留菜单栏
-- **状态栏显示策略** — 平均延迟 / 最差主机 / 最快主机 / 首个主机
-- **主机预设库** — 内置常用 DNS 和服务器，快速添加
-- **自定义 Ping 命令** — 使用 `{host}` 占位符自定义命令
-- **开机自启动** — 基于 ServiceManagement 框架
-- **菜单栏图标** — 等宽数字字体，运行时实时更新延迟数值
+- **桌面小组件**：小/中/大三款尺寸，渐变背景，App Group 双向数据同步
+- **多语言与通知**：中/英文运行时动态切换；系统通知 + Bark 远程推送
+- **审计日志**：Debug/Info/Warning/Error 分级记录，支持按级别/主机检索并导出 `.txt`
+- **网络质量评分**：多维评分（延迟/抖动/丢包/稳定性），实时质量事件流与历史趋势
+- **无感自启**：ServiceManagement 框架开机自启，主窗口关闭时隐藏 Dock 图标
 
 ---
 
@@ -142,11 +67,11 @@
 |------|------|
 | UI 框架 | SwiftUI 6.0 |
 | 最低系统 | macOS 14.0+ |
-| 架构模式 | MVVM |
-| 数据存储 | File-based Data Sharing (JSON) |
+| 架构模式 | MVVM + @MainActor |
+| 数据共享 | App Group (JSON) |
 | 小组件 | WidgetKit |
 | 自启动 | ServiceManagement |
-| 多语言 | Localization (Dynamic) |
+| 多语言 | Dynamic Localization |
 | 构建工具 | XcodeGen |
 
 ---
@@ -158,95 +83,64 @@ PingMonitor/
 ├── PingMonitor/
 │   ├── PingMonitorApp.swift        # 应用入口、数据模型、ViewModel、StatusBarController
 │   ├── MainView.swift              # 主视图路由与侧边栏导航
-│   ├── MonitorTab.swift            # 监控 Tab、快捷服务面板、Sparkline 组件
-│   ├── StatisticsTab.swift         # 统计 Tab、延迟图表、聚合统计
 │   ├── DashboardView.swift         # 统计仪表盘（3D 饼图、趋势卡片）
-│   ├── HostManagementTab.swift     # 主机/预设管理、编辑 Sheet
-│   ├── HostDetailView.swift        # 主机详情页（图表、丢包、流量）
-│   ├── SettingsTab.swift           # 设置 Tab（状态栏、Widget、通知）
-│   ├── LogsTab.swift               # 日志 Tab、日志导出
-│   ├── SidebarView.swift           # 自定义侧边栏导航
 │   ├── EditableHostCard.swift      # 主机卡片组件
+│   ├── HostDetailView.swift        # 主机详情页（图表、丢包、流量、日志导出）
+│   ├── SidebarView.swift           # 侧边栏导航组件
+│   ├── ServicesTab.swift           # 服务快捷方式面板
+│   ├── NetworkSpeedManager.swift   # 网速监控（接口/进程级）
+│   ├── NetworkSpeedTab.swift       # 网速 Tab UI
 │   ├── TracerouteManager.swift     # 路由追踪逻辑与地理定位
 │   ├── TracerouteView.swift        # 路由追踪 UI（地图、跳点表）
 │   ├── TailscaleManager.swift      # Tailscale VPN 集成
 │   ├── TailscaleTab.swift          # Tailscale Tab UI
-│   ├── NetworkSpeedManager.swift   # 网速监控（接口/进程级）
-│   ├── NetworkSpeedTab.swift       # 网速 Tab UI
-│   ├── ServicesTab.swift           # 服务快捷方式面板
-│   ├── WidgetDataManager.swift     # Widget 数据同步（三级回退）
+│   ├── WidgetDataManager.swift     # Widget 数据同步（三级回退策略）
+│   ├── ConfigManager.swift         # 统一配置存储管理
+│   ├── KeepAliveManager.swift      # Keep-Alive 探测策略
+│   ├── PrivilegedManager.swift     # FIFO 持久化特权命令会话
+│   ├── FolderMonitor.swift         # 文件系统变更监听
 │   ├── Components.swift            # 通用 UI 组件（ModernCard 等）
 │   ├── Theme.swift                 # 设计系统（颜色、字体、布局）
-│   ├── Localization.swift          # 中英多语言管理
-│   ├── Info.plist
-│   ├── PingMonitor.entitlements
-│   └── Assets.xcassets/            # 应用图标
+│   └── Localization.swift          # 中英多语言管理
 ├── PingMonitorWidget/
-│   ├── PingMonitorWidget.swift     # 桌面小组件（小/中/大）
-│   └── Info.plist
+│   └── PingMonitorWidget.swift     # 桌面小组件（小/中/大）
+├── PingMonitorTests/
+│   └── QualityEngineTests.swift    # 网络质量引擎单元测试
+├── docs/                           # GitHub Pages 落地页
+├── scripts/
+│   └── bump_build.sh               # 自动版本号递增脚本
 ├── project.yml                     # XcodeGen 工程配置
-└── build.sh                        # 自动化打包脚本
+└── build.sh                        # 一键打包脚本（生成 DMG）
 ```
 
 ---
 
 ## 🚀 编译与安装
 
-### 环境要求
-
-- macOS 14.0+
-- Xcode 16+
-- XcodeGen：`brew install xcodegen`
-
-### 一键打包
+**环境要求**：macOS 14.0+ | Xcode 16+ | XcodeGen
 
 ```bash
-chmod +x build.sh
+brew install xcodegen
+git clone https://github.com/framecy/Ping-Monitor.git
+cd Ping-Monitor
 ./build.sh
 ```
 
-打包输出至 `~/Desktop/PingMonitor-v{version}.dmg`，默认自动递增版本号。
+打包输出至 `~/Desktop/PingMonitor-v{version}.dmg`，脚本自动递增构建号。
 
-如需关闭自动版本递增，编辑 `build.sh`：
-
-```bash
-AUTO_VERSION=false
-```
-
-### 安装
-
-1. 双击打开 DMG 文件
-2. 将 PingMonitor 拖入 Applications 文件夹
-3. 首次打开时允许系统安全提示
+**安装步骤**：
+1. 打开 DMG，将 PingMonitor 拖入 Applications 文件夹
+2. 首次启动时在「系统设置 → 隐私与安全性」中允许运行
 
 ---
 
 ## 📖 使用指南
 
-### 添加监控主机
-
-1. 进入「主机管理」→ 点击「添加」
-2. 输入名称和地址（IP 或域名）
-3. 可选：自定义 ping 命令，用 `{host}` 作为地址占位符
-4. 或从预设库快速添加常用主机
-
-### 查看统计
-
-1. 切换至「统计」页面
-2. 顶部概览卡片显示整体数据
-3. 选择「全部主机」或单个主机查看延迟趋势图和详细指标
-
-### 配置状态栏
-
-进入「设置」→「状态栏显示」，选择延迟显示策略和是否显示规则标签。
-
-### 切换语言
-
-点击顶部菜单栏右上角的语言切换按钮（中/EN），界面即时更新。
-
-### 配置通知
-
-进入「设置」→「通知」，选择系统通知或填写 Bark URL 进行远程推送。
+- **添加主机**：「主机管理」→「添加」→ 输入名称与地址；或通过预设库快速导入
+- **查看统计**：「统计」页面顶部概览卡片掌握全局，点击主机查看深度图表
+- **配置状态栏**：「设置」→ 调整延迟显示策略与网速样式
+- **切换语言**：点击菜单栏窗口右上角「中/EN」即时切换
+- **通知推送**：「设置」→「通知」→ 填入 Bark URL 启用移动端推送
 
 ---
 
@@ -254,20 +148,20 @@ AUTO_VERSION=false
 
 | 版本 | 更新内容 |
 |------|---------|
-| **v2.1.1 R9**<br>性能优化 | 缓存 NSRegularExpression / DateFormatter / ByteCountFormatter 静态实例，消除高频路径重复创建开销；Widget 同步 5s 防抖节流，减少 90%+ 无效文件 IO；Ping 主机追踪改为 UUID 查找，消除索引错位风险；MainView.swift（2444 行）拆分为 5 个独立 Tab 文件（MonitorTab / StatisticsTab / HostManagementTab / LogsTab / SettingsTab） |
-| **v2.1.1 R1–R6**<br>UI 与 Widget 修复 | 主机拖拽排序；Tailscale 快捷命令面板与 Exit Node 状态标识；浅/深色模式设计系统；规则编辑器布局修复与默认规则补全；Widget App Group 双向数据通讯打通，彻底解决组件画廊找不到应用的问题；图表阶梯式警示色（&lt;100ms 绿 / 100–300ms 橙 / &gt;300ms 红） |
-| **v2.1.0**<br>Traceroute & 状态栏 | Traceroute / MTR 路由追踪（单次提权 Bash 容器封装、地图逐级渲染本地→目标）；全新状态栏（网速仪表盘、图标开关、可调字体/间距、固定宽度防抖）；SSH 安全连接（expect 脚本绕过 AppleScript 授权）；监控页常驻 ServiceShortcutsRibbon 面板；网速折线图贝塞尔曲线 + 炫光渐变；netstat 动态列偏移检测修复 VPN 下 Errors 计数异常 |
-| **v2.0.51–v2.0.55**<br>Tailscale & 服务集成 | Tailscale 自动发现私网节点并一键导入监控；服务快捷方式（Web / SSH / 自定义）全局汇总面板；NAT 类型检测（tailscale netcheck，展示 UDP / IPv4 / IPv6 / DERP 区域延迟图）；WidgetDataManager 三级回退策略重构，彻底修复小组件无数据；SSH 配置支持用户名 / 端口 / 密钥路径与实时命令预览 |
-| **v2.0.34–v2.0.40**<br>UI 升级 & 多语言 | 中/英文界面国际化，支持运行时动态切换（覆盖小组件与系统菜单）；统计仪表盘 3D 立体饼图与 Grid 延迟排行榜；实时内存监控；ModernCard 卡片式设置页；侧边栏显示 macOS 用户名；操作审计日志与单主机日志一键导出 |
-| **v2.0.20–v2.0.29**<br>基础功能建设 | 连续 ping 模式与聚合数据统计；响应式网格布局、延迟图表体系；侧边栏导航、Bézier 曲线图表、渐变卡片、迷你趋势图；小组件首版设计；macOS 15.7+ 小组件背景色崩溃修复；应用图标与 DMG 打包流程优化 |
+| **v2.1.2 R12**<br>质量引擎 & 特权管理 | 探针诊断框架（ProbeFailureReason / ProbePathKind / HostProbeDiagnostic）；网络质量多维评分（延迟/抖动/丢包/稳定性）；PrivilegedManager FIFO 持久化授权，彻底消除重复弹窗；KeepAliveManager 三档策略（Passive/Intensive/Adaptive）；ConfigManager 统一配置；FolderMonitor 文件系统监听；TracerouteManager NSLookup 集成与接口优先级路由；Tailscale Exit Node 切换与路径诊断 |
+| **v2.1.1 R9**<br>性能优化 | 缓存 NSRegularExpression / DateFormatter / ByteCountFormatter 静态实例，消除高频路径重复创建；Widget 同步 5s 防抖节流，减少 90%+ 无效文件 IO；Ping 主机追踪改为 UUID 查找，消除索引错位风险；MainView.swift（2444 行）拆分为 5 个独立 Tab 文件 |
+| **v2.1.1 R1–R6**<br>UI 与 Widget 修复 | 主机拖拽排序；Tailscale 快捷命令面板与 Exit Node 状态标识；浅/深色模式设计系统；规则编辑器布局修复；Widget App Group 双向通讯打通；图表阶梯式警示色（<100ms 绿 / 100–300ms 橙 / >300ms 红） |
+| **v2.1.0**<br>Traceroute & 状态栏 | Traceroute/MTR 路由追踪地图可视化；全新状态栏（网速仪表盘、固定宽度防抖）；SSH 安全连接；ServiceShortcutsRibbon 常驻面板；网速折线图贝塞尔曲线渐变 |
+| **v2.0.51–v2.0.55**<br>Tailscale & 服务集成 | Tailscale 自动发现与一键导入；服务快捷方式全局面板；NAT 类型检测；WidgetDataManager 三级回退策略 |
+| **v2.0.20–v2.0.40**<br>基础建设 | 连续 ping 与聚合统计；响应式网格 UI；中英国际化；3D 饼图；小组件首版；侧边栏导航 |
 
 ---
 
 ## 📄 开源协议
 
-MIT License
+MIT License © 2026 framecy
 
 ## 🙏 致谢
 
-- [XcodeGen](https://github.com/yonaskolb/XcodeGen) — 项目工程生成工具
+- [XcodeGen](https://github.com/yonaskolb/XcodeGen) — Xcode 工程生成工具
 - Apple SwiftUI / WidgetKit / ServiceManagement 框架

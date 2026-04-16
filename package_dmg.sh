@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-APP_PATH="/Users/framed/Documents/PingMonitor/build/Debug/PingMonitor.app"
+APP_PATH="/Users/framed/Documents/PingMonitor/build/Build/Products/Debug/PingMonitor.app"
 if [ ! -d "$APP_PATH" ]; then
     echo "❌ PingMonitor.app not found in $APP_PATH"
     exit 1

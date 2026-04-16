@@ -9,6 +9,8 @@ struct HostDetailView: View {
     @ObservedObject private var logManager = LogManager.shared
     @State private var showShortcutEditor = false
     @State private var editingShortcut: ServiceShortcut? = nil
+    @State private var showRecordEditor = false
+    @State private var editingRecord: HostRecord? = nil
     
     private var stats: HostStats? {
         viewModel.hostStats[host.id]
@@ -16,6 +18,49 @@ struct HostDetailView: View {
     
     private var currentHost: HostConfig? {
         viewModel.hosts.first(where: { $0.id == host.id })
+    }
+
+    private var probeDiagnostic: HostProbeDiagnostic? {
+        viewModel.hostDiagnostics[host.id]
+    }
+
+    private var qualitySnapshot: HostQualitySnapshot {
+        viewModel.qualitySnapshot(for: currentHost ?? host)
+    }
+
+    private var lastResultText: String {
+        if let diagnostic = probeDiagnostic {
+            switch diagnostic.lastOutcome {
+            case .success:
+                return languageManager.t("diagnostics.result.reachable")
+            case .failure:
+                return diagnostic.lastFailureReason?.localizedDescription(using: languageManager) ?? languageManager.t("diagnostics.failure.unknown")
+            case nil:
+                break
+            }
+        }
+
+        if currentHost?.isChecking == true {
+            return languageManager.t("host_detail.checking")
+        }
+        if currentHost?.isReachable == true {
+            return languageManager.t("diagnostics.result.reachable")
+        }
+        return languageManager.t("host_detail.offline")
+    }
+
+    private var lastResultColor: Color {
+        if probeDiagnostic?.lastOutcome == .success || currentHost?.isReachable == true {
+            return Theme.Colors.accentGreen
+        }
+        if let category = probeDiagnostic?.lastFailureReason?.category, category == .dnsFailure {
+            return Theme.Colors.accentOrange
+        }
+        return Theme.Colors.accentRed
+    }
+
+    private var pathText: String? {
+        probeDiagnostic?.lastPathSnapshot?.localizedDescription(using: languageManager)
     }
     
     var body: some View {
@@ -41,13 +86,31 @@ struct HostDetailView: View {
                         trafficCard
                     }
                     
-                    // Row 4: Display Rules
+                    // Row 4: Actions
+                    HStack {
+                        Spacer()
+                        Button(languageManager.t("stats.export_current")) {
+                            viewModel.exportStats(for: host.id)
+                        }
+                        .buttonStyle(.bordered)
+                        
+                        Button(languageManager.t("stats.reset_current")) {
+                            viewModel.resetStats(for: host.id)
+                        }
+                        .buttonStyle(.bordered)
+                        .foregroundStyle(.red)
+                    }
+                    
+                    // Row 5: Display Rules
                     if !host.displayRules.isEmpty {
                         displayRulesCard
                     }
                     
                     // Row 5: Service Shortcuts
                     serviceShortcutsCard
+                    
+                    // Row 6: Records
+                    recordsCard
                     
                     // Row 6: Logs
                     logsCard
@@ -72,6 +135,22 @@ struct HostDetailView: View {
                     viewModel.saveSettings()
                 }
                 editingShortcut = nil
+            }
+        }
+        .sheet(isPresented: $showRecordEditor) {
+            RecordEditorSheet(existingRecord: editingRecord) { record in
+                if let index = viewModel.hosts.firstIndex(where: { $0.id == host.id }) {
+                    if let existing = editingRecord,
+                       let rIndex = viewModel.hosts[index].records.firstIndex(where: { $0.id == existing.id }) {
+                        viewModel.hosts[index].records[rIndex] = record
+                        LogManager.shared.info("Updated record: \(record.title)", host: host.name)
+                    } else {
+                        viewModel.hosts[index].records.append(record)
+                        LogManager.shared.info("Added record: \(record.title)", host: host.name)
+                    }
+                    viewModel.saveSettings()
+                }
+                editingRecord = nil
             }
         }
     }
@@ -193,18 +272,75 @@ struct HostDetailView: View {
                 
                 Spacer()
                 
-                // Ping command
-                if !host.command.isEmpty {
-                    HStack(spacing: 6) {
-                        Image(systemName: "terminal")
-                            .font(.system(size: 10))
-                            .foregroundStyle(Theme.Colors.textTertiary)
-                        Text(host.command)
-                            .font(.system(size: 11, design: .monospaced))
-                            .foregroundStyle(Theme.Colors.textTertiary)
-                            .lineLimit(1)
+                VStack(alignment: .leading, spacing: 8) {
+                    diagnosticInfoRow(
+                        title: languageManager.t("host_detail.probe_mode"),
+                        icon: currentHost?.probeMode == .tcp ? "cable.connector" : "waveform.path.ecg",
+                        text: currentHost?.probeDisplayLabel ?? host.probeDisplayLabel,
+                        color: Theme.Colors.textTertiary
+                    )
+
+                    diagnosticInfoRow(
+                        title: languageManager.t("dashboard.quality_score"),
+                        icon: "waveform.badge.magnifyingglass",
+                        text: "\(qualitySnapshot.score) / 100 · P95 \(qualitySnapshot.p95Latency.map { String(format: "%.0fms", $0) } ?? "—") · Loss \(String(format: "%.1f%%", qualitySnapshot.packetLoss))",
+                        color: lastResultColor
+                    )
+
+                    diagnosticInfoRow(
+                        title: languageManager.t("host_detail.last_result"),
+                        icon: probeDiagnostic?.lastOutcome == .success ? "checkmark.circle" : "exclamationmark.triangle",
+                        text: lastResultText,
+                        color: lastResultColor
+                    )
+
+                    if let pathText, let pathSnapshot = probeDiagnostic?.lastPathSnapshot {
+                        diagnosticInfoRow(
+                            title: languageManager.t("host_detail.path"),
+                            icon: pathSnapshot.kind == .relay ? "arrow.triangle.2.circlepath" : "point.topleft.down.to.point.bottomright.curvepath",
+                            text: pathText,
+                            color: pathSnapshot.kind == .relay ? Theme.Colors.accentOrange : Theme.Colors.accentGreen
+                        )
+                    }
+
+                    if let lastCheckedAt = probeDiagnostic?.lastCheckedAt {
+                        diagnosticInfoRow(
+                            title: languageManager.t("host_detail.last_checked"),
+                            icon: "clock",
+                            text: lastCheckedAt.formatted(date: .omitted, time: .standard),
+                            color: Theme.Colors.textTertiary
+                        )
+                    }
+
+                    if let command = currentHost?.command, !command.isEmpty {
+                        diagnosticInfoRow(
+                            title: languageManager.t("host_detail.command"),
+                            icon: "terminal",
+                            text: command,
+                            color: Theme.Colors.textTertiary
+                        )
                     }
                 }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func diagnosticInfoRow(title: String, icon: String, text: String, color: Color) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(title)
+                .font(Theme.Fonts.body(10))
+                .foregroundStyle(Theme.Colors.textSecondary)
+                .frame(width: 72, alignment: .leading)
+
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 10))
+                    .foregroundStyle(color)
+                Text(text)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(color)
+                    .lineLimit(1)
             }
         }
     }
@@ -268,6 +404,8 @@ struct HostDetailView: View {
     
     // MARK: - Latency Chart
     
+    @State private var selectedWindow: NetworkQualityWindow = .fiveMinutes
+    
     private var latencyChartCard: some View {
         ModernCard {
             VStack(alignment: .leading, spacing: 12) {
@@ -279,43 +417,60 @@ struct HostDetailView: View {
                         .foregroundStyle(Theme.Colors.textPrimary)
                     Spacer()
                     
-                    if let history = stats?.latencyHistory, !history.isEmpty {
-                        Text("\(history.count) " + languageManager.t("host_detail.data_points"))
-                            .font(.system(size: 10))
-                            .foregroundStyle(Theme.Colors.textTertiary)
+                    Picker("", selection: $selectedWindow) {
+                        Text("1m").tag(NetworkQualityWindow.oneMinute)
+                        Text("5m").tag(NetworkQualityWindow.fiveMinutes)
+                        Text("1h").tag(NetworkQualityWindow.oneHour)
                     }
+                    .pickerStyle(.segmented)
+                    .frame(width: 140)
+                    .controlSize(.small)
                 }
                 
-                if let history = stats?.latencyHistory, !history.isEmpty {
-                    let recent = Array(history.suffix(60))
-                    
+                let cutoff = Date().addingTimeInterval(-selectedWindow.duration)
+                let recentSamples = (viewModel.probeSamples[host.id] ?? []).filter { $0.timestamp >= cutoff }
+                
+                if !recentSamples.isEmpty {
                     Chart {
-                        ForEach(Array(recent.enumerated()), id: \.element.id) { index, point in
-                            LineMark(
-                                x: .value("Time", index),
-                                y: .value("Latency", point.latency)
-                            )
-                            .interpolationMethod(.monotone)
-                            .foregroundStyle(
-                                .linearGradient(
-                                    colors: [Theme.Colors.accentBlue, Theme.Colors.accentPurple],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
+                        ForEach(recentSamples) { sample in
+                            if let latency = sample.latency {
+                                LineMark(
+                                    x: .value("Time", sample.timestamp),
+                                    y: .value("Latency", latency)
                                 )
-                            )
-                            
-                            AreaMark(
-                                x: .value("Time", index),
-                                y: .value("Latency", point.latency)
-                            )
-                            .interpolationMethod(.monotone)
-                            .foregroundStyle(
-                                .linearGradient(
-                                    colors: [Theme.Colors.accentBlue.opacity(0.25), Theme.Colors.accentBlue.opacity(0.0)],
-                                    startPoint: .top,
-                                    endPoint: .bottom
+                                .interpolationMethod(.monotone)
+                                .foregroundStyle(
+                                    .linearGradient(
+                                        colors: [Theme.Colors.accentBlue, .cyan, Theme.Colors.accentGreen],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
                                 )
-                            )
+                                .shadow(color: Theme.Colors.accentBlue.opacity(0.35), radius: 3)
+                                
+                                AreaMark(
+                                    x: .value("Time", sample.timestamp),
+                                    y: .value("Latency", latency)
+                                )
+                                .interpolationMethod(.monotone)
+                                .foregroundStyle(
+                                    .linearGradient(
+                                        colors: [Theme.Colors.accentBlue.opacity(0.2), Theme.Colors.accentBlue.opacity(0.0)],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
+                                )
+                            } else {
+                                // Packet Loss marker (red dashed line)
+                                RuleMark(x: .value("Time", sample.timestamp))
+                                    .foregroundStyle(Theme.Colors.accentRed.opacity(0.8))
+                                    .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [4, 4]))
+                                    .annotation(position: .bottom) {
+                                        Circle()
+                                            .fill(Theme.Colors.accentRed)
+                                            .frame(width: 4, height: 4)
+                                    }
+                            }
                         }
                         
                         // Avg line
@@ -330,18 +485,32 @@ struct HostDetailView: View {
                                 }
                         }
                     }
-                    .animation(.easeInOut, value: recent.map { $0.latency })
+                    .chartYScale(domain: .automatic(includesZero: true))
+                    .chartYScale(domain: 0...chartMaxLatency(for: recentSamples))
                     .chartYAxis {
                         AxisMarks(position: .leading) { value in
                             AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [4, 4]))
                                 .foregroundStyle(Color.white.opacity(0.08))
-                            AxisValueLabel()
-                                .foregroundStyle(Theme.Colors.textTertiary)
-                                .font(.system(size: 9))
+                            AxisValueLabel {
+                                if let val = value.as(Double.self) {
+                                    Text("\(Int(val))")
+                                        .frame(width: 40, alignment: .trailing)
+                                        .foregroundStyle(Theme.Colors.textTertiary)
+                                        .font(.system(size: 9))
+                                }
+                            }
                         }
                     }
                     .chartXAxis {
-                        AxisMarks { _ in }
+                        AxisMarks(values: .automatic(desiredCount: 5)) { value in
+                            if let date = value.as(Date.self) {
+                                AxisValueLabel {
+                                    Text(date.formatted(.dateTime.hour().minute().second()))
+                                        .font(.system(size: 8))
+                                        .foregroundStyle(Theme.Colors.textTertiary)
+                                }
+                            }
+                        }
                     }
                     .frame(minHeight: 160)
                 } else {
@@ -548,6 +717,18 @@ struct HostDetailView: View {
         return .red
     }
     
+    private func chartMaxLatency(for points: [ProbeSample]) -> Double {
+        let values = points.compactMap { $0.latency }
+        let maxVal = values.max() ?? 100
+        let avgVal = values.isEmpty ? 0 : values.reduce(0, +) / Double(values.count)
+        
+        // Cap the display scale to at most 5x the average or a minimum of 200
+        let adaptiveCap = max(200, avgVal * 5)
+        let displayMax = min(maxVal, adaptiveCap)
+        
+        return max(10, displayMax * 1.1)
+    }
+    
     // MARK: - Service Shortcuts Card
     
     private var serviceShortcutsCard: some View {
@@ -688,6 +869,91 @@ struct HostDetailView: View {
         LogManager.shared.info("Opened service: \(shortcut.name)", host: host.name)
     }
     
+    // MARK: - Records Card
+    
+    private var recordsCard: some View {
+        ModernCard {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Image(systemName: "note.text")
+                        .foregroundStyle(.orange)
+                    Text("Records")
+                        .font(Theme.Fonts.display(14))
+                        .foregroundStyle(Theme.Colors.textPrimary)
+                    Spacer()
+                    
+                    Button(action: {
+                        editingRecord = nil
+                        showRecordEditor = true
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "plus")
+                                .font(.system(size: 10, weight: .semibold))
+                            Text("Add")
+                                .font(Theme.Fonts.body(11))
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Color.orange.opacity(0.15))
+                        .cornerRadius(6)
+                    }
+                    .buttonStyle(.plain)
+                }
+                
+                let records = currentHost?.records ?? []
+                
+                if records.isEmpty {
+                    Text("No records yet")
+                        .font(Theme.Fonts.body(12))
+                        .foregroundStyle(Theme.Colors.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 16)
+                } else {
+                    VStack(spacing: 12) {
+                        ForEach(records.sorted(by: { $0.createdAt > $1.createdAt })) { record in
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack(alignment: .top) {
+                                    Text(record.title)
+                                        .font(.system(size: 13, weight: .semibold))
+                                        .foregroundStyle(Theme.Colors.textPrimary)
+                                    Spacer()
+                                    Text(record.createdAt.formatted(date: .abbreviated, time: .shortened))
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(Theme.Colors.textTertiary)
+                                }
+                                
+                                Text(record.content)
+                                    .font(Theme.Fonts.body(12))
+                                    .foregroundStyle(Theme.Colors.textSecondary)
+                                    .lineLimit(3)
+                            }
+                            .padding(12)
+                            .background(Theme.Colors.background.opacity(0.5))
+                            .cornerRadius(8)
+                            .contextMenu {
+                                Button {
+                                    editingRecord = record
+                                    showRecordEditor = true
+                                } label: {
+                                    Label("Edit", systemImage: "pencil")
+                                }
+                                Divider()
+                                Button(role: .destructive) {
+                                    if let index = viewModel.hosts.firstIndex(where: { $0.id == host.id }) {
+                                        viewModel.hosts[index].records.removeAll(where: { $0.id == record.id })
+                                        viewModel.saveSettings()
+                                    }
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
     // MARK: - Logs Card
     
     private var logsCard: some View {
@@ -815,5 +1081,84 @@ struct DetailStatItem: View {
                 .foregroundStyle(color)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+// MARK: - Record Editor Sheet
+
+struct RecordEditorSheet: View {
+    let existingRecord: HostRecord?
+    let onSave: (HostRecord) -> Void
+    
+    @Environment(\.presentationMode) var presentationMode
+    @State private var title: String = ""
+    @State private var content: String = ""
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Text(existingRecord == nil ? "Add Record" : "Edit Record")
+                    .font(.system(size: 14, weight: .semibold))
+                Spacer()
+                Button(action: { presentationMode.wrappedValue.dismiss() }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.gray)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding()
+            .background(Theme.Colors.sidebarBackground)
+            
+            // Form
+            Form {
+                Section(header: Text("Title")) {
+                    TextField("Record title", text: $title)
+                        .textFieldStyle(.roundedBorder)
+                }
+                
+                Section(header: Text("Content")) {
+                    TextEditor(text: $content)
+                        .frame(minHeight: 120)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                        )
+                }
+            }
+            .padding()
+            
+            // Footer
+            HStack {
+                Spacer()
+                Button("Cancel") {
+                    presentationMode.wrappedValue.dismiss()
+                }
+                .keyboardShortcut(.cancelAction)
+                
+                Button("Save") {
+                    let record = HostRecord(
+                        id: existingRecord?.id ?? UUID(),
+                        title: title.trimmingCharacters(in: .whitespacesAndNewlines),
+                        content: content.trimmingCharacters(in: .whitespacesAndNewlines),
+                        createdAt: existingRecord?.createdAt ?? Date()
+                    )
+                    onSave(record)
+                    presentationMode.wrappedValue.dismiss()
+                }
+                .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.defaultAction)
+                .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+            .padding()
+            .background(Theme.Colors.sidebarBackground)
+        }
+        .frame(width: 400, height: 350)
+        .onAppear {
+            if let record = existingRecord {
+                title = record.title
+                content = record.content
+            }
+        }
     }
 }
