@@ -3,60 +3,72 @@ import AppKit
 
 /// Manages privileged command execution with a persistent authorization session.
 /// Uses a background osascript process and a FIFO (named pipe) to avoid multiple password prompts.
+///
+/// FIFO lives in a per-instance, mode-0700 directory under the user's private
+/// temp dir (`NSTemporaryDirectory()`), with `umask 077` set before `mkfifo`.
+/// This eliminates the TOCTOU window of the previous `/tmp/pingmonitor_priv_fifo`
+/// implementation, where another local user could race between mkfifo and chmod
+/// to inject commands into the root osascript loop.
 @MainActor
 final class PrivilegedManager: Sendable {
     static let shared = PrivilegedManager()
-    
-    private let fifoPath = "/tmp/pingmonitor_priv_fifo"
+
+    private let privDir: String
+    private let fifoPath: String
     private var runnerProcess: Process?
     private var isInitialized = false
-    
-    private init() {}
-    
+
+    private init() {
+        let base = NSTemporaryDirectory() as NSString
+        privDir = base.appendingPathComponent("pingmonitor.\(UUID().uuidString)")
+        try? FileManager.default.createDirectory(
+            atPath: privDir,
+            withIntermediateDirectories: false,
+            attributes: [.posixPermissions: NSNumber(value: Int16(0o700))]
+        )
+        fifoPath = (privDir as NSString).appendingPathComponent("priv.fifo")
+    }
+
     /// Initializes the privileged runner. This will trigger the osascript password prompt.
     func initialize() {
         guard !isInitialized else { return }
-        
+
         setupFIFO()
         startRunner()
         isInitialized = true
         LogManager.shared.info("PrivilegedManager initialized")
     }
-    
+
     private func setupFIFO() {
-        // Clean up old FIFO if exists
         if FileManager.default.fileExists(atPath: fifoPath) {
             try? FileManager.default.removeItem(atPath: fifoPath)
         }
-        
-        // Create new FIFO
+
+        // umask 077 → mkfifo creates the node as 0600 atomically.
+        // No chmod race window. Restored before returning.
+        let oldMask = umask(0o077)
+        defer { _ = umask(oldMask) }
+
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: "/usr/bin/mkfifo")
         proc.arguments = [fifoPath]
         try? proc.run()
         proc.waitUntilExit()
-        
-        // Set permissions so only current user can write, but root (script) can read
-        // Actually bash running as root can read anything.
-        // We set 600 for current user security.
-        let chmod = Process()
-        chmod.executableURL = URL(fileURLWithPath: "/bin/chmod")
-        chmod.arguments = ["600", fifoPath]
-        try? chmod.run()
-        chmod.waitUntilExit()
     }
-    
+
     private func startRunner() {
-        // The script loop that reads from FIFO and executes as root
-        // We use a robust loop that reopens the FIFO after each command (or use a persistent read)
+        // Single-quote the FIFO path inside bash so any unusual characters in
+        // NSTemporaryDirectory/UUID can't break the loop. Embedded single quotes
+        // (not expected from UUID, but defensive) are escaped via '\''.
+        let safeFifo = fifoPath.replacingOccurrences(of: "'", with: "'\\''")
         let script = """
-        bash -c "while true; do if read cmd < \(fifoPath); then if [ \\\"$cmd\\\" == \\\"exit\\\" ]; then break; fi; eval \\\"$cmd\\\"; fi; done"
+        bash -c "while true; do if read cmd < '\(safeFifo)'; then if [ \\\"$cmd\\\" == \\\"exit\\\" ]; then break; fi; eval \\\"$cmd\\\"; fi; done"
         """
-        
+
         let osaProc = Process()
         osaProc.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
         osaProc.arguments = ["-e", "do shell script \"\(script)\" with administrator privileges"]
-        
+
         // Run in background
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             do {
@@ -102,6 +114,7 @@ final class PrivilegedManager: Sendable {
     func stop() {
         run("exit")
         try? FileManager.default.removeItem(atPath: fifoPath)
+        try? FileManager.default.removeItem(atPath: privDir)
         runnerProcess?.terminate()
         isInitialized = false
     }
