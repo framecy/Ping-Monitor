@@ -411,11 +411,11 @@ class LogManager: ObservableObject {
             try content.write(to: fileURL, atomically: true, encoding: .utf8)
             return fileURL
         } catch {
-            print("Failed to export logs: \(error)")
+            self.error("Failed to export logs: \(error)")
             return nil
         }
     }
-    
+
     func exportHostLogs(for hostName: String) -> URL? {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyyMMdd_HHmmss"
@@ -433,7 +433,7 @@ class LogManager: ObservableObject {
             try content.write(to: fileURL, atomically: true, encoding: .utf8)
             return fileURL
         } catch {
-            print("Failed to export host logs: \(error)")
+            self.error("Failed to export host logs: \(error)")
             return nil
         }
     }

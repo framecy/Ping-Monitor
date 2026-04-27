@@ -74,6 +74,8 @@ struct WidgetDataManager {
         encoder.dateEncodingStrategy = .secondsSince1970
         
         guard let jsonData = try? encoder.encode(data) else {
+            // NOTE: This file is shared with the PingMonitorWidget target where
+            // LogManager isn't available, so we keep print() here intentionally.
             print("WidgetDataManager: Failed to encode data")
             return
         }

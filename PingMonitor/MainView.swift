@@ -2023,7 +2023,7 @@ struct LogsTab: View {
             defaultFilename: "PingMonitor_Logs.txt"
         ) { result in
             if case .success = result {
-                print("Log exported successfully")
+                LogManager.shared.info("Log exported successfully")
             }
         }
     }

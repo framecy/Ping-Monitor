@@ -34,10 +34,10 @@ class ConfigManager {
             let jsonData = try encoder.encode(data)
             try jsonData.write(to: url, options: .atomic)
         } catch {
-            print("ConfigManager: Failed to save to \(url.lastPathComponent): \(error)")
+            LogManager.shared.error("ConfigManager: Failed to save to \(url.lastPathComponent): \(error)")
         }
     }
-    
+
     func load<T: Decodable>(from url: URL) -> T? {
         guard fm.fileExists(atPath: url.path) else { return nil }
         do {
@@ -45,28 +45,28 @@ class ConfigManager {
             let decoder = JSONDecoder()
             return try decoder.decode(T.self, from: data)
         } catch {
-            print("ConfigManager: Failed to load from \(url.lastPathComponent): \(error)")
+            LogManager.shared.error("ConfigManager: Failed to load from \(url.lastPathComponent): \(error)")
             return nil
         }
     }
-    
+
     // Migration helpers
     func migrateFromUserDefaults(hostsKey: String, presetsKey: String, statsKey: String) {
         let defaults = UserDefaults.standard
-        
+
         if let data = defaults.data(forKey: hostsKey), !fm.fileExists(atPath: hostsURL.path) {
             try? data.write(to: hostsURL)
-            print("ConfigManager: Migrated hosts from UserDefaults")
+            LogManager.shared.info("ConfigManager: Migrated hosts from UserDefaults")
         }
-        
+
         if let data = defaults.data(forKey: presetsKey), !fm.fileExists(atPath: presetsURL.path) {
             try? data.write(to: presetsURL)
-            print("ConfigManager: Migrated presets from UserDefaults")
+            LogManager.shared.info("ConfigManager: Migrated presets from UserDefaults")
         }
-        
+
         if let data = defaults.data(forKey: statsKey), !fm.fileExists(atPath: statsURL.path) {
             try? data.write(to: statsURL)
-            print("ConfigManager: Migrated stats from UserDefaults")
+            LogManager.shared.info("ConfigManager: Migrated stats from UserDefaults")
         }
     }
 }
