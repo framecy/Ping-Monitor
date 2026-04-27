@@ -14,6 +14,7 @@
   <img src="https://img.shields.io/badge/SwiftUI-6.0-orange" alt="SwiftUI">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
   <img src="https://img.shields.io/badge/version-2.1.2--R12-brightgreen" alt="Version">
+  <a href="https://github.com/framecy/Ping-Monitor/actions/workflows/ci.yml"><img src="https://github.com/framecy/Ping-Monitor/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
 </p>
 
 <p align="center">

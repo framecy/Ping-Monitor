@@ -20,6 +20,10 @@ build/
 scratch/
 .claude/
 
+## Node sub-projects (e.g. dashboard/)
+node_modules/
+/dashboard/
+
 ## Reproduction Scripts
 repro_*.swift
 

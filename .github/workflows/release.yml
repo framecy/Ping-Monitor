@@ -1,0 +1,39 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  build-dmg:
+    name: Build & Publish DMG
+    runs-on: macos-14
+    permissions:
+      contents: write
+    env:
+      SKIP_VERSION_BUMP: "1"
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Build DMG
+        run: ./build.sh
+
+      - name: Locate DMG
+        id: dmg
+        run: |
+          DMG_PATH=$(ls "$HOME/Desktop/"PingMonitor-v*.dmg | head -n1)
+          echo "Found: $DMG_PATH"
+          echo "path=$DMG_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.dmg.outputs.path }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
