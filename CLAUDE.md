@@ -72,17 +72,23 @@ The widget target is sandboxed, the host app is **not** (`com.apple.security.app
 
 `PrivilegedManager` runs a **single** `osascript`-prompted root bash loop that reads commands from a FIFO at `/tmp/pingmonitor_priv_fifo`. This is how `TracerouteManager` / MTR / interface tooling avoid prompting for the password on every invocation. Anything that needs root should `PrivilegedManager.shared.run("…")` rather than spawning its own `osascript` — re-invoking `osascript … with administrator privileges` re-prompts.
 
+### Logging
+
+`LogManager` (defined in `PingMonitorApp.swift`) is the only logging channel. Use `LogManager.shared.debug/info/warning/error(_ message:, host:)` — **never `print()`**. The `host:` parameter is optional and scopes the entry to a specific host in the audit log UI.
+
 ### Larger feature modules
 
 Each tab is its own file driven by the same `PingMonitorViewModel`:
 
 - `MainView.swift` — sidebar router (`SidebarItem` enum) and `MonitorTab`.
+- `SidebarView.swift` — the `SidebarView` component rendered inside the split view.
 - `DashboardView.swift`, `HostDetailView.swift`, `EditableHostCard.swift` — statistics + host detail + cards.
 - `NetworkSpeedManager.swift` / `NetworkSpeedTab.swift` — interface + per-process speed sampling.
 - `TracerouteManager.swift` / `TracerouteView.swift` — traceroute/MTR + map visualization (uses `PrivilegedManager`).
 - `TailscaleManager.swift` / `TailscaleTab.swift` — `tailscale` CLI integration, exit-node switching.
 - `ServicesTab.swift` — per-host SSH/Web shortcuts; SSH auth uses an `expect` script to bypass AppleScript-only auth.
 - `KeepAliveManager.swift` — adaptive idle detection on `utun*` interfaces; emits `.keepAliveStatusChanged` notifications consumed by the ping loop.
+- `FolderMonitor.swift` — `DispatchSourceFileSystemObject` wrapper that debounces filesystem changes; used to watch the config directory.
 - `Localization.swift` (`LanguageManager.shared.t(...)`) — runtime zh/en switch; UI must observe `languageManager.currentLanguage` and re-render rather than reading bundle strings.
 - `Theme.swift` / `Components.swift` — design tokens (`Theme.Colors.*`) and shared UI primitives like `ModernCard`.
 
@@ -95,3 +101,4 @@ The codebase is on Swift 6 strict concurrency. `PingMonitorViewModel` mutations 
 - `PingMonitor.xcodeproj/` — regenerated; edit `project.yml` instead.
 - `DerivedData/`, `build/`, `PingMonitor_Debug.app/` — local build artifacts.
 - `docs/` — GitHub Pages site for `ping.diswant.space`, hand-authored HTML/CSS/JS unrelated to the app.
+- `scratch/` — personal Swift experiments unrelated to the app.

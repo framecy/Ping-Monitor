@@ -1421,8 +1421,59 @@ class PingMonitorViewModel: ObservableObject {
         }
     }
 
+    func qualityTrend(for host: HostConfig, window: NetworkQualityWindow = .fiveMinutes) -> [QualityTrendPoint] {
+        let bucketInterval: TimeInterval
+        switch window {
+        case .oneMinute:
+            bucketInterval = 5
+        case .fiveMinutes:
+            bucketInterval = 15
+        case .oneHour:
+            bucketInterval = 60
+        }
+
+        let cutoff = Date().addingTimeInterval(-window.duration)
+        let hostSamples = (probeSamples[host.id] ?? []).filter { $0.timestamp >= cutoff }
+        guard !hostSamples.isEmpty else { return [] }
+
+        let grouped = Dictionary(grouping: hostSamples) { sample -> Date in
+            let seconds = floor(sample.timestamp.timeIntervalSince1970 / bucketInterval) * bucketInterval
+            return Date(timeIntervalSince1970: seconds)
+        }
+
+        return grouped.keys.sorted().compactMap { bucket in
+            guard let bucketSamples = grouped[bucket], !bucketSamples.isEmpty else { return nil }
+            let latencies = bucketSamples.compactMap(\.latency)
+            let avgLatency = average(latencies) ?? 0
+            let failureCount = bucketSamples.filter { !$0.success }.count
+            let loss = Double(failureCount) / Double(bucketSamples.count) * 100.0
+
+            var score = 100.0
+            if avgLatency > 200 {
+                score -= 35
+            } else if avgLatency > 100 {
+                score -= 20
+            } else if avgLatency > 50 {
+                score -= 10
+            }
+            score -= min(loss * 4.0, 45.0)
+
+            return QualityTrendPoint(
+                timestamp: bucket,
+                score: max(0, min(100, score)),
+                averageLatency: avgLatency,
+                packetLoss: loss
+            )
+        }
+    }
+
     func recentQualityEvents(limit: Int = 8) -> [NetworkQualityEvent] {
         Array(qualityEvents.prefix(limit))
+    }
+
+    func recentQualityEvents(for hostId: UUID?, limit: Int = 8) -> [NetworkQualityEvent] {
+        guard let hostId else { return recentQualityEvents(limit: limit) }
+        return Array(qualityEvents.filter { $0.hostId == hostId }.prefix(limit))
     }
     
     /// Legacy method kept for backward compatibility if needed synchronously

@@ -6,6 +6,9 @@
 xcuserdata/
 .DS_Store
 
+## Generated Xcode project — regenerated from project.yml via `xcodegen generate`
+PingMonitor.xcodeproj/
+
 ## Logs and Build Artifacts
 *.log
 build_log.txt

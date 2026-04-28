@@ -312,42 +312,44 @@ class NetworkSpeedManager: ObservableObject {
         // -L 1: One sample
         // -k state,interface: skip columns to keep CSV shorter
         process.arguments = ["-P", "-L", "1", "-k", "state,interface"]
-        
+
         let pipe = Pipe()
         process.standardOutput = pipe
         process.standardError = Pipe()
-        
+
         do {
             try process.run()
             process.waitUntilExit()
-            
+
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
             guard let output = String(data: data, encoding: .utf8) else { return [:] }
-            
-            var results: [Int32: (bytesIn: UInt64, bytesOut: UInt64)] = [:]
-            let lines = output.components(separatedBy: "\n")
-            
-            for line in lines {
-                let parts = line.components(separatedBy: ",")
-                // nettop -P CSV columns: time(0), process.pid(1), bytes_in(2), bytes_out(3), ...
-                guard parts.count >= 4 else { continue }
-                
-                // Column 1 is "name.PID"
-                let procPart = parts[1]
-                let procComponents = procPart.components(separatedBy: ".")
-                guard let lastPart = procComponents.last, let pid = Int32(lastPart) else { continue }
-                
-                // Column 2 is bytes_in, 3 is bytes_out
-                if let bin = UInt64(parts[2]), let bout = UInt64(parts[3]) {
-                    // Aggregate just in case multiple entries appear for same PID
-                    let current = results[pid] ?? (0, 0)
-                    results[pid] = (current.bytesIn + bin, current.bytesOut + bout)
-                }
-            }
-            return results
+            return Self.parseNettopOutput(output)
         } catch {
             return [:]
         }
+    }
+
+    /// Pure parser exposed for unit tests. nettop -P CSV columns:
+    /// time(0), process.pid(1), bytes_in(2), bytes_out(3), ...
+    nonisolated static func parseNettopOutput(_ output: String) -> [Int32: (bytesIn: UInt64, bytesOut: UInt64)] {
+        var results: [Int32: (bytesIn: UInt64, bytesOut: UInt64)] = [:]
+        let lines = output.components(separatedBy: "\n")
+
+        for line in lines {
+            let parts = line.components(separatedBy: ",")
+            guard parts.count >= 4 else { continue }
+
+            // Column 1 is "name.PID"
+            let procPart = parts[1]
+            let procComponents = procPart.components(separatedBy: ".")
+            guard let lastPart = procComponents.last, let pid = Int32(lastPart) else { continue }
+
+            if let bin = UInt64(parts[2]), let bout = UInt64(parts[3]) {
+                let current = results[pid] ?? (0, 0)
+                results[pid] = (current.bytesIn + bin, current.bytesOut + bout)
+            }
+        }
+        return results
     }
     
     nonisolated private func parseLsof() -> [ProcessNetworkInfo] {
@@ -356,24 +358,24 @@ class NetworkSpeedManager: ObservableObject {
         // Use -a to AND conditions: -i (network files only) AND -u (current user only)
         // -P -n to skip DNS/Port resolution
         process.arguments = ["-i", "-n", "-P", "-a", "-u", NSUserName()]
-        
+
         let pipe = Pipe()
         process.standardOutput = pipe
         process.standardError = Pipe()
-        
+
         do {
             try process.run()
             process.waitUntilExit()
-            
+
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
             guard let output = String(data: data, encoding: .utf8) else { return [] }
-            return parseLsofOutput(output)
+            return Self.parseLsofOutput(output)
         } catch {
             return []
         }
     }
-    
-    nonisolated private func parseLsofOutput(_ output: String) -> [ProcessNetworkInfo] {
+
+    nonisolated static func parseLsofOutput(_ output: String) -> [ProcessNetworkInfo] {
         var results: [ProcessNetworkInfo] = []
         let lines = output.components(separatedBy: "\n")
         
@@ -412,12 +414,12 @@ class NetworkSpeedManager: ObservableObject {
                 // Connection: local->remote
                 let sides = addrPart.components(separatedBy: "->")
                 if sides.count == 2 {
-                    (localAddr, localPort) = splitAddressPort(sides[0])
-                    (remoteAddr, remotePort) = splitAddressPort(sides[1])
+                    (localAddr, localPort) = Self.splitAddressPort(sides[0])
+                    (remoteAddr, remotePort) = Self.splitAddressPort(sides[1])
                 }
             } else {
                 // Listening or single address
-                (localAddr, localPort) = splitAddressPort(addrPart)
+                (localAddr, localPort) = Self.splitAddressPort(addrPart)
                 if state.isEmpty { state = node == "TCP" ? "LISTEN" : "" }
             }
             
@@ -449,7 +451,7 @@ class NetworkSpeedManager: ObservableObject {
         return results
     }
     
-    nonisolated private func splitAddressPort(_ str: String) -> (String, String) {
+    nonisolated static func splitAddressPort(_ str: String) -> (String, String) {
         // IPv6: [::1]:8080 or *:8080 or 127.0.0.1:8080
         let s = str.trimmingCharacters(in: .whitespaces)
         if s.hasPrefix("[") {
@@ -589,13 +591,13 @@ class NetworkSpeedManager: ObservableObject {
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
             guard let output = String(data: data, encoding: .utf8) else { return [] }
             
-            return parseNetstatOutput(output)
+            return Self.parseNetstatOutput(output)
         } catch {
             return []
         }
     }
-    
-    nonisolated private func parseNetstatOutput(_ output: String) -> [NetworkInterfaceStats] {
+
+    nonisolated static func parseNetstatOutput(_ output: String) -> [NetworkInterfaceStats] {
         var results: [String: NetworkInterfaceStats] = [:]
         let lines = output.components(separatedBy: "\n").filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
         guard let headerLine = lines.first else { return [] }
@@ -663,7 +665,7 @@ class NetworkSpeedManager: ObservableObject {
     
     // MARK: - Formatting
     
-    static func formatSpeed(_ bytesPerSec: Double) -> String {
+    nonisolated static func formatSpeed(_ bytesPerSec: Double) -> String {
         if bytesPerSec < 1024 {
             return String(format: "%.0f B/s", bytesPerSec)
         } else if bytesPerSec < 1024 * 1024 {
@@ -675,7 +677,7 @@ class NetworkSpeedManager: ObservableObject {
         }
     }
     
-    static func formatBytes(_ bytes: UInt64) -> String {
+    nonisolated static func formatBytes(_ bytes: UInt64) -> String {
         let b = Double(bytes)
         if b < 1024 {
             return String(format: "%.0f B", b)

@@ -122,6 +122,48 @@ struct EditableHostCard: View {
         }
     }
 
+    /// Score is only meaningful once we have collected enough samples.
+    /// Below this threshold the dimensions fall back to defaults (e.g. 100% availability,
+    /// 80 bandwidth) and produce a misleadingly high score.
+    private var hasEnoughQualityData: Bool {
+        qualitySnapshot.sampleCount >= 5
+    }
+
+    private var gradeLabel: String {
+        switch qualitySnapshot.score {
+        case 90...: return languageManager.t("stats.grade.excellent")
+        case 75..<90: return languageManager.t("stats.grade.good")
+        case 60..<75: return languageManager.t("stats.grade.fair")
+        case 40..<60: return languageManager.t("stats.grade.poor")
+        default: return languageManager.t("stats.grade.critical")
+        }
+    }
+
+    private var availabilityColor: Color {
+        guard hasEnoughQualityData else { return Theme.Colors.textSecondary }
+        if qualitySnapshot.availability >= 99 { return Theme.Colors.accentGreen }
+        if qualitySnapshot.availability >= 95 { return Theme.Colors.accentOrange }
+        return Theme.Colors.accentRed
+    }
+
+    private var availabilityText: String {
+        guard hasEnoughQualityData else { return "—" }
+        return String(format: "%.1f%%", qualitySnapshot.availability)
+    }
+
+    private var stats: HostStats? {
+        viewModel.hostStats[host.id]
+    }
+
+    private var successRateText: String {
+        guard let stats else { return "—" }
+        return String(format: "%.0f%%", stats.successRate)
+    }
+
+    private var serviceCountText: String {
+        "\(host.serviceShortcuts.count)"
+    }
+
     private var pathLabel: String {
         switch qualitySnapshot.pathKind {
         case .direct:
@@ -155,9 +197,56 @@ struct EditableHostCard: View {
         .cornerRadius(8)
     }
 
+    @ViewBuilder
+    private var qualityBadge: some View {
+        let scoreText = hasEnoughQualityData ? "\(qualitySnapshot.score)" : "—"
+        let labelText = hasEnoughQualityData ? gradeLabel : languageManager.t("card.measuring")
+        let badgeColor = hasEnoughQualityData ? qualityColor : Theme.Colors.textTertiary
+
+        HStack(spacing: 4) {
+            Text(scoreText)
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundStyle(badgeColor)
+            Text(labelText)
+                .font(.system(size: 9, weight: .medium))
+                .foregroundStyle(badgeColor)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 7)
+        .padding(.vertical, 2)
+        .background(badgeColor.opacity(0.14))
+        .overlay(
+            Capsule()
+                .stroke(badgeColor.opacity(0.28), lineWidth: 0.5)
+        )
+        .clipShape(Capsule())
+        .help(languageManager.t("card.score_help"))
+    }
+
+    @ViewBuilder
+    private func infoPill(icon: String, title: String, value: String, color: Color) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 10))
+                .foregroundStyle(color)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(.system(size: 9))
+                    .foregroundStyle(Theme.Colors.textSecondary)
+                Text(value)
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(color)
+                    .lineLimit(1)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(Theme.Colors.background.opacity(0.45))
+        .cornerRadius(8)
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Header: Icon, Name, Status
+        VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 ZStack {
                     Circle()
@@ -189,21 +278,56 @@ struct EditableHostCard: View {
                 }
                 
                 Spacer()
-                
-                // Live Latency
-                if let latency = host.lastLatency, viewModel.isRunning {
-                    Text("\(Int(latency)) ms")
-                        .font(Theme.Fonts.number(14))
-                        .foregroundStyle(statusColor)
-                } else if !host.isReachable && viewModel.isRunning && !host.isChecking {
-                    Text(languageManager.t("card.timeout"))
-                        .font(Theme.Fonts.number(12))
-                        .foregroundStyle(Theme.Colors.accentRed)
+
+                VStack(alignment: .trailing, spacing: 4) {
+                    if let latency = host.lastLatency, viewModel.isRunning {
+                        Text("\(Int(latency)) ms")
+                            .font(.system(size: 16, weight: .bold, design: .monospaced))
+                            .foregroundStyle(statusColor)
+                    } else if !host.isReachable && viewModel.isRunning && !host.isChecking {
+                        Text(languageManager.t("card.timeout"))
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Theme.Colors.accentRed)
+                    } else if host.isChecking {
+                        Text("…")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(Theme.Colors.textSecondary)
+                    }
+
+                    qualityBadge
                 }
             }
-            
-            // Sparkline
-            if let stats = viewModel.hostStats[host.id], stats.latencyHistory.count > 1 {
+
+            HStack(spacing: 8) {
+                compactMetric(
+                    title: languageManager.t("stats.availability"),
+                    value: availabilityText,
+                    color: availabilityColor
+                )
+                compactMetric(
+                    title: languageManager.t("card.p95"),
+                    value: qualitySnapshot.p95Latency.map { String(format: "%.0fms", $0) } ?? "—",
+                    color: Theme.Colors.accentBlue
+                )
+                compactMetric(
+                    title: languageManager.t("card.loss"),
+                    value: hasEnoughQualityData ? String(format: "%.1f%%", qualitySnapshot.packetLoss) : "—",
+                    color: qualitySnapshot.packetLoss > 3 ? Theme.Colors.accentRed : Theme.Colors.textPrimary
+                )
+                compactMetric(
+                    title: languageManager.t("host_detail.jitter"),
+                    value: hasEnoughQualityData ? String(format: "%.1fms", qualitySnapshot.jitter) : "—",
+                    color: Theme.Colors.accentOrange
+                )
+            }
+
+            HStack(spacing: 8) {
+                infoPill(icon: "point.topleft.down.to.point.bottomright.curvepath", title: languageManager.t("card.path"), value: pathLabel, color: diagnosticColor)
+                infoPill(icon: "checkmark.shield", title: languageManager.t("stats.success_rate"), value: successRateText, color: Theme.Colors.accentGreen)
+                infoPill(icon: "bolt.horizontal.circle", title: languageManager.t("card.services"), value: serviceCountText, color: Theme.Colors.accentPurple)
+            }
+
+            if let stats, stats.latencyHistory.count > 1 {
                 let history = Array(stats.latencyHistory.suffix(20))
                 Chart {
                     ForEach(history) { point in
@@ -238,30 +362,6 @@ struct EditableHostCard: View {
                 .padding(.horizontal, 2)
             } else {
                 Color.clear.frame(height: 32)
-            }
-
-            if qualitySnapshot.sampleCount > 0 {
-                HStack(spacing: 8) {
-                    compactMetric(title: languageManager.t("card.score"), value: "\(qualitySnapshot.score)", color: qualityColor)
-                    compactMetric(
-                        title: languageManager.t("card.p95"),
-                        value: qualitySnapshot.p95Latency.map { String(format: "%.0fms", $0) } ?? "—",
-                        color: Theme.Colors.accentBlue
-                    )
-                    compactMetric(
-                        title: languageManager.t("card.loss"),
-                        value: String(format: "%.1f%%", qualitySnapshot.packetLoss),
-                        color: qualitySnapshot.packetLoss > 3 ? Theme.Colors.accentRed : Theme.Colors.textPrimary
-                    )
-                    compactMetric(title: languageManager.t("card.path"), value: pathLabel, color: diagnosticColor)
-                }
-            } else {
-                HStack(spacing: 8) {
-                    compactMetric(title: languageManager.t("card.score"), value: "—", color: Theme.Colors.textTertiary)
-                    compactMetric(title: languageManager.t("card.p95"), value: "—", color: Theme.Colors.textTertiary)
-                    compactMetric(title: languageManager.t("card.loss"), value: "—", color: Theme.Colors.textTertiary)
-                    compactMetric(title: languageManager.t("card.path"), value: "—", color: Theme.Colors.textTertiary)
-                }
             }
             
             // Footer: Rules & Actions
@@ -335,7 +435,7 @@ struct EditableHostCard: View {
             }
             .frame(height: 24)
         }
-        .frame(height: 164, alignment: .top)
+        .frame(height: 186, alignment: .top)
         .padding(Theme.Layout.cardPadding)
         .background(Theme.Colors.cardBackground)
         .cornerRadius(Theme.Layout.cardCornerRadius)
