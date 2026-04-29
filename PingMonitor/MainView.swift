@@ -1316,89 +1316,76 @@ struct QuickAccessServicesRibbon: View {
     
     var body: some View {
         if !hostGroups.isEmpty {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "bolt.fill")
-                                .font(.system(size: 10))
-                                .foregroundStyle(Theme.Colors.accentOrange)
-                            Text(LanguageManager.shared.t("monitor.quick_access"))
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(Theme.Colors.textPrimary)
-                        }
-                        Text(LanguageManager.shared.t("monitor.quick_access_hint"))
-                            .font(.system(size: 11))
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 0) {
+                    // Label
+                    HStack(spacing: 5) {
+                        Image(systemName: "bolt.fill")
+                            .font(.system(size: 9))
+                            .foregroundStyle(Theme.Colors.accentOrange)
+                        Text(LanguageManager.shared.t("monitor.quick_access"))
+                            .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(Theme.Colors.textSecondary)
                     }
+                    .padding(.horizontal, 14)
 
-                    Spacer()
+                    // Host groups
+                    ForEach(hostGroups, id: \.host.id) { group in
+                        HStack(spacing: 0) {
+                            // Separator
+                            Rectangle()
+                                .fill(Color.white.opacity(0.07))
+                                .frame(width: 1, height: 20)
+                                .padding(.horizontal, 12)
 
-                    HStack(spacing: 8) {
-                        quickAccessBadge(title: LanguageManager.shared.t("monitor.quick_access_hosts"), value: "\(hostGroups.count)")
-                        quickAccessBadge(title: LanguageManager.shared.t("monitor.quick_access_services"), value: "\(totalShortcutCount)")
-                    }
-                }
-                .padding(.horizontal)
+                            // Status dot + host name
+                            Circle()
+                                .fill(hostStatusColor(group.host))
+                                .frame(width: 6, height: 6)
+                                .shadow(color: hostStatusColor(group.host).opacity(0.6), radius: 2)
+                            Text(group.host.name)
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(Theme.Colors.textSecondary)
+                                .lineLimit(1)
+                                .padding(.leading, 5)
 
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(alignment: .top, spacing: 14) {
-                        ForEach(hostGroups, id: \.host.id) { group in
-                            VStack(alignment: .leading, spacing: 12) {
-                                HStack(alignment: .top, spacing: 10) {
-                                    Circle()
-                                        .fill(hostStatusColor(group.host))
-                                        .frame(width: 10, height: 10)
-                                        .shadow(color: hostStatusColor(group.host).opacity(0.45), radius: 3)
-
-                                    VStack(alignment: .leading, spacing: 3) {
-                                        Text(group.host.name)
-                                            .font(.system(size: 13, weight: .semibold))
-                                            .foregroundStyle(Theme.Colors.textPrimary)
-                                        Text(group.host.address)
-                                            .font(.system(size: 10, design: .monospaced))
-                                            .foregroundStyle(Theme.Colors.textTertiary)
-                                            .lineLimit(1)
+                            // Service icon buttons
+                            HStack(spacing: 3) {
+                                ForEach(group.shortcuts) { shortcut in
+                                    Button {
+                                        openService(shortcut, host: group.host)
+                                    } label: {
+                                        Image(systemName: shortcut.icon)
+                                            .font(.system(size: 12))
+                                            .foregroundStyle(serviceColor(for: shortcut.type))
+                                            .frame(width: 28, height: 28)
+                                            .background(serviceColor(for: shortcut.type).opacity(0.10))
+                                            .cornerRadius(7)
                                     }
-
-                                    Spacer()
-
-                                    if let latency = group.host.lastLatency, group.host.isReachable {
-                                        Text("\(Int(latency))ms")
-                                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                                            .foregroundStyle(hostStatusColor(group.host))
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 4)
-                                            .background(hostStatusColor(group.host).opacity(0.12))
-                                            .cornerRadius(999)
+                                    .buttonStyle(.plain)
+                                    .help("\(shortcut.name)  \(serviceTargetPreview(shortcut))")
+                                    .contextMenu {
+                                        Button {
+                                            openService(shortcut, host: group.host)
+                                        } label: {
+                                            Label(LanguageManager.shared.t("monitor.quick_access_open"), systemImage: "arrow.up.forward.app")
+                                        }
+                                        Button {
+                                            copyServiceTarget(shortcut, host: group.host)
+                                        } label: {
+                                            Label(LanguageManager.shared.t("monitor.quick_access_copy"), systemImage: "doc.on.doc")
+                                        }
                                     }
                                 }
-
-                                VStack(spacing: 8) {
-                                    ForEach(group.shortcuts) { shortcut in
-                                        quickAccessButton(shortcut: shortcut, host: group.host)
-                                    }
-                                }
-
-                                Spacer(minLength: 0)
                             }
-                            .padding(14)
-                            .frame(width: 280, alignment: .topLeading)
-                            .frame(maxHeight: .infinity, alignment: .top)
-                            .background(
-                                RoundedRectangle(cornerRadius: 14)
-                                    .fill(Theme.Colors.cardBackground)
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 14)
-                                    .stroke(Color.white.opacity(0.06), lineWidth: 1)
-                            )
+                            .padding(.leading, 8)
                         }
                     }
-                    .padding(.horizontal)
+
+                    Spacer(minLength: 14)
                 }
+                .frame(height: 44)
             }
-            .padding(.vertical, 12)
             .background(Theme.Colors.cardBackground.opacity(0.42))
             .overlay(
                 Rectangle()
@@ -1407,90 +1394,6 @@ struct QuickAccessServicesRibbon: View {
                 alignment: .bottom
             )
         }
-    }
-
-    @ViewBuilder
-    private func quickAccessButton(shortcut: ServiceShortcut, host: HostConfig) -> some View {
-        HStack(spacing: 10) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(serviceColor(for: shortcut.type).opacity(0.12))
-                    .frame(width: 28, height: 28)
-                Image(systemName: shortcut.icon)
-                    .font(.system(size: 13))
-                    .foregroundStyle(serviceColor(for: shortcut.type))
-            }
-
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(shortcut.name)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(Theme.Colors.textPrimary)
-                        .lineLimit(1)
-                    typePill(shortcut.type)
-                }
-                Text(serviceTargetPreview(shortcut))
-                    .font(.system(size: 10))
-                    .foregroundStyle(Theme.Colors.textTertiary)
-                    .lineLimit(1)
-            }
-
-            Spacer(minLength: 0)
-
-            Button {
-                copyServiceTarget(shortcut, host: host)
-            } label: {
-                Image(systemName: "doc.on.doc")
-                    .font(.system(size: 11))
-                    .foregroundStyle(Theme.Colors.textSecondary)
-                    .padding(6)
-                    .background(Theme.Colors.background.opacity(0.45))
-                    .cornerRadius(8)
-            }
-            .buttonStyle(.plain)
-
-            Button {
-                openService(shortcut, host: host)
-            } label: {
-                Image(systemName: "arrow.up.forward.app.fill")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.white)
-                    .padding(7)
-                    .background(serviceColor(for: shortcut.type))
-                    .cornerRadius(8)
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(10)
-        .background(Theme.Colors.background.opacity(0.45))
-        .cornerRadius(10)
-        .contextMenu {
-            Button {
-                openService(shortcut, host: host)
-            } label: {
-                Label(LanguageManager.shared.t("monitor.quick_access_open"), systemImage: "arrow.up.forward.app")
-            }
-            Button {
-                copyServiceTarget(shortcut, host: host)
-            } label: {
-                Label(LanguageManager.shared.t("monitor.quick_access_copy"), systemImage: "doc.on.doc")
-            }
-        }
-    }
-
-    private func quickAccessBadge(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title)
-                .font(.system(size: 10))
-                .foregroundStyle(Theme.Colors.textSecondary)
-            Text(value)
-                .font(.system(size: 12, weight: .bold, design: .monospaced))
-                .foregroundStyle(Theme.Colors.textPrimary)
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 7)
-        .background(Theme.Colors.cardBackground)
-        .cornerRadius(10)
     }
 
     private func typePill(_ type: ServiceShortcut.ServiceType) -> some View {

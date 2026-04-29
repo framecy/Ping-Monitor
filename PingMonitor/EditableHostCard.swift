@@ -435,7 +435,6 @@ struct EditableHostCard: View {
             }
             .frame(height: 24)
         }
-        .frame(height: 186, alignment: .top)
         .padding(Theme.Layout.cardPadding)
         .background(Theme.Colors.cardBackground)
         .cornerRadius(Theme.Layout.cardCornerRadius)
