@@ -1302,6 +1302,7 @@ struct MonitorTab: View {
 // MARK: - Quick Access Services Ribbon
 struct QuickAccessServicesRibbon: View {
     @ObservedObject var viewModel: PingMonitorViewModel
+    @AppStorage("pm.quickAccessExpanded") private var isExpanded: Bool = true
 
     private var hostGroups: [(host: HostConfig, shortcuts: [ServiceShortcut])] {
         viewModel.hosts.compactMap { host in
@@ -1310,15 +1311,11 @@ struct QuickAccessServicesRibbon: View {
         }
     }
 
-    private var totalShortcutCount: Int {
-        hostGroups.reduce(0) { $0 + $1.shortcuts.count }
-    }
-    
     var body: some View {
         if !hostGroups.isEmpty {
-            ScrollView(.horizontal, showsIndicators: false) {
+            VStack(spacing: 0) {
+                // Header — always visible
                 HStack(spacing: 0) {
-                    // Label
                     HStack(spacing: 5) {
                         Image(systemName: "bolt.fill")
                             .font(.system(size: 9))
@@ -1327,64 +1324,40 @@ struct QuickAccessServicesRibbon: View {
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(Theme.Colors.textSecondary)
                     }
-                    .padding(.horizontal, 14)
+                    .padding(.leading, 14)
 
-                    // Host groups
-                    ForEach(hostGroups, id: \.host.id) { group in
-                        HStack(spacing: 0) {
-                            // Separator
-                            Rectangle()
-                                .fill(Color.white.opacity(0.07))
-                                .frame(width: 1, height: 20)
-                                .padding(.horizontal, 12)
+                    Spacer()
 
-                            // Status dot + host name
-                            Circle()
-                                .fill(hostStatusColor(group.host))
-                                .frame(width: 6, height: 6)
-                                .shadow(color: hostStatusColor(group.host).opacity(0.6), radius: 2)
-                            Text(group.host.name)
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundStyle(Theme.Colors.textSecondary)
-                                .lineLimit(1)
-                                .padding(.leading, 5)
+                    Button {
+                        withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+                            isExpanded.toggle()
+                        }
+                    } label: {
+                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(Theme.Colors.textTertiary)
+                            .frame(width: 28, height: 28)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.trailing, 8)
+                }
+                .frame(height: 36)
 
-                            // Service icon buttons
-                            HStack(spacing: 3) {
-                                ForEach(group.shortcuts) { shortcut in
-                                    Button {
-                                        openService(shortcut, host: group.host)
-                                    } label: {
-                                        Image(systemName: shortcut.icon)
-                                            .font(.system(size: 12))
-                                            .foregroundStyle(serviceColor(for: shortcut.type))
-                                            .frame(width: 28, height: 28)
-                                            .background(serviceColor(for: shortcut.type).opacity(0.10))
-                                            .cornerRadius(7)
-                                    }
-                                    .buttonStyle(.plain)
-                                    .help("\(shortcut.name)  \(serviceTargetPreview(shortcut))")
-                                    .contextMenu {
-                                        Button {
-                                            openService(shortcut, host: group.host)
-                                        } label: {
-                                            Label(LanguageManager.shared.t("monitor.quick_access_open"), systemImage: "arrow.up.forward.app")
-                                        }
-                                        Button {
-                                            copyServiceTarget(shortcut, host: group.host)
-                                        } label: {
-                                            Label(LanguageManager.shared.t("monitor.quick_access_copy"), systemImage: "doc.on.doc")
-                                        }
-                                    }
-                                }
-                            }
-                            .padding(.leading, 8)
+                // Expanded content
+                if isExpanded {
+                    Rectangle()
+                        .fill(Color.white.opacity(0.05))
+                        .frame(height: 1)
+                        .padding(.horizontal, 14)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        ForEach(hostGroups, id: \.host.id) { group in
+                            hostRow(group: group)
                         }
                     }
-
-                    Spacer(minLength: 14)
+                    .padding(.vertical, 6)
                 }
-                .frame(height: 44)
             }
             .background(Theme.Colors.cardBackground.opacity(0.42))
             .overlay(
@@ -1393,6 +1366,71 @@ struct QuickAccessServicesRibbon: View {
                     .frame(height: 1),
                 alignment: .bottom
             )
+        }
+    }
+
+    @ViewBuilder
+    private func hostRow(group: (host: HostConfig, shortcuts: [ServiceShortcut])) -> some View {
+        HStack(spacing: 10) {
+            // Status dot + host name (fixed-width label column)
+            HStack(spacing: 5) {
+                Circle()
+                    .fill(hostStatusColor(group.host))
+                    .frame(width: 6, height: 6)
+                    .shadow(color: hostStatusColor(group.host).opacity(0.6), radius: 2)
+                Text(group.host.name)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Theme.Colors.textSecondary)
+                    .lineLimit(1)
+            }
+            .frame(width: 110, alignment: .leading)
+
+            // All chips — horizontal scroll so every shortcut is reachable
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 4) {
+                    ForEach(group.shortcuts) { shortcut in
+                        serviceChip(shortcut: shortcut, host: group.host)
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 4)
+    }
+
+    @ViewBuilder
+    private func serviceChip(shortcut: ServiceShortcut, host: HostConfig) -> some View {
+        Button {
+            openService(shortcut, host: host)
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: shortcut.icon)
+                    .font(.system(size: 11))
+                    .foregroundStyle(serviceColor(for: shortcut.type))
+                Text(shortcut.name)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Theme.Colors.textPrimary)
+                    .lineLimit(1)
+                typePill(shortcut.type)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(serviceColor(for: shortcut.type).opacity(0.10))
+            .cornerRadius(8)
+        }
+        .buttonStyle(.plain)
+        .help(serviceTargetPreview(shortcut))
+        .contextMenu {
+            Button {
+                openService(shortcut, host: host)
+            } label: {
+                Label(LanguageManager.shared.t("monitor.quick_access_open"), systemImage: "arrow.up.forward.app")
+            }
+            Button {
+                copyServiceTarget(shortcut, host: host)
+            } label: {
+                Label(LanguageManager.shared.t("monitor.quick_access_copy"), systemImage: "doc.on.doc")
+            }
         }
     }
 
