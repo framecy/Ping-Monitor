@@ -2580,6 +2580,9 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
         var latencyStr = ""
         if viewModel.isRunning && showingText && !displayText.isEmpty && displayText != "●" {
             latencyStr = viewModel.showIconInMenu ? " \(displayText)" : displayText
+        } else if viewModel.isRunning && showingText && !viewModel.showIconInMenu && displayText == "●" {
+            // Labels-only mode with no matching rules: show bullet so button stays clickable
+            latencyStr = "●"
         }
 
         if viewModel.showSpeedInMenu {

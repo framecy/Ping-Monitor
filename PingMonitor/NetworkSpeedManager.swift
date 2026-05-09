@@ -159,7 +159,8 @@ class NetworkSpeedManager: ObservableObject {
     private var processTimer: Timer?
     private var previousStats: [String: (bytesIn: UInt64, bytesOut: UInt64)] = [:]
     private var previousTimestamp: Date?
-    
+    private var isFetchingStats = false
+
     private var lastProcessStats: [Int32: (bytesIn: UInt64, bytesOut: UInt64)] = [:]
     private var lastProcessTimestamp: Date?
     private var isRefreshingProcessList = false
@@ -244,8 +245,13 @@ class NetworkSpeedManager: ObservableObject {
         
         Task.detached(priority: .background) { [weak self] in
             guard let self = self else { return }
-            let connections = self.parseLsof()
-            let traffic = self.fetchProcessTraffic()
+            // Run lsof and nettop concurrently: they're independent subprocesses,
+            // so parallel dispatch halves the blocking time (~1s instead of ~1.5s)
+            // and keeps the two snapshots temporally aligned.
+            let connectionsTask = Task.detached(priority: .background) { self.parseLsof() }
+            let trafficTask = Task.detached(priority: .background) { self.fetchProcessTraffic() }
+            let connections = await connectionsTask.value
+            let traffic = await trafficTask.value
             let now = Date()
             
             await MainActor.run {
@@ -498,19 +504,92 @@ class NetworkSpeedManager: ObservableObject {
         }
     }
     
+    /// Maximum tolerated gap between samples before we treat the new sample as
+    /// a "fresh start" (system slept, interface restarted, refresh paused).
+    /// Anything larger and the (current - prev) / elapsed math produces an
+    /// average over the whole gap that misrepresents instantaneous speed.
+    nonisolated static let maxValidElapsedMultiplier: TimeInterval = 5
+
+    /// Aggregate speeds/bytes for the user's selection.
+    ///
+    /// Strategy for `selection == "all"`:
+    /// - speeds: `max(physical_sum, tunnel_sum)` per direction so that
+    ///   pure-VPN users see the real throughput (tunnel) without
+    ///   double-counting the encrypted copy on the physical NIC.
+    /// - bytes: physical sum (the canonical "what left the box") to keep the
+    ///   cumulative counter monotonic across VPN connect/disconnect.
+    /// Tunnel speeds/bytes are also returned separately for UI breakdowns.
+    nonisolated static func aggregateTotals(
+        from interfaces: [NetworkInterfaceStats],
+        selection: String
+    ) -> (totalSpeedIn: Double, totalSpeedOut: Double,
+          totalBytesIn: UInt64, totalBytesOut: UInt64,
+          tunnelSpeedIn: Double, tunnelSpeedOut: Double,
+          tunnelBytesIn: UInt64, tunnelBytesOut: UInt64) {
+        let physical = interfaces.filter { $0.role == .physical }
+        let tunnel = interfaces.filter { $0.role == .tunnel }
+
+        let physSpeedIn  = physical.reduce(0) { $0 + $1.speedIn }
+        let physSpeedOut = physical.reduce(0) { $0 + $1.speedOut }
+        let tunSpeedIn   = tunnel.reduce(0) { $0 + $1.speedIn }
+        let tunSpeedOut  = tunnel.reduce(0) { $0 + $1.speedOut }
+
+        let totalSpeedIn: Double
+        let totalSpeedOut: Double
+        let totalBytesIn: UInt64
+        let totalBytesOut: UInt64
+
+        if selection == "all" {
+            totalSpeedIn  = max(physSpeedIn,  tunSpeedIn)
+            totalSpeedOut = max(physSpeedOut, tunSpeedOut)
+            totalBytesIn  = physical.reduce(0) { $0 + $1.bytesIn }
+            totalBytesOut = physical.reduce(0) { $0 + $1.bytesOut }
+        } else {
+            let chosen = interfaces.filter { $0.id == selection }
+            totalSpeedIn  = chosen.reduce(0) { $0 + $1.speedIn }
+            totalSpeedOut = chosen.reduce(0) { $0 + $1.speedOut }
+            totalBytesIn  = chosen.reduce(0) { $0 + $1.bytesIn }
+            totalBytesOut = chosen.reduce(0) { $0 + $1.bytesOut }
+        }
+
+        return (
+            totalSpeedIn, totalSpeedOut, totalBytesIn, totalBytesOut,
+            tunSpeedIn, tunSpeedOut,
+            tunnel.reduce(0) { $0 + $1.bytesIn },
+            tunnel.reduce(0) { $0 + $1.bytesOut }
+        )
+    }
+
     private func fetchStats() {
+        guard !isFetchingStats else { return }
+        isFetchingStats = true
+
         Task.detached(priority: .background) { [weak self] in
             guard let self = self else { return }
             let currentStats = self.parseNetstat()
             let now = Date()
-            
+
             await MainActor.run {
+                defer { self.isFetchingStats = false }
                 if let prevTimestamp = self.previousTimestamp {
                     let elapsed = now.timeIntervalSince(prevTimestamp)
                     guard elapsed > 0 else { return }
-                    
+
+                    // Bug #3 fix: after sleep/wake (or any long stall) the
+                    // delta over a 1h window averages out to a misleading
+                    // sub-1KB/s sample. Rebase silently instead.
+                    let maxValid = self.refreshInterval * Self.maxValidElapsedMultiplier
+                    if elapsed > maxValid {
+                        self.previousStats.removeAll(keepingCapacity: true)
+                        for iface in currentStats {
+                            self.previousStats[iface.id] = (bytesIn: iface.bytesIn, bytesOut: iface.bytesOut)
+                        }
+                        self.previousTimestamp = now
+                        return
+                    }
+
                     var updatedInterfaces: [NetworkInterfaceStats] = []
-                    
+
                     for var iface in currentStats {
                         if let prev = self.previousStats[iface.id] {
                             let deltaIn = iface.bytesIn >= prev.bytesIn ? iface.bytesIn - prev.bytesIn : 0
@@ -520,7 +599,7 @@ class NetworkSpeedManager: ObservableObject {
                         }
                         updatedInterfaces.append(iface)
                     }
-                    
+
                     self.interfaces = updatedInterfaces.sorted { a, b in
                         // Priority: active with traffic > active no traffic > loopback > inactive
                         let aIsLo = a.name.starts(with: "lo")
@@ -532,29 +611,17 @@ class NetworkSpeedManager: ObservableObject {
                         if aTraffic != bTraffic { return aTraffic > bTraffic }
                         return a.displayName < b.displayName
                     }
-                    
-                    // Calculate totals based on selection
-                    let physicalIfaces = self.interfaces.filter { $0.role == .physical }
-                    let tunnelIfaces = self.interfaces.filter { $0.role == .tunnel }
 
-                    let selectedIfaces: [NetworkInterfaceStats]
-                    if self.selectedInterface == "all" {
-                        // Preserve physical totals for "internet-facing" traffic and
-                        // expose tunnel traffic separately to avoid VPN double-counting.
-                        selectedIfaces = physicalIfaces
-                    } else {
-                        selectedIfaces = self.interfaces.filter { $0.id == self.selectedInterface }
-                    }
-                    
-                    self.totalSpeedIn = selectedIfaces.reduce(0) { $0 + $1.speedIn }
-                    self.totalSpeedOut = selectedIfaces.reduce(0) { $0 + $1.speedOut }
-                    self.totalBytesIn = selectedIfaces.reduce(0) { $0 + $1.bytesIn }
-                    self.totalBytesOut = selectedIfaces.reduce(0) { $0 + $1.bytesOut }
-                    self.tunnelSpeedIn = tunnelIfaces.reduce(0) { $0 + $1.speedIn }
-                    self.tunnelSpeedOut = tunnelIfaces.reduce(0) { $0 + $1.speedOut }
-                    self.tunnelBytesIn = tunnelIfaces.reduce(0) { $0 + $1.bytesIn }
-                    self.tunnelBytesOut = tunnelIfaces.reduce(0) { $0 + $1.bytesOut }
-                    
+                    let totals = Self.aggregateTotals(from: self.interfaces, selection: self.selectedInterface)
+                    self.totalSpeedIn = totals.totalSpeedIn
+                    self.totalSpeedOut = totals.totalSpeedOut
+                    self.totalBytesIn = totals.totalBytesIn
+                    self.totalBytesOut = totals.totalBytesOut
+                    self.tunnelSpeedIn = totals.tunnelSpeedIn
+                    self.tunnelSpeedOut = totals.tunnelSpeedOut
+                    self.tunnelBytesIn = totals.tunnelBytesIn
+                    self.tunnelBytesOut = totals.tunnelBytesOut
+
                     // Add to history
                     let sample = SpeedSample(timestamp: now, speedIn: self.totalSpeedIn, speedOut: self.totalSpeedOut)
                     self.speedHistory.append(sample)
@@ -562,7 +629,7 @@ class NetworkSpeedManager: ObservableObject {
                         self.speedHistory.removeFirst(self.speedHistory.count - self.maxHistoryCount)
                     }
                 }
-                
+
                 // Store for next iteration
                 self.previousStats = [:]
                 for iface in currentStats {
@@ -648,8 +715,13 @@ class NetworkSpeedManager: ObservableObject {
                 return UInt64(s) ?? 0
             }
             
-            results[name] = NetworkInterfaceStats(
-                id: name,
+            // Bug #2 fix: macOS marks "down" interfaces with a trailing `*`
+            // (e.g. `gif0*`, `en1*`). The asterisk flips on/off as the link
+            // toggles, so we use a stable id (sans asterisk) for previousStats
+            // lookups while keeping the raw name for display.
+            let stableID = name.replacingOccurrences(of: "*", with: "")
+            results[stableID] = NetworkInterfaceStats(
+                id: stableID,
                 name: name,
                 bytesIn: val(iBytIdx),
                 bytesOut: val(oBytIdx),
@@ -769,12 +841,34 @@ class NetworkSpeedManager: ObservableObject {
     }
     
     func trafficTotals(for range: TrafficTimeRange) -> (bytesIn: UInt64, bytesOut: UInt64) {
-        // Use the latest snapshot's cumulative bytes vs the earliest in range
-        let snapshots = trafficSnapshots(for: range)
-        guard let first = snapshots.first, let last = snapshots.last else { return (0, 0) }
-        let deltaIn = last.bytesIn >= first.bytesIn ? last.bytesIn - first.bytesIn : last.bytesIn
-        let deltaOut = last.bytesOut >= first.bytesOut ? last.bytesOut - first.bytesOut : last.bytesOut
-        return (deltaIn, deltaOut)
+        Self.trafficTotals(snapshots: trafficSnapshots(for: range))
+    }
+
+    /// Bug #4 fix: the previous implementation took only the first/last
+    /// snapshot delta, which under-counted (or wildly over-counted) traffic
+    /// whenever the underlying byte counter reset within the window — e.g.
+    /// after a VPN reconnect, an interface bounce, or a Mac reboot.
+    ///
+    /// Walk *all* adjacent pairs and discard any pair where the counter
+    /// went backwards; that pair contributes 0 instead of poisoning the
+    /// total. The remaining monotonic deltas accumulate correctly.
+    nonisolated static func trafficTotals(snapshots: [TrafficSnapshot]) -> (bytesIn: UInt64, bytesOut: UInt64) {
+        let ordered = snapshots.sorted { $0.timestamp < $1.timestamp }
+        guard ordered.count >= 2 else { return (0, 0) }
+
+        var totalIn: UInt64 = 0
+        var totalOut: UInt64 = 0
+        for i in 1..<ordered.count {
+            let prev = ordered[i - 1]
+            let curr = ordered[i]
+            if curr.bytesIn >= prev.bytesIn {
+                totalIn += curr.bytesIn - prev.bytesIn
+            }
+            if curr.bytesOut >= prev.bytesOut {
+                totalOut += curr.bytesOut - prev.bytesOut
+            }
+        }
+        return (totalIn, totalOut)
     }
 }
 

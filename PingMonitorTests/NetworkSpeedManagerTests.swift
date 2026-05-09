@@ -75,18 +75,38 @@ final class NetworkSpeedManagerTests: XCTestCase {
         XCTAssertEqual(utun.role, .tunnel, "utun* must classify as .tunnel for VPN bookkeeping")
     }
 
-    func testParseNetstat_InactiveInterfaceKeepsAsterisk() {
-        // BUG SURFACE: netstat marks down interfaces with a trailing `*`.
-        // The parser currently keeps the `*` in the interface id/name. That
-        // means when an interface comes back online ("en1*" → "en1"), the
-        // previousStats lookup misses and we lose one delta cycle.
+    func testParseNetstat_StripsAsteriskFromIdKeepsInName() {
+        // Bug #2 fix: netstat marks down interfaces with a trailing `*`. The
+        // parser keeps the asterisk in `name` for display, but uses a stable
+        // id (no asterisk) so previousStats survives the up/down transition.
         let interfaces = NetworkSpeedManager.parseNetstatOutput(netstatSample)
-        XCTAssertNotNil(interfaces.first(where: { $0.name == "gif0*" }),
-                        "gif0* is parsed verbatim — id contains the asterisk")
-        XCTAssertNotNil(interfaces.first(where: { $0.name == "en1*" }),
-                        "en1* is parsed verbatim — id contains the asterisk")
-        XCTAssertNil(interfaces.first(where: { $0.name == "en1" }),
-                     "without the asterisk en1 does NOT exist — see speed continuity bug above")
+        guard let gif0 = interfaces.first(where: { $0.id == "gif0" }) else {
+            return XCTFail("gif0 should be parsed under stable id 'gif0'")
+        }
+        XCTAssertEqual(gif0.id, "gif0", "id is stripped of the down marker")
+        XCTAssertEqual(gif0.name, "gif0*", "name keeps the down marker for display")
+
+        guard let en1 = interfaces.first(where: { $0.id == "en1" }) else {
+            return XCTFail("en1 should be parsed under stable id 'en1'")
+        }
+        XCTAssertEqual(en1.id, "en1")
+        XCTAssertEqual(en1.name, "en1*")
+    }
+
+    func testParseNetstat_AsteriskTransitionPreservesBaseline() {
+        // The whole point of Bug #2: when an interface goes from down (en1*)
+        // to up (en1), the previousStats key (= id) must still match so we
+        // don't lose a delta cycle.
+        let downSnapshot = NetworkSpeedManager.parseNetstatOutput("""
+        Name       Mtu   Network       Address            Ipkts Ierrs     Ibytes    Opkts Oerrs     Obytes  Coll
+        en1*       1500  <Link#11>   9e:65:19:4f:f3:60       0     0          0        0     0          0     0
+        """)
+        let upSnapshot = NetworkSpeedManager.parseNetstatOutput("""
+        Name       Mtu   Network       Address            Ipkts Ierrs     Ibytes    Opkts Oerrs     Obytes  Coll
+        en1        1500  <Link#11>   9e:65:19:4f:f3:60      10     0      12345       10     0       6789     0
+        """)
+        XCTAssertEqual(downSnapshot.first?.id, upSnapshot.first?.id,
+                       "id must remain stable across the down→up transition")
     }
 
     func testParseNetstat_NonLinkRowsAreSkipped() {
@@ -215,31 +235,101 @@ final class NetworkSpeedManagerTests: XCTestCase {
 
     // MARK: - Total/Tunnel split semantics ("all" interface bookkeeping)
 
-    /// BUG SURFACE: `fetchStats` filters `selectedIfaces = physicalIfaces`
-    /// when the user picks "all". Pure VPN traffic (everything on utun*) is
-    /// therefore *excluded* from `totalSpeedIn/Out`. The user sees 0 B/s in
-    /// the headline number while saturating their VPN tunnel. This test
-    /// pins that current behavior so any future fix is intentional.
-    func testTotalSpeedSemantics_AllExcludesTunnelTraffic_PINNED() {
+    // MARK: - aggregateTotals (Bug #1 fix)
+
+    func testAggregateTotals_AllUsesMaxOfPhysicalAndTunnel_VPNScenario() {
+        // Pure VPN: same user payload goes encrypted on en0 and decrypted on utun.
+        // physical_in ≈ tunnel_in (encryption adds a small overhead, modeled here
+        // as physical 1.05 MB vs tunnel 1.00 MB). max() ≈ physical avoids
+        // double-counting and matches what the user actually downloaded.
         let interfaces: [NetworkInterfaceStats] = [
-            stub(name: "en0",  bytesIn: 1_000_000, bytesOut: 500_000),
-            stub(name: "utun3", bytesIn: 9_000_000, bytesOut: 4_000_000),
-            stub(name: "lo0",   bytesIn: 100,        bytesOut: 100),
+            speedStub(name: "en0", speedIn: 1_050_000, speedOut: 250_000),
+            speedStub(name: "utun3", speedIn: 1_000_000, speedOut: 240_000),
         ]
+        let totals = NetworkSpeedManager.aggregateTotals(from: interfaces, selection: "all")
+        XCTAssertEqual(totals.totalSpeedIn, 1_050_000, "max(en0=1.05M, utun3=1.0M)")
+        XCTAssertEqual(totals.totalSpeedOut, 250_000)
+        // Tunnel speeds are also exposed so the UI can show "of which X went via VPN":
+        XCTAssertEqual(totals.tunnelSpeedIn, 1_000_000)
+        XCTAssertEqual(totals.tunnelSpeedOut, 240_000)
+    }
 
-        let physicalBytes = interfaces.filter { $0.role == .physical }
-            .reduce(into: (UInt64(0), UInt64(0))) { acc, i in acc.0 += i.bytesIn; acc.1 += i.bytesOut }
-        let tunnelBytes   = interfaces.filter { $0.role == .tunnel }
-            .reduce(into: (UInt64(0), UInt64(0))) { acc, i in acc.0 += i.bytesIn; acc.1 += i.bytesOut }
+    func testAggregateTotals_AllReportsTunnelWhenPhysicalIsIdle() {
+        // The pre-fix bug. User has a Tailscale-only flow on utun, en0 is idle.
+        // Old behavior: total = 0 (only physical counted). New behavior: total = utun.
+        let interfaces: [NetworkInterfaceStats] = [
+            speedStub(name: "en0", speedIn: 0, speedOut: 0),
+            speedStub(name: "utun3", speedIn: 5_000_000, speedOut: 1_000_000),
+        ]
+        let totals = NetworkSpeedManager.aggregateTotals(from: interfaces, selection: "all")
+        XCTAssertEqual(totals.totalSpeedIn, 5_000_000,
+                       "VPN-only traffic must surface in the headline number, not just in the tunnel breakout")
+        XCTAssertEqual(totals.totalSpeedOut, 1_000_000)
+    }
 
-        // What `selectedIfaces == "all"` currently sums:
-        XCTAssertEqual(physicalBytes.0, 1_000_000)
-        XCTAssertEqual(physicalBytes.1, 500_000)
+    func testAggregateTotals_AllSplitTunnelDoesNotDoubleCount() {
+        // Split tunnel: most traffic on en0, a smaller VPN flow on utun. The
+        // bug we want to *avoid* introducing is summing physical + tunnel and
+        // overcounting the VPN payload (which is already in en0's number).
+        let interfaces: [NetworkInterfaceStats] = [
+            speedStub(name: "en0", speedIn: 5_000_000, speedOut: 1_000_000),
+            speedStub(name: "utun3", speedIn: 500_000, speedOut: 100_000),
+        ]
+        let totals = NetworkSpeedManager.aggregateTotals(from: interfaces, selection: "all")
+        XCTAssertEqual(totals.totalSpeedIn, 5_000_000, "physical sum, since it's larger")
+        XCTAssertEqual(totals.totalSpeedOut, 1_000_000)
+    }
 
-        // What the user expects "all" to sum (today they have to read the
-        // separate `tunnelSpeed*` field to add this in):
-        XCTAssertEqual(tunnelBytes.0, 9_000_000)
-        XCTAssertEqual(tunnelBytes.1, 4_000_000)
+    func testAggregateTotals_SpecificInterfaceSelection() {
+        let interfaces: [NetworkInterfaceStats] = [
+            stub(name: "en0", bytesIn: 1_000_000, bytesOut: 500_000),
+            speedStub(name: "utun3", speedIn: 5_000_000, speedOut: 1_000_000),
+        ]
+        let totals = NetworkSpeedManager.aggregateTotals(from: interfaces, selection: "utun3")
+        XCTAssertEqual(totals.totalSpeedIn, 5_000_000, "specific selection picks just that interface")
+        XCTAssertEqual(totals.totalSpeedOut, 1_000_000)
+    }
+
+    func testAggregateTotals_BytesUseMonotonicPhysicalSum() {
+        // bytes are cumulative counters. We don't max them — that would let
+        // them oscillate when VPN flips on/off. Always physical sum.
+        let interfaces: [NetworkInterfaceStats] = [
+            stub(name: "en0", bytesIn: 1_000_000, bytesOut: 500_000),
+            stub(name: "utun3", bytesIn: 9_000_000, bytesOut: 4_000_000),
+        ]
+        let totals = NetworkSpeedManager.aggregateTotals(from: interfaces, selection: "all")
+        XCTAssertEqual(totals.totalBytesIn, 1_000_000, "all-bytes uses physical sum, not max")
+        XCTAssertEqual(totals.totalBytesOut, 500_000)
+        XCTAssertEqual(totals.tunnelBytesIn, 9_000_000)
+        XCTAssertEqual(totals.tunnelBytesOut, 4_000_000)
+    }
+
+    // MARK: - Long-elapsed rebase (Bug #3 fix)
+
+    func testLongElapsedRebaseThreshold_NormalRefreshAccepted() {
+        let refreshInterval: TimeInterval = 1.0
+        let elapsed: TimeInterval = 1.05  // typical timer jitter
+        XCTAssertLessThanOrEqual(elapsed,
+                                 refreshInterval * NetworkSpeedManager.maxValidElapsedMultiplier,
+                                 "small jitter must not trigger a rebase")
+    }
+
+    func testLongElapsedRebaseThreshold_PostSleepRejected() {
+        let refreshInterval: TimeInterval = 1.0
+        let elapsed: TimeInterval = 3600   // 1h sleep
+        XCTAssertGreaterThan(elapsed,
+                             refreshInterval * NetworkSpeedManager.maxValidElapsedMultiplier,
+                             "post-sleep gap must trigger a silent rebase, not publish a fake average")
+    }
+
+    func testLongElapsedRebaseThreshold_TightBoundary() {
+        // The threshold is 5x. At 4.99x we still publish a delta; at 5.01x we
+        // rebase. Pinning the boundary so future tweaks stay deliberate.
+        let refreshInterval: TimeInterval = 2.0
+        XCTAssertEqual(NetworkSpeedManager.maxValidElapsedMultiplier, 5.0,
+                       "if you change the multiplier, update operator docs and this test together")
+        XCTAssertLessThan(refreshInterval * 4.99, refreshInterval * NetworkSpeedManager.maxValidElapsedMultiplier)
+        XCTAssertGreaterThan(refreshInterval * 5.01, refreshInterval * NetworkSpeedManager.maxValidElapsedMultiplier)
     }
 
     // MARK: - Speed delta math (private to fetchStats — re-implemented here)
@@ -350,6 +440,14 @@ final class NetworkSpeedManagerTests: XCTestCase {
     private func stub(name: String, bytesIn: UInt64, bytesOut: UInt64) -> NetworkInterfaceStats {
         NetworkInterfaceStats(id: name, name: name, bytesIn: bytesIn, bytesOut: bytesOut,
                               packetsIn: 0, packetsOut: 0, errorsIn: 0, errorsOut: 0)
+    }
+
+    private func speedStub(name: String, speedIn: Double, speedOut: Double) -> NetworkInterfaceStats {
+        var iface = NetworkInterfaceStats(id: name, name: name, bytesIn: 0, bytesOut: 0,
+                                          packetsIn: 0, packetsOut: 0, errorsIn: 0, errorsOut: 0)
+        iface.speedIn = speedIn
+        iface.speedOut = speedOut
+        return iface
     }
 
     /// Mirror of `fetchStats`'s inline math so we can pin its boundary behavior
