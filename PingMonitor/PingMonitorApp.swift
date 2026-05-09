@@ -477,7 +477,19 @@ class PingMonitorViewModel: ObservableObject {
     private let maxFailuresBeforeOffline = 3
     private let maxProbeSamplesPerHost = 4096
     private let maxQualityEventCount = 120
+
+    // Pre-compiled once; NSRegularExpression is thread-safe after init (Apple docs).
+    nonisolated(unsafe) private static let pingLatencyRegexes: [NSRegularExpression] = [
+        try! NSRegularExpression(pattern: #"time[=<>](\d+\.?\d*)\s*ms"#, options: .caseInsensitive),
+        try! NSRegularExpression(pattern: #"time[=<>](\d+)"#,             options: .caseInsensitive),
+        try! NSRegularExpression(pattern: #"in (\d+\.?\d*)ms"#,           options: .caseInsensitive),
+    ]
     
+    // Quality computation cache — keyed by window, invalidated every 5 batch ticks
+    private var qualityRefreshTick = 0
+    private var globalSnapshotCache: [NetworkQualityWindow: GlobalQualitySnapshot] = [:]
+    private var globalTrendCache:    [NetworkQualityWindow: [QualityTrendPoint]]   = [:]
+
     // Batch update properties
     private var batchUpdateTimer: AnyCancellable?
     private struct PendingUpdate: Sendable {
@@ -925,7 +937,16 @@ class PingMonitorViewModel: ObservableObject {
             lastWidgetSync = Date()
             syncToWidget()
         }
-        
+
+        // Expire quality cache every 5 ticks (~5 s) — keeps CPU low between refreshes
+        qualityRefreshTick &+= 1
+        if qualityRefreshTick % 5 == 0 {
+            globalSnapshotCache.removeAll(keepingCapacity: true)
+            globalTrendCache.removeAll(keepingCapacity: true)
+        }
+
+        // $hosts mutations above already enqueue updateStatusBar() via Combine sink;
+        // one explicit call here synchronises the bar immediately after the batch.
         updateStatusBarDisplay()
     }
     
@@ -1309,6 +1330,7 @@ class PingMonitorViewModel: ObservableObject {
     }
 
     func globalQualitySnapshot(window: NetworkQualityWindow = .fiveMinutes) -> GlobalQualitySnapshot {
+        if let cached = globalSnapshotCache[window] { return cached }
         let snapshots = qualitySnapshots(window: window)
         let speedManager = NetworkSpeedManager.shared
         let tunnelSpeed = speedManager.tunnelSpeedIn + speedManager.tunnelSpeedOut
@@ -1355,7 +1377,7 @@ class PingMonitorViewModel: ObservableObject {
             overlay: averageDimension(\.overlay)
         )
 
-        return GlobalQualitySnapshot(
+        let result = GlobalQualitySnapshot(
             window: window,
             score: overallScore,
             dimensions: dimensions,
@@ -1370,9 +1392,13 @@ class PingMonitorViewModel: ObservableObject {
             worstHosts: Array(snapshots.sorted { $0.score < $1.score }.prefix(5)),
             recentEvents: recentQualityEvents()
         )
+        globalSnapshotCache[window] = result
+        return result
     }
 
     func qualityTrend(window: NetworkQualityWindow = .fiveMinutes) -> [QualityTrendPoint] {
+        if let cached = globalTrendCache[window] { return cached }
+
         let bucketInterval: TimeInterval
         switch window {
         case .oneMinute:
@@ -1395,7 +1421,7 @@ class PingMonitorViewModel: ObservableObject {
             return Date(timeIntervalSince1970: seconds)
         }
 
-        return grouped.keys.sorted().compactMap { bucket in
+        let result = grouped.keys.sorted().compactMap { bucket -> QualityTrendPoint? in
             guard let bucketSamples = grouped[bucket], !bucketSamples.isEmpty else { return nil }
             let latencies = bucketSamples.compactMap(\.latency)
             let avgLatency = average(latencies) ?? 0
@@ -1419,6 +1445,8 @@ class PingMonitorViewModel: ObservableObject {
                 packetLoss: loss
             )
         }
+        globalTrendCache[window] = result
+        return result
     }
 
     func qualityTrend(for host: HostConfig, window: NetworkQualityWindow = .fiveMinutes) -> [QualityTrendPoint] {
@@ -1656,15 +1684,8 @@ class PingMonitorViewModel: ObservableObject {
             }
         }
 
-        let patterns = [
-            #"time[=<>](\d+\.?\d*)\s*ms"#,
-            #"time[=<>](\d+)"#,
-            #"in (\d+\.?\d*)ms"#, // For tailscale ping output: "... in 12ms"
-        ]
-        
-        for pattern in patterns {
-            if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
-               let match = regex.firstMatch(in: trimmedLine, range: NSRange(trimmedLine.startIndex..., in: trimmedLine)) {
+        for regex in Self.pingLatencyRegexes {
+            if let match = regex.firstMatch(in: trimmedLine, range: NSRange(trimmedLine.startIndex..., in: trimmedLine)) {
                 if let timeRange = Range(match.range(at: 1), in: trimmedLine) {
                     let timeStr = String(trimmedLine[timeRange])
                     if let latency = Double(timeStr) {
@@ -2450,6 +2471,7 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
     }
     
     private var speedTimer: Timer?
+    private var statusBarUpdatePending = false
     
     private func updateSpeedMonitoring() {
         speedTimer?.invalidate()
@@ -2558,6 +2580,16 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
     }
 
     func updateStatusBar() {
+        // Coalesce multiple calls within the same runloop turn into one render.
+        guard !statusBarUpdatePending else { return }
+        statusBarUpdatePending = true
+        DispatchQueue.main.async { [weak self] in
+            self?.statusBarUpdatePending = false
+            self?.renderStatusBar()
+        }
+    }
+
+    private func renderStatusBar() {
         guard let button = statusItem?.button else { return }
 
         let displayText = viewModel.getStatusBarDisplayText()
