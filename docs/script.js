@@ -10,7 +10,7 @@ const i18n = {
     en: {
         'nav.features':        'Features',
         'nav.changelog':       'Changelog',
-        'hero.title':          '<span class="word-network">Network.</span><br><span class="word-nuanced">Nuanced.</span>',
+        'hero.title':          '<span class="word-network">Network.</span><span class="word-nuanced">Nuanced.</span>',
         'hero.desc':           'Every millisecond. Every hop. Every host. PingMonitor turns raw network noise into a precise, living dashboard — right in your menu bar.',
         'hero.download':       'Download for macOS',
         'hero.explore':        'Explore the Repo',
@@ -70,7 +70,7 @@ const i18n = {
     zh: {
         'nav.features':        '功能',
         'nav.changelog':       '更新日志',
-        'hero.title':          '<span class="word-network">网络。</span><br><span class="word-nuanced">精细。</span>',
+        'hero.title':          '<span class="word-network">网络。</span><span class="word-nuanced">精细。</span>',
         'hero.desc':           '每一毫秒。每一跳。每一台主机。PingMonitor 将原始网络噪声转化为精准、鲜活的仪表盘——就在你的菜单栏里。',
         'hero.download':       '下载 macOS 版',
         'hero.explore':        '查看源码',
@@ -474,6 +474,11 @@ function initSmoothScroll() {
    ======================================== */
 document.addEventListener('DOMContentLoaded', () => {
     applyLang(currentLang);
+
+    // Bind language toggle button
+    const langBtn = document.getElementById('lang-toggle');
+    if (langBtn) langBtn.addEventListener('click', toggleLang);
+
     fetchLatestRelease();
     initReveal();
     initNavbar();
