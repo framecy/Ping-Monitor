@@ -406,6 +406,10 @@ struct StatisticsContentView: View {
         hostSnapshot?.p95Latency ?? globalSnapshot.averageP95Latency
     }
 
+    private var p99Latency: Double? {
+        hostSnapshot?.p99Latency
+    }
+
     private var packetLoss: Double {
         hostSnapshot?.packetLoss ?? globalSnapshot.averagePacketLoss
     }
@@ -463,7 +467,8 @@ struct StatisticsContentView: View {
                     StatsQualityTrendCard(
                         trendPoints: trendPoints,
                         score: score,
-                        packetLoss: packetLoss
+                        packetLoss: packetLoss,
+                        jitter: jitter
                     )
                     StatsEventTimelineCard(events: recentEvents)
                 }
@@ -475,6 +480,7 @@ struct StatisticsContentView: View {
                         stats: aggregatedStats,
                         score: score,
                         p95Latency: p95Latency,
+                        p99Latency: p99Latency,
                         jitter: jitter,
                         packetLoss: packetLoss,
                         consecutiveFailures: consecutiveFailures,
@@ -704,6 +710,7 @@ private struct StatsQualityTrendCard: View {
     let trendPoints: [QualityTrendPoint]
     let score: Int
     let packetLoss: Double
+    let jitter: Double
     @ObservedObject private var languageManager = LanguageManager.shared
 
     var body: some View {
@@ -732,7 +739,7 @@ private struct StatsQualityTrendCard: View {
                                 y: .value("Score", point.score)
                             )
                             .interpolationMethod(.monotone)
-                            .foregroundStyle(scoreColor(Int(point.score)))
+                            .foregroundStyle(Theme.Colors.accentBlue)
                             .lineStyle(StrokeStyle(lineWidth: 2))
 
                             AreaMark(
@@ -780,6 +787,7 @@ private struct StatsQualityTrendCard: View {
                 HStack(spacing: 12) {
                     trendBadge(title: languageManager.t("dashboard.quality_score"), value: "\(score)", color: scoreColor(score))
                     trendBadge(title: languageManager.t("stats.loss_rate"), value: String(format: "%.1f%%", packetLoss), color: packetLoss > 3 ? Theme.Colors.accentRed : Theme.Colors.textPrimary)
+                    trendBadge(title: languageManager.t("host_detail.jitter"), value: String(format: "%.1f ms", jitter), color: jitter > 25 ? Theme.Colors.accentOrange : Theme.Colors.textPrimary)
                 }
             }
         }
@@ -969,6 +977,7 @@ private struct StatsRawMetricsCard: View {
     let stats: AggregatedStats
     let score: Int
     let p95Latency: Double?
+    let p99Latency: Double?
     let jitter: Double
     let packetLoss: Double
     let consecutiveFailures: Int
@@ -986,6 +995,7 @@ private struct StatsRawMetricsCard: View {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
                     metricCard(label: languageManager.t("dashboard.quality_score"), value: "\(score)", color: scoreColor(score))
                     metricCard(label: languageManager.t("dashboard.p95_latency"), value: p95Latency.map { String(format: "%.0fms", $0) } ?? "—", color: Theme.Colors.accentBlue)
+                    metricCard(label: "P99", value: p99Latency.map { String(format: "%.0fms", $0) } ?? "—", color: Theme.Colors.accentPurple)
                     metricCard(label: languageManager.t("host_detail.jitter"), value: String(format: "%.1fms", jitter), color: Theme.Colors.accentOrange)
                     metricCard(label: languageManager.t("stats.success_rate"), value: String(format: "%.1f%%", stats.successRate), color: Theme.Colors.accentGreen)
                     metricCard(label: languageManager.t("stats.loss_rate"), value: String(format: "%.1f%%", packetLoss), color: packetLoss > 3 ? Theme.Colors.accentRed : Theme.Colors.textPrimary)

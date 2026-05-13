@@ -176,12 +176,17 @@ enum NetworkQualityWindow: String, CaseIterable, Identifiable, Sendable {
 
     var duration: TimeInterval {
         switch self {
-        case .oneMinute:
-            return 60
-        case .fiveMinutes:
-            return 5 * 60
-        case .oneHour:
-            return 60 * 60
+        case .oneMinute:   return 60
+        case .fiveMinutes: return 5 * 60
+        case .oneHour:     return 60 * 60
+        }
+    }
+
+    var bucketInterval: TimeInterval {
+        switch self {
+        case .oneMinute:   return 5
+        case .fiveMinutes: return 15
+        case .oneHour:     return 60
         }
     }
 }
@@ -489,6 +494,8 @@ class PingMonitorViewModel: ObservableObject {
     private var qualityRefreshTick = 0
     private var globalSnapshotCache: [NetworkQualityWindow: GlobalQualitySnapshot] = [:]
     private var globalTrendCache:    [NetworkQualityWindow: [QualityTrendPoint]]   = [:]
+    // Previous scores used for degradation event detection
+    private var lastKnownScores: [UUID: Int] = [:]
 
     // Batch update properties
     private var batchUpdateTimer: AnyCancellable?
@@ -963,6 +970,7 @@ class PingMonitorViewModel: ObservableObject {
         if qualityRefreshTick % 5 == 0 {
             globalSnapshotCache.removeAll(keepingCapacity: true)
             globalTrendCache.removeAll(keepingCapacity: true)
+            detectScoreDegradation()
         }
 
         // $hosts mutations above already enqueue updateStatusBar() via Combine sink;
@@ -1156,7 +1164,7 @@ class PingMonitorViewModel: ObservableObject {
         let jitterValue = jitter(for: latencyValues)
 
         let spikeThreshold = (avgLatency ?? 0) + max(25.0, jitterValue * 2.0)
-        let spikeCount = latencyValues.filter { $0 > spikeThreshold && spikeThreshold > 0 }.count
+        let spikeCount = latencyValues.count >= 5 ? latencyValues.filter { $0 > spikeThreshold }.count : 0
         let spikeRate = latencyValues.isEmpty ? 0 : (Double(spikeCount) / Double(latencyValues.count) * 100.0)
 
         let pathKinds = samples
@@ -1268,7 +1276,7 @@ class PingMonitorViewModel: ObservableObject {
         let resolutionScore: Int = {
             let dnsFailures = samples.filter { $0.failureCategory == .dnsFailure }.count
             if dnsFailures == 0 {
-                return 85
+                return 100
             }
             let ratio = sampleCount > 0 ? Double(dnsFailures) / Double(sampleCount) : 0
             if ratio > 0.2 {
@@ -1418,92 +1426,39 @@ class PingMonitorViewModel: ObservableObject {
 
     func qualityTrend(window: NetworkQualityWindow = .fiveMinutes) -> [QualityTrendPoint] {
         if let cached = globalTrendCache[window] { return cached }
-
-        let bucketInterval: TimeInterval
-        switch window {
-        case .oneMinute:
-            bucketInterval = 5
-        case .fiveMinutes:
-            bucketInterval = 15
-        case .oneHour:
-            bucketInterval = 60
-        }
-
         let cutoff = Date().addingTimeInterval(-window.duration)
-        let allSamples = probeSamples.values
-            .flatMap { $0 }
-            .filter { $0.timestamp >= cutoff }
-
-        guard !allSamples.isEmpty else { return [] }
-
-        let grouped = Dictionary(grouping: allSamples) { sample -> Date in
-            let seconds = floor(sample.timestamp.timeIntervalSince1970 / bucketInterval) * bucketInterval
-            return Date(timeIntervalSince1970: seconds)
-        }
-
-        let result = grouped.keys.sorted().compactMap { bucket -> QualityTrendPoint? in
-            guard let bucketSamples = grouped[bucket], !bucketSamples.isEmpty else { return nil }
-            let latencies = bucketSamples.compactMap(\.latency)
-            let avgLatency = average(latencies) ?? 0
-            let failureCount = bucketSamples.filter { !$0.success }.count
-            let loss = Double(failureCount) / Double(bucketSamples.count) * 100.0
-
-            var score = 100.0
-            if avgLatency > 200 {
-                score -= 35
-            } else if avgLatency > 100 {
-                score -= 20
-            } else if avgLatency > 50 {
-                score -= 10
-            }
-            score -= min(loss * 4.0, 45.0)
-
-            return QualityTrendPoint(
-                timestamp: bucket,
-                score: max(0, min(100, score)),
-                averageLatency: avgLatency,
-                packetLoss: loss
-            )
-        }
+        let allSamples = probeSamples.values.flatMap { $0 }.filter { $0.timestamp >= cutoff }
+        let result = trendPoints(from: allSamples, bucketInterval: window.bucketInterval)
         globalTrendCache[window] = result
         return result
     }
 
     func qualityTrend(for host: HostConfig, window: NetworkQualityWindow = .fiveMinutes) -> [QualityTrendPoint] {
-        let bucketInterval: TimeInterval
-        switch window {
-        case .oneMinute:
-            bucketInterval = 5
-        case .fiveMinutes:
-            bucketInterval = 15
-        case .oneHour:
-            bucketInterval = 60
-        }
-
         let cutoff = Date().addingTimeInterval(-window.duration)
         let hostSamples = (probeSamples[host.id] ?? []).filter { $0.timestamp >= cutoff }
-        guard !hostSamples.isEmpty else { return [] }
+        return trendPoints(from: hostSamples, bucketInterval: window.bucketInterval)
+    }
 
-        let grouped = Dictionary(grouping: hostSamples) { sample -> Date in
+    private func trendPoints(from samples: [ProbeSample], bucketInterval: TimeInterval) -> [QualityTrendPoint] {
+        guard !samples.isEmpty else { return [] }
+        let grouped = Dictionary(grouping: samples) { sample -> Date in
             let seconds = floor(sample.timestamp.timeIntervalSince1970 / bucketInterval) * bucketInterval
             return Date(timeIntervalSince1970: seconds)
         }
-
-        return grouped.keys.sorted().compactMap { bucket in
+        return grouped.keys.sorted().compactMap { bucket -> QualityTrendPoint? in
             guard let bucketSamples = grouped[bucket], !bucketSamples.isEmpty else { return nil }
             let latencies = bucketSamples.compactMap(\.latency)
             let avgLatency = average(latencies) ?? 0
+            let jitterVal = jitter(for: latencies)
             let failureCount = bucketSamples.filter { !$0.success }.count
             let loss = Double(failureCount) / Double(bucketSamples.count) * 100.0
 
             var score = 100.0
-            if avgLatency > 200 {
-                score -= 35
-            } else if avgLatency > 100 {
-                score -= 20
-            } else if avgLatency > 50 {
-                score -= 10
-            }
+            if avgLatency > 200 { score -= 35 }
+            else if avgLatency > 100 { score -= 20 }
+            else if avgLatency > 50 { score -= 10 }
+            if jitterVal > 25 { score -= 15 }
+            else if jitterVal > 10 { score -= 8 }
             score -= min(loss * 4.0, 45.0)
 
             return QualityTrendPoint(
@@ -1523,7 +1478,32 @@ class PingMonitorViewModel: ObservableObject {
         guard let hostId else { return recentQualityEvents(limit: limit) }
         return Array(qualityEvents.filter { $0.hostId == hostId }.prefix(limit))
     }
-    
+
+    private func detectScoreDegradation() {
+        let lm = LanguageManager.shared
+        for host in hosts {
+            let snapshot = qualitySnapshot(for: host, window: .fiveMinutes)
+            defer { lastKnownScores[host.id] = snapshot.score }
+            guard let prev = lastKnownScores[host.id] else { continue }
+            let drop = prev - snapshot.score
+            if snapshot.score < 40 && prev >= 40 {
+                appendQualityEvent(qualityEvent(
+                    for: host.id,
+                    severity: .critical,
+                    title: lm.t("quality_event.score_critical"),
+                    detail: String(format: lm.t("quality_event.score_critical_detail"), prev, snapshot.score)
+                ))
+            } else if drop >= 20 {
+                appendQualityEvent(qualityEvent(
+                    for: host.id,
+                    severity: .warning,
+                    title: lm.t("quality_event.score_degraded"),
+                    detail: String(format: lm.t("quality_event.score_degraded_detail"), prev, snapshot.score)
+                ))
+            }
+        }
+    }
+
     /// Legacy method kept for backward compatibility if needed synchronously
     private func updateStats(for hostId: UUID, latency: Double?, success: Bool) {
         updateStatsInternal(for: hostId, latency: latency, success: success)

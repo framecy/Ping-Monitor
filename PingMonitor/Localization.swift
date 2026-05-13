@@ -352,7 +352,11 @@ public final class LanguageManager: ObservableObject {
             "quality_event.host_recovered": "Host recovered",
             "quality_event.host_recovered_detail": "Probe responses are healthy again",
             "quality_event.probe_failed": "Probe failed",
-            
+            "quality_event.score_critical": "Quality dropped to critical",
+            "quality_event.score_critical_detail": "Score fell from %d to %d (below threshold 40)",
+            "quality_event.score_degraded": "Quality degraded",
+            "quality_event.score_degraded_detail": "Score dropped from %d to %d",
+
             // Context Menu
             "menu.edit": "Edit",
             "menu.delete": "Delete",
@@ -839,7 +843,11 @@ public final class LanguageManager: ObservableObject {
             "quality_event.host_recovered": "主机已恢复",
             "quality_event.host_recovered_detail": "探测结果已恢复正常",
             "quality_event.probe_failed": "探测失败",
-            
+            "quality_event.score_critical": "质量降至严重",
+            "quality_event.score_critical_detail": "分数从 %d 降至 %d（低于阈值 40）",
+            "quality_event.score_degraded": "质量下降",
+            "quality_event.score_degraded_detail": "分数从 %d 降至 %d",
+
             // Context Menu
             "menu.edit": "编辑",
             "menu.delete": "删除",
