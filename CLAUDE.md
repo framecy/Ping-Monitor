@@ -23,10 +23,13 @@ xcodebuild test -scheme PingMonitor \
     -destination 'platform=macOS' \
     -derivedDataPath ~/Library/Developer/Xcode/DerivedData/PingMonitor
 
-# Run a single test
+# Run a single test (two test files: QualityEngineTests, NetworkSpeedManagerTests)
 xcodebuild test -scheme PingMonitor \
     -destination 'platform=macOS' \
     -only-testing:PingMonitorTests/QualityEngineTests/testQualityDimensionScoresAverage
+
+# Package a Debug build into a local DMG (no version bump, reads from build/)
+./package_dmg.sh
 ```
 
 ### Versioning
@@ -66,7 +69,7 @@ The probe pipeline is intentionally split into layered Sendable value types defi
 2. Direct file in the widget's sandbox container (`~/Library/Containers/com.pingmonitor.app.widget/Data/Documents/widget_data.json`)
 3. Shared `~/Library/Application Support/PingMonitor/widget_data.json`
 
-The widget target is sandboxed, the host app is **not** (`com.apple.security.app-sandbox: false` in the widget entitlements section of `project.yml`) — that's what makes the cross-container write in tier 2 work. Don't "fix" this by enabling sandbox without also wiring up real App Groups + a Team ID. Widget syncs are throttled to once per 5 s (`widgetSyncInterval`); preserve this when emitting writes.
+Neither target is sandboxed: the widget explicitly sets `com.apple.security.app-sandbox: false` in its entitlements (overriding the WidgetKit default), and the host app has no sandbox entitlement either. This is what makes the cross-container write in tier 2 work — don't "fix" this by enabling sandbox without also wiring up real App Groups + a Team ID. Widget syncs are throttled to once per 5 s (`widgetSyncInterval`); preserve this when emitting writes.
 
 ### Privileged operations
 

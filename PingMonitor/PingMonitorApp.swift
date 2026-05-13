@@ -539,6 +539,26 @@ class PingMonitorViewModel: ObservableObject {
                 }
             }
             .store(in: &keepAliveCancellables)
+
+        // When Tailscale node list first loads, upgrade any probes that started as regular
+        // ping (because nodes were empty at launch) but should use tailscale ping.
+        TailscaleManager.shared.$nodes
+            .filter { !$0.isEmpty }
+            .first()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self = self, self.isRunning else { return }
+                for (i, host) in self.hosts.enumerated() {
+                    guard !host.isPaused, host.probeMode == .icmp,
+                          host.command.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
+                    let address = host.address.trimmingCharacters(in: .whitespacesAndNewlines)
+                    // Only restart hosts whose probe type would change now that nodes are loaded
+                    guard !host.isTailscaleNode, self.isKnownTailscaleNodeAddress(address) else { continue }
+                    self.stopPingProcess(for: host.id)
+                    self.startPingProcess(for: host, at: i)
+                }
+            }
+            .store(in: &keepAliveCancellables)
     }
     
     private func handleKeepAliveChange(interface: String, active: Bool) {
@@ -1536,7 +1556,7 @@ class PingMonitorViewModel: ObservableObject {
         if customCommand.isEmpty {
             if let cli = tailscaleCLIPath {
                 // Use JSON output for Tailscale probes so we can classify failures and extract direct/relay path details.
-                commandString = "while true; do \(cli) ping --json --c=1 \(address); sleep \(interval); done"
+                commandString = "while true; do \(cli) ping --c=1 \(address); sleep \(interval); done"
             } else {
                 commandString = "ping -i \(interval) \(address)"
             }
@@ -1630,6 +1650,10 @@ class PingMonitorViewModel: ObservableObject {
         let normalizedAddress = address.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !normalizedAddress.isEmpty else { return false }
 
+        // Tailscale always uses the CGNAT range (100.64.0.0/10). Recognise it immediately
+        // without waiting for the async node list to load, so probes start correctly at launch.
+        if isIPv4InCIDR(normalizedAddress, cidr: "100.64.0.0/10") { return true }
+
         let tailscale = TailscaleManager.shared
         let suffix = tailscale.magicDNSSuffix.lowercased()
 
@@ -1638,8 +1662,24 @@ class PingMonitorViewModel: ObservableObject {
             if node.tailscaleIP.lowercased() == normalizedAddress { return true }
             if hostname == normalizedAddress { return true }
             if !suffix.isEmpty, "\(hostname).\(suffix)" == normalizedAddress { return true }
+            // Match IPs that fall within a subnet route advertised by this peer
+            for cidr in node.primaryRoutes where isIPv4InCIDR(normalizedAddress, cidr: cidr) { return true }
             return false
         }
+    }
+
+    private func isIPv4InCIDR(_ ip: String, cidr: String) -> Bool {
+        let parts = cidr.split(separator: "/")
+        guard parts.count == 2, let prefixLen = Int(parts[1]), prefixLen >= 0, prefixLen <= 32 else { return false }
+        guard let ipInt = ipv4ToUInt32(ip), let netInt = ipv4ToUInt32(String(parts[0])) else { return false }
+        let mask: UInt32 = prefixLen == 0 ? 0 : (~UInt32(0) << (32 - prefixLen))
+        return (ipInt & mask) == (netInt & mask)
+    }
+
+    private func ipv4ToUInt32(_ ip: String) -> UInt32? {
+        let octets = ip.split(separator: ".").compactMap { UInt32($0) }
+        guard octets.count == 4, octets.allSatisfy({ $0 < 256 }) else { return nil }
+        return (octets[0] << 24) | (octets[1] << 16) | (octets[2] << 8) | octets[3]
     }
     
     nonisolated private func parsePingLine(_ line: String, hostId: UUID, index: Int, hostName: String, isTailscaleProbe: Bool) {
@@ -2011,7 +2051,12 @@ class PingMonitorViewModel: ObservableObject {
             }
         }
 
-        return parts.isEmpty ? (isRunning ? "●" : LanguageManager.shared.t("header.stopped")) : parts.joined(separator: " ")
+        if parts.isEmpty {
+            guard isRunning else { return LanguageManager.shared.t("header.stopped") }
+            // Labels-only mode with no rules configured or matched: show PING at fixed width
+            return (showLabelsInMenu && !showLatencyInMenu) ? "PING" : "●"
+        }
+        return parts.joined(separator: " ")
     }
     
     func getStatusBarDisplayHost() -> HostConfig? {
@@ -2613,7 +2658,7 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
         if viewModel.isRunning && showingText && !displayText.isEmpty && displayText != "●" {
             latencyStr = viewModel.showIconInMenu ? " \(displayText)" : displayText
         } else if viewModel.isRunning && showingText && !viewModel.showIconInMenu && displayText == "●" {
-            // Labels-only mode with no matching rules: show bullet so button stays clickable
+            // No latency available yet and icon hidden: keep a bullet so the button stays clickable
             latencyStr = "●"
         }
 

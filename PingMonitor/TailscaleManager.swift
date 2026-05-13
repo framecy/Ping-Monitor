@@ -26,6 +26,9 @@ struct TailscaleNode: Identifiable, Codable {
     var rxBytes: Int64 = 0
     var txBytes: Int64 = 0
     
+    // Subnet routes advertised by this peer (e.g. ["10.1.1.0/24"])
+    var primaryRoutes: [String] = []
+
     // Diagnostic info
     var lastPingResult: String? = nil
     var isCheckingPath: Bool = false
@@ -137,6 +140,7 @@ private struct TailscalePeer: Codable {
     let RxBytes: Int64?
     let TxBytes: Int64?
     let LastSeen: String?
+    let PrimaryRoutes: [String]?
 }
 
 // MARK: - Netcheck Result Model
@@ -375,6 +379,7 @@ class TailscaleManager: ObservableObject {
                             currentNode: peer.Relay ?? peer.CurAddr,
                             rxBytes: peer.RxBytes ?? 0,
                             txBytes: peer.TxBytes ?? 0,
+                            primaryRoutes: peer.PrimaryRoutes ?? [],
                             relayCode: peer.Relay,
                             directAddr: peer.CurAddr
                         ))
