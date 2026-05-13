@@ -1,0 +1,146 @@
+# Changelog
+
+所有显著的更改将记录在此文件中。格式基于 [Keep a Changelog](https://keepachangelog.com) 规范，版本遵循语义化版本。
+
+---
+
+## [v2.2.0] - 2026-05-13 · 质量引擎精化
+
+### Fixed
+- `resolutionScore`：零 DNS 失败时上限由 85 修正为 100，消除与其他维度的不对称性
+- `spikeRate`：样本数 <5 时跳过尖峰率计算，避免冷启动阶段的误报评分
+
+### Added
+- `detectScoreDegradation()`：每 5 个批次轮次检测评分变化；分数跌破 40 触发 `.critical` 质量事件，单批次降幅 ≥20 分触发 `.warning` 质量事件
+- 质量趋势卡片新增**抖动趋势徽章**：抖动 >25 ms 时以橙色突出显示
+- 统计页原始指标格新增 **P99 延迟**单元格
+
+### Changed
+- 提取 `trendPoints(from:bucketInterval:)` 公共 helper，消除 ~80 行重复趋势分桶逻辑
+- `NetworkQualityWindow` 新增 `bucketInterval` 计算属性（`.oneMinute` = 5 s，`.fiveMinutes` = 15 s，`.oneHour` = 60 s）
+- 趋势评分公式引入抖动惩罚（>25 ms 扣 15 分，>10 ms 扣 8 分），与全维度评分模型保持一致
+- 质量趋势折线颜色统一改为固定的 `accentBlue`，不再随分段评分变色
+
+---
+
+## [v2.1.2-R16] - 2026-05-13 · Tailscale CGNAT 检测
+
+### Added
+- 100.64.0.0/10（CGNAT 地址段）即时识别为 Tailscale 地址，无需等待异步节点列表加载
+- 匹配节点 `PrimaryRoutes` 广播子网路由内的 IP，支持 Tailscale 子网路由场景
+- 节点列表延迟加载完成后，自动重启以普通 ICMP 启动的探针，升级为 Tailscale Ping
+
+### Changed
+- `tailscale ping` 切换为非 JSON 输出模式，简化延迟解析逻辑
+- `isIPv4InCIDR` / `ipv4ToUInt32` 辅助函数新增
+
+---
+
+## [v2.1.2-R15] - 2026-05-09 · 版本号同步
+
+### Changed
+- Marketing version 同步为 2.1.2-R15 / build 118
+
+---
+
+## [v2.1.2-R14] - 2026-05-09 · 状态栏与网速稳定性
+
+### Fixed
+- 状态栏在「仅标签」模式下无规则命中时缩至零宽变为不可点击；现在回退显示 `●` 占位符
+- `NetworkSpeedManager.fetchStats` 新增 `isFetchingStats` 并发保护，防止慢速 netstat 进程重叠调用导致时间间隔近零、速度尖峰
+- 流量计数器回绕导致的负值速度（Bug #4）
+- 睡眠/唤醒后基准未重置导致的速度突增（Bug #3）
+- 带星号后缀的 down 接口 ID 不稳定导致的重复条目（Bug #2）
+
+### Added
+- `NetworkSpeedManagerTests`：34 个单元测试用例，覆盖上述所有修复点
+
+### Changed
+- `parseLsof` 与 `fetchProcessTraffic` 改为并行 Task 执行，进程列表刷新耗时从 ~1.5 s 降至 ~1 s
+- 提取 `aggregateTotals` 辅助函数，流量统计逻辑集中管理
+
+---
+
+## [v2.1.2-R13] - 2026-04-29 · 快速访问功能区
+
+### Changed
+- 顶部快速访问面板重构为可折叠条带：展开时每台主机独立行，固定 110 px 名称列 + 横向滚动快捷操作列表
+- 展开/折叠状态通过 `@AppStorage("pm.quickAccessExpanded")` 持久化，跨重启保留；默认展开
+
+---
+
+## [v2.1.2-R12] - 2026-04-28 · 质量引擎首版 & 特权管理
+
+### Added
+- **探针诊断框架**：`ProbeFailureReason` / `ProbeFailureCategory` / `ProbePathKind` / `ProbePathSnapshot` / `HostProbeDiagnostic`，每次 ping 结构化记录失败原因与路径元数据
+- **六维质量评分引擎**：`QualityDimensionScores`（延迟/稳定性/路径/带宽/DNS 解析/叠加层）、`HostQualitySnapshot`、`GlobalQualitySnapshot`、`NetworkQualityEvent`、`QualityTrendPoint`；4096 样本环形缓冲（`maxProbeSamplesPerHost`）
+- **质量评估 Tab**：1 分钟 / 5 分钟 / 1 小时三时间窗口，维度分解条形图、事件流
+- **`PrivilegedManager`**：FIFO 持久化特权 Bash 会话（`/tmp/pingmonitor_priv_fifo`），单次授权后全生命周期复用，彻底消除 Traceroute/MTR 重复弹窗
+- **`KeepAliveManager`**：Passive / Intensive / Adaptive 三档探测策略；SSH 主机自动升频，检测到空闲时自动降频；监听 `utun*` 接口状态
+- **`ConfigManager`**：统一 JSON 持久化层，管理 `hosts.json` / `presets.json` / `stats.json` / `settings.json`；首次启动自动从 UserDefaults 迁移旧数据
+- **`FolderMonitor`**：`DispatchSourceFileSystemObject` 封装，防抖监听配置目录变更
+- **`WidgetDataManager`**：三级回退同步策略（App Group → 容器文件 → 共享目录）；5 s 节流防止频繁 IO
+- **`PrivilegedManager` FIFO 安全加固**：/tmp 竞态条件（TOCTOU）防护
+
+---
+
+## [v2.1.1] - R1–R9 · 性能优化与架构拆分
+
+### Changed
+- 缓存 `NSRegularExpression` / `DateFormatter` / `ByteCountFormatter` 为 `nonisolated(unsafe) static`，消除高频路径重复分配
+- 默认探测间隔调整为 10 秒
+- `MainView.swift`（2444 行）拆分为 `DashboardView`、`HostDetailView`、`NetworkSpeedTab`、`TracerouteView`、`TailscaleTab` 五个独立文件
+- Widget 数据同步节流至 5 s，减少 90%+ 无效文件 IO
+- Ping 主机查找改为 UUID 匹配，消除数组索引错位风险
+
+### Added
+- 主机拖拽排序
+- Tailscale 快捷命令面板与 Exit Node 状态标识
+- 图表阶梯式警示色（<100 ms 绿 / 100–300 ms 橙 / >300 ms 红）
+
+### Fixed
+- 主机规则编辑器排版错位及默认值缺失
+- 主应用与小组件 App Group 双向通讯
+- 浅色/深色模式设计系统适配
+
+---
+
+## [v2.1.0] - 核心功能与 UI 升级 (r19–r38)
+
+### Added
+- **Traceroute / MTR**：逐跳 IP、延迟与丢包；地图可视化本地→目标完整路径；MTR 持续追踪模式
+- 监控页顶部常驻 `ServiceShortcutsRibbon` 快捷访问面板
+- 独立变更日志文件与自动打包脚本联动
+
+### Changed
+- 采用单次提权 Bash 容器封装 MTR 循环，消除频繁系统授权弹窗
+- 网速页折线图升级为平滑贝塞尔曲线与渐变填充
+- 全新状态栏：网速仪表盘集成、固定宽度防抖
+
+### Fixed
+- VPN / Tailscale 接口下 Errors 计数异常
+- 主机卡片连接状态颜色判断逻辑
+- Traceroute 权限执行问题
+
+---
+
+## [v2.0.x] - 功能奠基与体验完善 (r21–r64)
+
+### Added
+- 自动发现并一键导入 Tailscale 私有网络节点；NAT 类型检测；Exit Node 切换
+- 全局服务快捷方式面板；SSH 自动认证（expect 脚本绕过 AppleScript 授权限制）
+- 统计仪表盘 3D 立体饼图
+- 小/中/大三款 WidgetKit 桌面小组件
+- 中英文运行时动态切换（`Localization.swift`）
+- Bark 远程推送通知
+- 审计日志（Debug/Info/Warning/Error 分级）
+
+### Changed
+- 状态栏多级间距、字体与网速全集成
+- 设置页重构为卡片式分组设计
+- `WidgetDataManager` 三级回退同步策略
+
+### Fixed
+- macOS 15.7+ 环境下小组件背景色崩溃
+- 网速状态栏抖动与排版对齐
+- AppleScript 授权限制下的 SSH 认证问题
