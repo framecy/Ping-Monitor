@@ -186,7 +186,7 @@ async function fetchLatestRelease() {
 }
 
 /* ========================================
-   Hero Sparkline — requestAnimationFrame canvas
+   Hero Sparkline — throttled to ~20fps, paused when off-screen
    ======================================== */
 function initSparkline() {
     const canvas = document.getElementById('hero-sparkline');
@@ -195,40 +195,42 @@ function initSparkline() {
     const ctx = canvas.getContext('2d');
     const W = canvas.width;
     const H = canvas.height;
+    // Pre-build gradient once — avoid recreating every frame
+    const grad = ctx.createLinearGradient(0, 0, W, 0);
+    grad.addColorStop(0,   'rgba(59,130,246,0)');
+    grad.addColorStop(0.2, 'rgba(59,130,246,0.7)');
+    grad.addColorStop(0.8, 'rgba(34,211,238,0.7)');
+    grad.addColorStop(1,   'rgba(34,211,238,0)');
+
     let t = 0;
+    let visible = true;
+
+    // Pause animation when hero is off screen
+    const io = new IntersectionObserver(([e]) => { visible = e.isIntersecting; }, { threshold: 0 });
+    io.observe(canvas);
 
     function draw() {
+        // Throttle to ~20fps
+        setTimeout(() => requestAnimationFrame(draw), 50);
+        if (!visible) return;
+
         ctx.clearRect(0, 0, W, H);
-
         ctx.beginPath();
-        const pts = 120;
-        for (let i = 0; i <= pts; i++) {
-            const x = (i / pts) * W;
-            // Composite wave: slow base + faster jitter + very fast noise
+        // Fewer sample points (60 vs 120) — same visual at 0.18 opacity
+        for (let i = 0; i <= 60; i++) {
+            const x = (i / 60) * W;
             const y = H / 2
-                - Math.sin(i * 0.08 + t * 0.6) * (H * 0.22)
-                - Math.sin(i * 0.21 + t * 1.3) * (H * 0.10)
-                - Math.sin(i * 0.55 + t * 2.1) * (H * 0.05);
-
-            if (i === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
+                - Math.sin(i * 0.16 + t * 0.6) * (H * 0.22)
+                - Math.sin(i * 0.42 + t * 1.3) * (H * 0.10);
+            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
         }
-
-        const grad = ctx.createLinearGradient(0, 0, W, 0);
-        grad.addColorStop(0, 'rgba(59,130,246,0)');
-        grad.addColorStop(0.2, 'rgba(59,130,246,0.7)');
-        grad.addColorStop(0.8, 'rgba(34,211,238,0.7)');
-        grad.addColorStop(1, 'rgba(34,211,238,0)');
-
         ctx.strokeStyle = grad;
         ctx.lineWidth = 1.5;
         ctx.stroke();
-
         t += 0.012;
-        requestAnimationFrame(draw);
     }
 
-    draw();
+    requestAnimationFrame(draw);
 }
 
 /* ========================================
@@ -292,18 +294,8 @@ function initCounters() {
     counters.forEach(el => observer.observe(el));
 }
 
-/* ========================================
-   Parallax — hero mockup shifts up on scroll
-   ======================================== */
-function initParallax() {
-    const mockup = document.getElementById('hero-mockup');
-    if (!mockup) return;
-
-    window.addEventListener('scroll', () => {
-        const y = window.scrollY;
-        mockup.style.transform = `translateY(${-y * 0.12}px)`;
-    }, { passive: true });
-}
+/* Parallax removed — caused mockup to overlap CTA buttons on scroll */
+function initParallax() {}
 
 /* ========================================
    Preview Strip — dimension bars animate in on scroll
@@ -385,21 +377,33 @@ function initNavbar() {
 }
 
 /* ========================================
-   Bento & Background Mouse Tracking
+   Bento & Background Mouse Tracking — rAF-throttled
    ======================================== */
 function initTracking() {
     const root = document.documentElement;
+    let bgPending = false;
 
     document.addEventListener('mousemove', (e) => {
-        root.style.setProperty('--bg-mouse-x', `${e.clientX}px`);
-        root.style.setProperty('--bg-mouse-y', `${e.clientY}px`);
+        if (bgPending) return;
+        bgPending = true;
+        requestAnimationFrame(() => {
+            root.style.setProperty('--bg-mouse-x', `${e.clientX}px`);
+            root.style.setProperty('--bg-mouse-y', `${e.clientY}px`);
+            bgPending = false;
+        });
     });
 
     document.querySelectorAll('.bento-item').forEach(item => {
+        let pending = false;
         item.addEventListener('mousemove', (e) => {
-            const rect = item.getBoundingClientRect();
-            item.style.setProperty('--mouse-x', `${e.clientX - rect.left}px`);
-            item.style.setProperty('--mouse-y', `${e.clientY - rect.top}px`);
+            if (pending) return;
+            pending = true;
+            requestAnimationFrame(() => {
+                const rect = item.getBoundingClientRect();
+                item.style.setProperty('--mouse-x', `${e.clientX - rect.left}px`);
+                item.style.setProperty('--mouse-y', `${e.clientY - rect.top}px`);
+                pending = false;
+            });
         });
     });
 }

@@ -477,8 +477,9 @@ body::after {
     border-radius: 50%;
     flex-shrink: 0;
 }
-.mh-dot.online  { background: #22c55e; animation: pulse 2.8s ease-in-out infinite; }
-.mh-dot.offline { background: #f87171; animation: pulse 1.6s ease-in-out infinite; }
+/* Keep pulse only on offline dot — online dots use static color for perf */
+.mh-dot.online  { background: #22c55e; }
+.mh-dot.offline { background: #f87171; animation: pulse 2s ease-in-out infinite; }
 
 .mh-name {
     flex: 1;
@@ -595,11 +596,9 @@ body::after {
     max-width: 100%;
     margin: 0 auto 60px;
     padding: 1.4rem 1.5rem;
-    background: var(--card-bg);
+    background: rgba(255,255,255,0.04);
     border: 1px solid var(--border);
     border-radius: 20px;
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
     flex-wrap: nowrap;
     overflow-x: auto;
 }
@@ -693,14 +692,14 @@ body::after {
 }
 
 .preview-panel-inner {
-    background: rgba(255,255,255,0.025);
+    background: rgba(255,255,255,0.03);
     border: 1px solid rgba(255,255,255,0.08);
     border-radius: 16px;
     padding: 1.4rem;
     min-height: 270px;
     position: relative;
     overflow: hidden;
-    transition: border-color 0.4s ease, transform 0.5s cubic-bezier(0.16,1,0.3,1), box-shadow 0.4s ease;
+    transition: border-color 0.4s ease, transform 0.4s cubic-bezier(0.16,1,0.3,1), box-shadow 0.4s ease;
 }
 
 .preview-panel-inner::before {
@@ -783,8 +782,8 @@ body::after {
     border-radius: 50%;
     flex-shrink: 0;
 }
-.pv-on  { background: #22c55e; animation: pulse 2.8s ease-in-out infinite; }
-.pv-off { background: #f87171; animation: pulse 1.6s ease-in-out infinite; }
+.pv-on  { background: #22c55e; }
+.pv-off { background: #f87171; animation: pulse 2s ease-in-out infinite; }
 
 .pv-hostname {
     flex: 1;
@@ -914,9 +913,7 @@ body::after {
     padding: 2.5rem;
     position: relative;
     overflow: hidden;
-    transition: all 0.5s cubic-bezier(0.16,1,0.3,1);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    transition: border-color 0.4s ease, transform 0.4s cubic-bezier(0.16,1,0.3,1), box-shadow 0.4s ease;
 }
 
 .bento-item:hover {
