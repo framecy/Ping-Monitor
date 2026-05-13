@@ -314,11 +314,8 @@ body::after {
     font-size: clamp(3.5rem, 12vw, 6.5rem);
     font-weight: 800;
     letter-spacing: -0.06em;
-    line-height: 0.9;
+    line-height: 1;
     margin-bottom: 2rem;
-    background: none;
-    -webkit-text-fill-color: initial;
-    filter: none;
 }
 
 .word-network {
@@ -327,17 +324,22 @@ body::after {
     background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
-    filter: drop-shadow(0 0 40px rgba(59,130,246,0.22));
+    /* No filter here — filter + background-clip:text causes gray box artifact.
+       Glow is handled via text-shadow on the pseudo-wrapper below. */
 }
 
 .word-nuanced {
     display: block;
+    margin-top: -0.12em;   /* close the block gap between the two words */
     background: linear-gradient(165deg, #cffafe 0%, #22d3ee 40%, #0891b2 80%);
     background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
-    filter: drop-shadow(0 0 40px rgba(6,182,212,0.22));
 }
+
+/* Subtle glow via text-shadow on each word — no filter, so no compositing box */
+.word-network { text-shadow: 0 0 60px rgba(59,130,246,0.25); }
+.word-nuanced { text-shadow: 0 0 60px rgba(6,182,212,0.25); }
 
 .hero-desc {
     font-size: 1.2rem;
