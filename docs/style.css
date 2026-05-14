@@ -337,6 +337,14 @@ body::after {
     -webkit-text-fill-color: transparent;
 }
 
+/* Chinese glyphs are full-em-height — reset tight Latin metrics to prevent overlap */
+:lang(zh) .hero h1 {
+    line-height: 1.05;
+}
+:lang(zh) .word-nuanced {
+    margin-top: 0;
+}
+
 /* Subtle glow via text-shadow on each word — no filter, so no compositing box */
 .word-network { text-shadow: 0 0 60px rgba(59,130,246,0.25); }
 .word-nuanced { text-shadow: 0 0 60px rgba(6,182,212,0.25); }
