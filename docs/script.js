@@ -70,7 +70,7 @@ const i18n = {
     zh: {
         'nav.features':        '功能',
         'nav.changelog':       '更新日志',
-        'hero.title':          '<span class="word-network">网络。</span><span class="word-nuanced">精细。</span>',
+        'hero.title':          '<span class="word-network">毫秒。</span><span class="word-nuanced">洞见。</span>',
         'hero.desc':           '每一毫秒。每一跳。每一台主机。PingMonitor 将原始网络噪声转化为精准、鲜活的仪表盘——就在你的菜单栏里。',
         'hero.download':       '下载 macOS 版',
         'hero.explore':        '查看源码',
