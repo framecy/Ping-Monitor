@@ -2634,90 +2634,182 @@ struct SettingsTab: View {
                                     viewModel.saveSettings()
                                 }
                             }
-                            
+                        }
+                        
+                        if viewModel.showIconInMenu {
                             Divider()
-                            
                             HStack {
-                                Text(languageManager.t("settings.bar_width"))
+                                Text(languageManager.t("settings.icon_width"))
                                 Spacer()
                                 HStack(spacing: 8) {
                                     Button {
-                                        if viewModel.statusBarWidth > 50 {
-                                            viewModel.statusBarWidth -= 10
-                                            viewModel.saveSettings()
-                                        }
-                                    } label: {
-                                        Image(systemName: "minus.circle")
-                                            .font(.system(size: 16))
-                                    }
-                                    .buttonStyle(.borderless)
-                                    .disabled(viewModel.statusBarWidth <= 50)
-                                    
-                                    Text("\(viewModel.statusBarWidth)")
-                                        .font(.system(.body, design: .monospaced))
-                                        .frame(width: 36, alignment: .center)
-                                    
-                                    Button {
-                                        if viewModel.statusBarWidth < 250 {
-                                            viewModel.statusBarWidth += 10
-                                            viewModel.saveSettings()
-                                        }
-                                    } label: {
-                                        Image(systemName: "plus.circle")
-                                            .font(.system(size: 16))
-                                    }
-                                    .buttonStyle(.borderless)
-                                    .disabled(viewModel.statusBarWidth >= 250)
-                                }
-                                .frame(width: 220, alignment: .trailing)
-                            }
-                            Divider()
-                            
-                            HStack {
-                                Text(languageManager.t("settings.font_size"))
-                                Spacer()
-                                HStack(spacing: 8) {
-                                    Button {
-                                        if viewModel.statusBarFontSize > 6 {
-                                            viewModel.statusBarFontSize -= 1
+                                        if viewModel.statusBarIconWidth > 10 {
+                                            viewModel.statusBarIconWidth -= 2
                                             viewModel.saveSettings()
                                         }
                                     } label: { Image(systemName: "minus.circle").font(.system(size: 16)) }
                                     .buttonStyle(.borderless)
-                                    .disabled(viewModel.statusBarFontSize <= 6)
+                                    .disabled(viewModel.statusBarIconWidth <= 10)
                                     
-                                    Text("\(viewModel.statusBarFontSize)")
+                                    Text("\(viewModel.statusBarIconWidth)")
                                         .font(.system(.body, design: .monospaced))
                                         .frame(width: 36, alignment: .center)
                                     
                                     Button {
-                                        if viewModel.statusBarFontSize < 18 {
-                                            viewModel.statusBarFontSize += 1
+                                        if viewModel.statusBarIconWidth < 100 {
+                                            viewModel.statusBarIconWidth += 2
                                             viewModel.saveSettings()
                                         }
                                     } label: { Image(systemName: "plus.circle").font(.system(size: 16)) }
                                     .buttonStyle(.borderless)
-                                    .disabled(viewModel.statusBarFontSize >= 18)
+                                    .disabled(viewModel.statusBarIconWidth >= 100)
                                 }
                                 .frame(width: 220, alignment: .trailing)
                             }
-                            
+                        }
+                        
+                        if viewModel.showLatencyInMenu {
                             Divider()
-                            
                             HStack {
-                                Text(languageManager.t("settings.font_weight"))
+                                Text(languageManager.t("settings.latency_width"))
                                 Spacer()
-                                Picker("", selection: $viewModel.statusBarFontWeight) {
-                                    Text(languageManager.t("settings.font_weight.regular")).tag("regular")
-                                    Text(languageManager.t("settings.font_weight.medium")).tag("medium")
-                                    Text(languageManager.t("settings.font_weight.bold")).tag("bold")
+                                HStack(spacing: 8) {
+                                    Button {
+                                        if viewModel.statusBarLatencyWidth > 20 {
+                                            viewModel.statusBarLatencyWidth -= 5
+                                            viewModel.saveSettings()
+                                        }
+                                    } label: { Image(systemName: "minus.circle").font(.system(size: 16)) }
+                                    .buttonStyle(.borderless)
+                                    .disabled(viewModel.statusBarLatencyWidth <= 20)
+                                    
+                                    Text("\(viewModel.statusBarLatencyWidth)")
+                                        .font(.system(.body, design: .monospaced))
+                                        .frame(width: 36, alignment: .center)
+                                    
+                                    Button {
+                                        if viewModel.statusBarLatencyWidth < 200 {
+                                            viewModel.statusBarLatencyWidth += 5
+                                            viewModel.saveSettings()
+                                        }
+                                    } label: { Image(systemName: "plus.circle").font(.system(size: 16)) }
+                                    .buttonStyle(.borderless)
+                                    .disabled(viewModel.statusBarLatencyWidth >= 200)
                                 }
-                                .pickerStyle(.segmented)
                                 .frame(width: 220, alignment: .trailing)
-                                .onChange(of: viewModel.statusBarFontWeight) { _, newValue in
-                                    LogManager.shared.info("Status bar font weight changed to \(newValue)")
-                                    viewModel.saveSettings()
+                            }
+                        }
+                        
+                        if viewModel.showLabelsInMenu {
+                            Divider()
+                            HStack {
+                                Text(languageManager.t("settings.label_width"))
+                                Spacer()
+                                HStack(spacing: 8) {
+                                    Button {
+                                        if viewModel.statusBarLabelWidth > 20 {
+                                            viewModel.statusBarLabelWidth -= 5
+                                            viewModel.saveSettings()
+                                        }
+                                    } label: { Image(systemName: "minus.circle").font(.system(size: 16)) }
+                                    .buttonStyle(.borderless)
+                                    .disabled(viewModel.statusBarLabelWidth <= 20)
+                                    
+                                    Text("\(viewModel.statusBarLabelWidth)")
+                                        .font(.system(.body, design: .monospaced))
+                                        .frame(width: 36, alignment: .center)
+                                    
+                                    Button {
+                                        if viewModel.statusBarLabelWidth < 200 {
+                                            viewModel.statusBarLabelWidth += 5
+                                            viewModel.saveSettings()
+                                        }
+                                    } label: { Image(systemName: "plus.circle").font(.system(size: 16)) }
+                                    .buttonStyle(.borderless)
+                                    .disabled(viewModel.statusBarLabelWidth >= 200)
                                 }
+                                .frame(width: 220, alignment: .trailing)
+                            }
+                        }
+                        
+                        if viewModel.showSpeedInMenu {
+                            Divider()
+                            HStack {
+                                Text(languageManager.t("settings.speed_width"))
+                                Spacer()
+                                HStack(spacing: 8) {
+                                    Button {
+                                        if viewModel.statusBarSpeedWidth > 40 {
+                                            viewModel.statusBarSpeedWidth -= 5
+                                            viewModel.saveSettings()
+                                        }
+                                    } label: { Image(systemName: "minus.circle").font(.system(size: 16)) }
+                                    .buttonStyle(.borderless)
+                                    .disabled(viewModel.statusBarSpeedWidth <= 40)
+                                    
+                                    Text("\(viewModel.statusBarSpeedWidth)")
+                                        .font(.system(.body, design: .monospaced))
+                                        .frame(width: 36, alignment: .center)
+                                    
+                                    Button {
+                                        if viewModel.statusBarSpeedWidth < 250 {
+                                            viewModel.statusBarSpeedWidth += 5
+                                            viewModel.saveSettings()
+                                        }
+                                    } label: { Image(systemName: "plus.circle").font(.system(size: 16)) }
+                                    .buttonStyle(.borderless)
+                                    .disabled(viewModel.statusBarSpeedWidth >= 250)
+                                }
+                                .frame(width: 220, alignment: .trailing)
+                            }
+                        }
+                        
+                        Divider()
+                        
+                        HStack {
+                            Text(languageManager.t("settings.font_size"))
+                            Spacer()
+                            HStack(spacing: 8) {
+                                Button {
+                                    if viewModel.statusBarFontSize > 6 {
+                                        viewModel.statusBarFontSize -= 1
+                                        viewModel.saveSettings()
+                                    }
+                                } label: { Image(systemName: "minus.circle").font(.system(size: 16)) }
+                                .buttonStyle(.borderless)
+                                .disabled(viewModel.statusBarFontSize <= 6)
+                                
+                                Text("\(viewModel.statusBarFontSize)")
+                                    .font(.system(.body, design: .monospaced))
+                                    .frame(width: 36, alignment: .center)
+                                
+                                Button {
+                                    if viewModel.statusBarFontSize < 18 {
+                                        viewModel.statusBarFontSize += 1
+                                        viewModel.saveSettings()
+                                    }
+                                } label: { Image(systemName: "plus.circle").font(.system(size: 16)) }
+                                .buttonStyle(.borderless)
+                                .disabled(viewModel.statusBarFontSize >= 18)
+                            }
+                            .frame(width: 220, alignment: .trailing)
+                        }
+                        
+                        Divider()
+                        
+                        HStack {
+                            Text(languageManager.t("settings.font_weight"))
+                            Spacer()
+                            Picker("", selection: $viewModel.statusBarFontWeight) {
+                                Text(languageManager.t("settings.font_weight.regular")).tag("regular")
+                                Text(languageManager.t("settings.font_weight.medium")).tag("medium")
+                                Text(languageManager.t("settings.font_weight.bold")).tag("bold")
+                            }
+                            .pickerStyle(.segmented)
+                            .frame(width: 220, alignment: .trailing)
+                            .onChange(of: viewModel.statusBarFontWeight) { _, newValue in
+                                LogManager.shared.info("Status bar font weight changed to \(newValue)")
+                                viewModel.saveSettings()
                             }
                         }
                         
