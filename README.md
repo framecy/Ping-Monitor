@@ -13,7 +13,7 @@
   <img src="https://img.shields.io/badge/platform-macOS%2014.0+-blue" alt="Platform">
   <img src="https://img.shields.io/badge/SwiftUI-6.0-orange" alt="SwiftUI">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/version-2.2.0-brightgreen" alt="Version">
+  <img src="https://img.shields.io/badge/version-2.2.1-brightgreen" alt="Version">
   <a href="https://github.com/framecy/Ping-Monitor/actions/workflows/ci.yml"><img src="https://github.com/framecy/Ping-Monitor/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
 </p>
 
@@ -152,6 +152,7 @@ cd Ping-Monitor
 
 | 版本 | 更新内容 |
 |------|---------|
+| **v2.2.1**<br>状态栏自定义宽度 | 重构状态栏（MenuBar）渲染架构：图标、延迟、规则标签、网速均使用独立且可自定义宽度的 [NSTextAttachment](apple-reference://NSTextAttachment) 渲染，从根本上解决网速/延迟文字变化导致状态栏宽度抖动挤压的问题；在设置界面提供 4 个组件的独立自定义宽度控制，并增加 Combine 属性变化订阅，实现设置更改在状态栏的**秒级实时更新响应**；优化停止监控及全部隐藏时的状态栏收缩排版，加入安全降级微圆点。 |
 | **v2.2.0**<br>质量引擎精化 | 修复 resolutionScore 上限不对称（85→100）；修复 <5 样本时 spikeRate 误报；提取 trendPoints 公共 helper 消除 ~80 行重复；趋势评分引入抖动惩罚项；新增 detectScoreDegradation()：分数跌破 40 触发 Critical、单批降幅 ≥20 触发 Warning；质量趋势卡片新增抖动趋势徽章；统计页新增 P99 延迟格；趋势折线颜色统一为固定 accentBlue |
 | **v2.1.2-R16**<br>Tailscale CGNAT 检测 | 100.64.0.0/10 地址段即时识别无需等待异步节点列表；匹配 PrimaryRoutes 广播子网路由内 IP；节点列表延迟加载后自动重启探针升级为 Tailscale Ping；切换 tailscale ping 为非 JSON 模式简化延迟解析 |
 | **v2.1.2-R14**<br>状态栏 & 网速稳定性 | 标签规则无匹配时显示 `●` 防止状态栏条目坍缩至零宽；并行执行 parseLsof + fetchProcessTraffic 将进程列表刷新耗时减半；新增 isFetchingStats 并发保护防止网速采集重叠；提取 aggregateTotals，修复睡眠唤醒基准重置（Bug #3）与流量计数器回绕（Bug #4）；NetworkSpeedManagerTests 34 个用例全部覆盖 |
