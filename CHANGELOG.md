@@ -4,6 +4,14 @@
 
 ---
 
+## [v2.2.2] - 2026-07-13 · macOS 26 (Tahoe) 兼容与菜单栏窗口修复
+
+### Fixed
+- **macOS 26/Tahoe 启动崩溃**：`startTCPProbe` 的 `DispatchSource` 定时器事件回调捕获了 `@MainActor` 隔离的 `self` 并在后台队列上执行；Swift 6 的执行器隔离前导代码在更严格的 Tahoe 运行时上触发 `_swift_task_checkIsolatedSwift → _dispatch_assert_queue_fail → SIGTRAP`，首个 TCP 探针 tick（`deadline: .now()`）一触发即崩。改为在主队列上驱动定时器，并以纯回调式（无 `Task.detached`/`await`）的 `measureTCPConnectLatency` 取代 `async` 版本；实际 TCP I/O 仍在 `NWConnection` 私有队列上运行，仅将结果回调写回 `pendingUpdatesBuffer`（`LockedArray` 自带锁，与 ICMP 路径 `parsePingLine` 同构的 off-actor 模式）。
+- **关闭窗口后无法从菜单栏重新打开**：`isReleasedWhenClosed = false` 令窗口被红按钮关闭后停留在「已关闭但未销毁」中间态，`isVisible` 语义破坏 `toggleWindow`；macOS 26 的 agent app 下 `makeKeyAndOrderFront` + `ignoringOtherApps:` 已无法可靠把窗口带回前台。新增 `windowShouldClose(_:)` 拦截红按钮关闭，改为 `orderOut(nil)` + `.accessory` 策略并返回 `false`，使窗口仅隐藏、与 toggle 保持对称；`showWindow()` 改用 `NSApp.activate()`（新激活语义）+ `orderFrontRegardless()` 兜底强制置前。
+
+---
+
 ## [v2.2.1] - 2026-06-10 · 状态栏自定义宽度
 
 ### Added

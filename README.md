@@ -13,7 +13,7 @@
   <img src="https://img.shields.io/badge/platform-macOS%2014.0+-blue" alt="Platform">
   <img src="https://img.shields.io/badge/SwiftUI-6.0-orange" alt="SwiftUI">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/version-2.2.1-brightgreen" alt="Version">
+  <img src="https://img.shields.io/badge/version-2.2.2-brightgreen" alt="Version">
   <a href="https://github.com/framecy/Ping-Monitor/actions/workflows/ci.yml"><img src="https://github.com/framecy/Ping-Monitor/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
 </p>
 
