@@ -1781,12 +1781,22 @@ class PingMonitorViewModel: ObservableObject {
         }
 
         let interval = max(pingInterval, 1.0)
-        let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.global(qos: .utility))
+        // Drive the tick on the main queue. The handler closure captures a main-actor
+        // `self`; on macOS 26+, Swift 6 inserts an executor-isolation prologue into that
+        // closure, so if it fires on a background queue the runtime traps
+        // (_swift_task_checkIsolatedSwift -> _dispatch_assert_queue_fail -> SIGTRAP).
+        // Running the handler on the main queue satisfies the assertion. The actual TCP
+        // I/O still runs off the main thread — measureTCPConnectLatency starts its
+        // NWConnection on a private serial queue and only surfaces the result via callback.
+        let timer = DispatchSource.makeTimerSource(queue: .main)
         timer.schedule(deadline: .now(), repeating: interval)
         timer.setEventHandler { [weak self] in
+            // Runs on the timer's queue (= main, see above). Kicks off the NWConnection
+            // probe and appends the result to pendingUpdatesBuffer (LockedArray, own lock,
+            // off-actor-safe like parsePingLine uses). No Swift Task hop anywhere on this
+            // path — keeping it callback-only avoids the macOS 26+ executor assertion.
             guard let self = self else { return }
-            Task.detached(priority: .utility) {
-                let result = await self.measureTCPConnectLatency(host: address, port: port, timeout: min(interval, 3.0))
+            measureTCPConnectLatency(host: address, port: port, timeout: min(interval, 3.0)) { result in
                 self.pendingUpdatesBuffer.append(
                     PendingUpdate(
                         hostId: hostId,
@@ -1808,48 +1818,56 @@ class PingMonitorViewModel: ObservableObject {
         LogManager.shared.info("Starting TCP probe: \(address):\(port)", host: hostName)
     }
 
-    nonisolated private func measureTCPConnectLatency(host: String, port: UInt16, timeout: TimeInterval) async -> TCPProbeResult {
-        await withCheckedContinuation { continuation in
-            let queue = DispatchQueue(label: "com.pingmonitor.tcp-probe.\(host).\(port)", qos: .utility)
-            let endpoint = NWEndpoint.Host(host)
-            guard let nwPort = NWEndpoint.Port(rawValue: port) else {
-                continuation.resume(returning: TCPProbeResult(latency: nil, failureReason: ProbeFailureReason(category: .processError, detail: "Invalid TCP port")))
-                return
-            }
-
-            let connection = NWConnection(host: endpoint, port: nwPort, using: .tcp)
-            let startedAt = DispatchTime.now()
-            let resolution = ProbeResolutionBox()
-            let failureBox = ProbeFailureBox()
-
-            let finish: @Sendable (TCPProbeResult) -> Void = { result in
-                guard resolution.tryResolve() else { return }
-                connection.cancel()
-                continuation.resume(returning: result)
-            }
-
-            connection.stateUpdateHandler = { state in
-                switch state {
-                case .ready:
-                    let elapsed = Double(DispatchTime.now().uptimeNanoseconds - startedAt.uptimeNanoseconds) / 1_000_000
-                    finish(TCPProbeResult(latency: elapsed, failureReason: nil))
-                case let .waiting(error):
-                    failureBox.set(Self.classifyTCPError(error))
-                case let .failed(error):
-                    finish(TCPProbeResult(latency: nil, failureReason: Self.classifyTCPError(error)))
-                case .cancelled:
-                    finish(TCPProbeResult(latency: nil, failureReason: failureBox.get() ?? ProbeFailureReason(category: .timeout, detail: nil)))
-                default:
-                    break
-                }
-            }
-
-            queue.asyncAfter(deadline: .now() + timeout) {
-                finish(TCPProbeResult(latency: nil, failureReason: failureBox.get() ?? ProbeFailureReason(category: .timeout, detail: nil)))
-            }
-
-            connection.start(queue: queue)
+    /// Measures a single TCP connect-probe latency. Callback-only (no `async`/`await`)
+    /// so it can be invoked directly from a background `DispatchSource` timer handler
+    /// without creating a Swift Task — see `startTCPProbe` for why that matters on
+    /// macOS 26+. `nonisolated`: touches no actor-isolated state, only NWConnection +
+    /// the `@unchecked Sendable` resolution/failure boxes.
+    nonisolated private func measureTCPConnectLatency(
+        host: String,
+        port: UInt16,
+        timeout: TimeInterval,
+        completion: @escaping @Sendable (TCPProbeResult) -> Void
+    ) {
+        let queue = DispatchQueue(label: "com.pingmonitor.tcp-probe.\(host).\(port)", qos: .utility)
+        let endpoint = NWEndpoint.Host(host)
+        guard let nwPort = NWEndpoint.Port(rawValue: port) else {
+            completion(TCPProbeResult(latency: nil, failureReason: ProbeFailureReason(category: .processError, detail: "Invalid TCP port")))
+            return
         }
+
+        let connection = NWConnection(host: endpoint, port: nwPort, using: .tcp)
+        let startedAt = DispatchTime.now()
+        let resolution = ProbeResolutionBox()
+        let failureBox = ProbeFailureBox()
+
+        let finish: @Sendable (TCPProbeResult) -> Void = { result in
+            guard resolution.tryResolve() else { return }
+            connection.cancel()
+            completion(result)
+        }
+
+        connection.stateUpdateHandler = { state in
+            switch state {
+            case .ready:
+                let elapsed = Double(DispatchTime.now().uptimeNanoseconds - startedAt.uptimeNanoseconds) / 1_000_000
+                finish(TCPProbeResult(latency: elapsed, failureReason: nil))
+            case let .waiting(error):
+                failureBox.set(Self.classifyTCPError(error))
+            case let .failed(error):
+                finish(TCPProbeResult(latency: nil, failureReason: Self.classifyTCPError(error)))
+            case .cancelled:
+                finish(TCPProbeResult(latency: nil, failureReason: failureBox.get() ?? ProbeFailureReason(category: .timeout, detail: nil)))
+            default:
+                break
+            }
+        }
+
+        queue.asyncAfter(deadline: .now() + timeout) {
+            finish(TCPProbeResult(latency: nil, failureReason: failureBox.get() ?? ProbeFailureReason(category: .timeout, detail: nil)))
+        }
+
+        connection.start(queue: queue)
     }
 
     nonisolated private func classifyFailureReason(from message: String) -> ProbeFailureReason? {
@@ -2645,19 +2663,38 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
     
     private func showWindow() {
         guard let window = mainWindow else { return }
-        
+
+        // .accessory apps don't bring windows to the foreground reliably; go .regular
+        // first so the window can become key/ordered-front at the proper window level.
         NSApp.setActivationPolicy(.regular)
-        
+
         // 如果窗口被最小化了，先恢复
         if window.isMiniaturized {
             window.deminiaturize(nil)
         }
-        
+
         window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        // macOS 26 (Tahoe) agent apps: the legacy `ignoringOtherApps:` activation no
+        // longer reliably raises the window above the frontmost app. `NSApp.activate()`
+        // uses the modern activation semantics (available macOS 14+, our deployment
+        // target) and `orderFrontRegardless()` is the hard fallback to force the window
+        // to the front even if we're not the active app yet.
+        NSApp.activate()
+        window.orderFrontRegardless()
     }
 
     // MARK: - NSWindowDelegate
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        // Intercept the red close button so the window hides instead of closing:
+        // `isReleasedWhenClosed = false` keeps a *closed* window in a half-alive state
+        // whose `isVisible` semantics break `toggleWindow` on macOS 26, making the app
+        // impossible to reopen from the menu bar. `orderOut(nil)` just hides it, so the
+        // window stays fully alive and the show/hide cycle stays symmetric.
+        sender.orderOut(nil)
+        NSApp.setActivationPolicy(.accessory)
+        return false
+    }
+
     func windowWillClose(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
     }
