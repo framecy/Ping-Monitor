@@ -54,19 +54,53 @@
         <!-- Timeline -->
         <div class="timeline" id="changelog-timeline">
 
-            <!-- v2.2.2 -->
-            <div class="timeline-item animate-fade-in" data-categories="fixed">
+            <!-- v2.3.0 -->
+            <div class="timeline-item animate-fade-in" data-categories="added,updated">
                 <div class="timeline-dot latest"></div>
                 <div class="timeline-card">
                     <div class="timeline-header" onclick="toggleTimeline(this)">
                         <div class="timeline-header-left">
-                            <span class="timeline-version">v2.2.2</span>
+                            <span class="timeline-version">v2.3.0</span>
                             <span class="timeline-badge">Latest</span>
-                            <span class="timeline-date">2026-07-13</span>
+                            <span class="timeline-date">2026-07-14</span>
                         </div>
                         <div class="timeline-toggle">▼</div>
                     </div>
                     <div class="timeline-body open">
+                        <div class="timeline-content">
+                            <div class="change-category" data-type="added">
+                                <div class="category-tag tag-added">Added</div>
+                                <ul class="change-list">
+                                    <li><strong>可调侧边栏</strong>：支持在 180–360 pt 范围内拖动调整宽度，并跨启动保留用户设置。</li>
+                                    <li><strong>Tailscale 功能开关</strong>：Tailscale 工具改为按需启用；仅在用户开启且本机 CLI 可用时显示相关入口。</li>
+                                    <li><strong>窗口尺寸保护</strong>：主窗口最小尺寸固定为 900 × 650，避免过度缩放破坏内容布局。</li>
+                                </ul>
+                            </div>
+                            <div class="change-category" data-type="updated">
+                                <div class="category-tag tag-updated">Updated</div>
+                                <ul class="change-list">
+                                    <li><strong>响应式仪表盘</strong>：质量卡片、统计页、主机详情与管理页面会根据可用宽度在双列和紧凑布局间自动切换。</li>
+                                    <li><strong>自适应主机健康表</strong>：宽屏显示六列指标，中等宽度显示三列，窄屏改用纵向关键指标布局。</li>
+                                    <li><strong>Traceroute 表格缩放</strong>：逐跳表格列宽随容器等比调整，减少窄窗口中的横向溢出。</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- v2.2.2 -->
+            <div class="timeline-item animate-fade-in" data-categories="fixed">
+                <div class="timeline-dot"></div>
+                <div class="timeline-card">
+                    <div class="timeline-header" onclick="toggleTimeline(this)">
+                        <div class="timeline-header-left">
+                            <span class="timeline-version">v2.2.2</span>
+                            <span class="timeline-date">2026-07-13</span>
+                        </div>
+                        <div class="timeline-toggle">▼</div>
+                    </div>
+                    <div class="timeline-body">
                         <div class="timeline-content">
                             <div class="change-category" data-type="fixed">
                                 <div class="category-tag tag-fixed">Fixed</div>
@@ -138,7 +172,7 @@
                         </div>
                         <div class="timeline-toggle">▼</div>
                     </div>
-                    <div class="timeline-body open">
+                    <div class="timeline-body">
                         <div class="timeline-content">
                             <div class="change-category" data-type="added">
                                 <div class="category-tag tag-added">Added</div>
