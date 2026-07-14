@@ -74,6 +74,10 @@ struct Theme {
         static let cardCornerRadius: CGFloat = 12
         static let cardPadding: CGFloat = 16
         static let gridSpacing: CGFloat = 16
+        // 自适应布局断点：detail 区宽度低于阈值时并排两列降为单列堆叠。
+        static let twoColumnMinWidth: CGFloat = 280
+        static let hostGridMinWidth: CGFloat = 260
+        static let narrowTableBreakpoint: CGFloat = 540
     }
 }
 

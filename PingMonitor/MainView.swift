@@ -64,16 +64,24 @@ struct MainView: View {
     @ObservedObject var viewModel: PingMonitorViewModel
     @State private var selectedItem: SidebarItem = .monitor
     @ObservedObject private var languageManager = LanguageManager.shared
+    // 固定默认宽度、可拖动调节、持久化；width 为硬约束，detail 内容无法反向挤压。
+    @AppStorage("pm.sidebarWidth") private var sidebarWidth: Double = 220
+    // Tailscale 功能总闸：关闭后隐藏侧边栏/header 入口；CLI 不可用且开启时仍不展示。
+    @AppStorage("pm.enableTailscale") private var enableTailscale: Bool = false
+    @State private var dragStartWidth: Double?
+
+    private var tailscaleVisible: Bool {
+        TailscaleManager.shared.isAvailable && enableTailscale
+    }
 
     var body: some View {
         HStack(spacing: 0) {
             SidebarView(selectedItem: $selectedItem)
-                .frame(width: 220)
+                .frame(width: sidebarWidth)
                 .background(Theme.Colors.sidebarBackground)
-            
-            Rectangle()
-                .fill(Theme.Colors.separator)
-                .frame(width: 1)
+
+            SidebarResizer(width: $sidebarWidth, dragStartWidth: $dragStartWidth)
+                .background(Theme.Colors.separator)
             
             VStack(spacing: 0) {
                 headerView
@@ -87,6 +95,12 @@ struct MainView: View {
         .onChange(of: languageManager.currentLanguage) { _, _ in
             viewModel.updateStatusBarDisplay()
             viewModel.syncToWidget()
+        }
+        .onChange(of: tailscaleVisible) { _, visible in
+            // Tailscale 不可见时，把残留在 .tailscale 的选中回退到监控页，避免高亮孤儿。
+            if !visible && selectedItem == .tailscale {
+                selectedItem = .monitor
+            }
         }
     }
     
@@ -103,7 +117,12 @@ struct MainView: View {
         case .netspeed:
             NetworkSpeedTab(viewModel: viewModel)
         case .tailscale:
-            TailscaleTab(viewModel: viewModel)
+            // 总闸关闭时（用户在设置页关掉、或残留选中 .tailscale）回退到监控页，不渲染 Tailscale。
+            if tailscaleVisible {
+                TailscaleTab(viewModel: viewModel)
+            } else {
+                MonitorTab(viewModel: viewModel)
+            }
         case .services:
             ServicesTab(viewModel: viewModel)
         case .hosts:
@@ -156,8 +175,10 @@ struct MainView: View {
             .buttonStyle(.plain)
             .help("Switch Language")
 
-            // Tailscale Quick Action
-            TailscaleQuickActionView()
+            // Tailscale Quick Action（功能总闸关闭时隐藏）
+            if tailscaleVisible {
+                TailscaleQuickActionView()
+            }
 
             Button(action: { viewModel.toggle() }) {
                 HStack(spacing: 6) {
@@ -189,6 +210,46 @@ struct MainView: View {
             )
         )
         .background(.ultraThinMaterial)
+    }
+}
+
+// MARK: - Sidebar Resizer
+// 可拖动的侧边栏分隔条：实时改变宽度并通过 @AppStorage 持久化。
+// 宽度被夹在 [180, 360]，避免过窄压坏内容或过宽挤占主区域。
+private struct SidebarResizer: View {
+    @Binding var width: Double
+    @Binding var dragStartWidth: Double?
+
+    private let minWidth: Double = 180
+    private let maxWidth: Double = 360
+
+    var body: some View {
+        Rectangle()
+            .fill(Color.clear)
+            .frame(width: 8)
+            .contentShape(Rectangle())
+            .onHover { hovering in
+                if hovering {
+                    NSCursor.resizeLeftRight.push()
+                } else {
+                    NSCursor.pop()
+                }
+            }
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        if dragStartWidth == nil {
+                            dragStartWidth = width
+                        }
+                        if let start = dragStartWidth {
+                            let candidate = start + value.translation.width
+                            width = min(maxWidth, max(minWidth, candidate))
+                        }
+                    }
+                    .onEnded { _ in
+                        dragStartWidth = nil
+                    }
+            )
     }
 }
 
@@ -448,7 +509,10 @@ struct StatisticsContentView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 18) {
-                HStack(alignment: .top, spacing: 18) {
+                LazyVGrid(
+                    columns: [GridItem(.adaptive(minimum: Theme.Layout.twoColumnMinWidth), spacing: 18)],
+                    spacing: 18
+                ) {
                     StatsQualityHeroCard(
                         targetName: targetName,
                         window: window,
@@ -463,7 +527,10 @@ struct StatisticsContentView: View {
                     StatsDimensionBreakdownCard(dimensions: dimensions)
                 }
 
-                HStack(alignment: .top, spacing: 18) {
+                LazyVGrid(
+                    columns: [GridItem(.adaptive(minimum: Theme.Layout.twoColumnMinWidth), spacing: 18)],
+                    spacing: 18
+                ) {
                     StatsQualityTrendCard(
                         trendPoints: trendPoints,
                         score: score,
@@ -475,7 +542,10 @@ struct StatisticsContentView: View {
 
                 StatsDimensionStandardsCard()
 
-                HStack(alignment: .top, spacing: 18) {
+                LazyVGrid(
+                    columns: [GridItem(.adaptive(minimum: Theme.Layout.twoColumnMinWidth), spacing: 18)],
+                    spacing: 18
+                ) {
                     StatsRawMetricsCard(
                         stats: aggregatedStats,
                         score: score,
@@ -992,7 +1062,7 @@ private struct StatsRawMetricsCard: View {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Theme.Colors.textPrimary)
 
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: 10)], spacing: 10) {
                     metricCard(label: languageManager.t("dashboard.quality_score"), value: "\(score)", color: scoreColor(score))
                     metricCard(label: languageManager.t("dashboard.p95_latency"), value: p95Latency.map { String(format: "%.0fms", $0) } ?? "—", color: Theme.Colors.accentBlue)
                     metricCard(label: "P99", value: p99Latency.map { String(format: "%.0fms", $0) } ?? "—", color: Theme.Colors.accentPurple)
@@ -1678,8 +1748,7 @@ struct HostsManagementView: View {
             } else {
                 ScrollView {
                     LazyVGrid(columns: [
-                        GridItem(.flexible(), spacing: 12),
-                        GridItem(.flexible(), spacing: 12)
+                        GridItem(.adaptive(minimum: Theme.Layout.hostGridMinWidth), spacing: 12)
                     ], spacing: 12) {
                         ForEach(viewModel.hosts) { host in
                             HostManagementCard(
@@ -1935,8 +2004,7 @@ struct PresetsManagementView: View {
             } else {
                 ScrollView {
                     LazyVGrid(columns: [
-                        GridItem(.flexible(), spacing: 12),
-                        GridItem(.flexible(), spacing: 12)
+                        GridItem(.adaptive(minimum: Theme.Layout.hostGridMinWidth), spacing: 12)
                     ], spacing: 12) {
                         ForEach(viewModel.presets) { preset in
                             PresetManagementCard(
@@ -2495,6 +2563,8 @@ struct LogFileDocument: FileDocument {
 struct SettingsTab: View {
     @ObservedObject var viewModel: PingMonitorViewModel
     @ObservedObject private var languageManager = LanguageManager.shared
+    // Tailscale 功能总闸：关闭后隐藏所有 Tailscale 入口；CLI 不可用且开关开启时仍不展示。
+    @AppStorage("pm.enableTailscale") private var enableTailscale: Bool = false
 
     var body: some View {
         ScrollView {
@@ -2543,6 +2613,11 @@ struct SettingsTab: View {
                             .onChange(of: viewModel.autoStart) { _, newValue in
                                 viewModel.toggleAutoStart(newValue)
                             }
+
+                        Divider()
+
+                        Toggle(languageManager.t("settings.tailscale"), isOn: $enableTailscale)
+                            .help(languageManager.t("settings.tailscale.help"))
                         
                         Divider()
                         

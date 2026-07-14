@@ -2639,6 +2639,12 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
         
         mainWindow?.title = "Ping Monitor"
         mainWindow?.contentView = NSHostingView(rootView: contentView)
+        // 窗口级最小尺寸：与 MainView 的 minWidth/minHeight(900×650) 对齐。
+        // 仅靠 SwiftUI 的 .frame(minWidth:) 不约束 NSWindow 标题栏拖拽缩小——
+        // 窗口会被拖到更小从而强制压缩 SwiftUI 视图，把侧边栏挤窄（统计页 Grid 不可压缩）。
+        // contentMinSize 让窗口本身不能再缩小，保证内容完整展示、侧边栏宽度不被挤压。
+        mainWindow?.contentMinSize = NSSize(width: 900, height: 650)
+        mainWindow?.minSize = NSSize(width: 900, height: 650)
         mainWindow?.center()
         mainWindow?.setFrameAutosaveName("PingMonitorMainWindow")
         

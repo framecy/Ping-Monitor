@@ -3,6 +3,12 @@ import SwiftUI
 struct SidebarView: View {
     @Binding var selectedItem: SidebarItem
     @ObservedObject private var languageManager = LanguageManager.shared
+    @AppStorage("pm.enableTailscale") private var enableTailscale: Bool = false
+
+    /// Tailscale 入口可见性总闸：CLI 可用且用户在设置页开启。
+    private var tailscaleVisible: Bool {
+        TailscaleManager.shared.isAvailable && enableTailscale
+    }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -35,7 +41,7 @@ struct SidebarView: View {
                     SidebarRow(item: .traceroute, selectedItem: $selectedItem, icon: SidebarItem.traceroute.icon, title: SidebarItem.traceroute.title)
                     SidebarRow(item: .netspeed, selectedItem: $selectedItem, icon: SidebarItem.netspeed.icon, title: SidebarItem.netspeed.title)
                     
-                    if TailscaleManager.shared.isAvailable {
+                    if tailscaleVisible {
                         SidebarRow(item: .tailscale, selectedItem: $selectedItem, icon: SidebarItem.tailscale.icon, title: SidebarItem.tailscale.title)
                     }
                     

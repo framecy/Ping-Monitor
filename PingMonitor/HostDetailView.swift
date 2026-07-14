@@ -72,16 +72,22 @@ struct HostDetailView: View {
             ScrollView {
                 VStack(spacing: 16) {
                     // Row 1: Status + Latency
-                    HStack(alignment: .top, spacing: 16) {
+                    LazyVGrid(
+                        columns: [GridItem(.adaptive(minimum: Theme.Layout.twoColumnMinWidth), spacing: 16)],
+                        spacing: 16
+                    ) {
                         statusCard
                         latencyStatsCard
                     }
-                    
+
                     // Row 2: Chart
                     latencyChartCard
-                    
+
                     // Row 3: Packet Stats + Traffic
-                    HStack(alignment: .top, spacing: 16) {
+                    LazyVGrid(
+                        columns: [GridItem(.adaptive(minimum: Theme.Layout.twoColumnMinWidth), spacing: 16)],
+                        spacing: 16
+                    ) {
                         packetStatsCard
                         trafficCard
                     }

@@ -1,11 +1,22 @@
 import SwiftUI
 import Charts
 
+// 读取 Dashboard 容器宽，用于在 2 列 Grid / 单列 VStack 间切换。
+private struct DetailWidthKey: PreferenceKey {
+    nonisolated(unsafe) static var defaultValue: CGFloat = 800
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        let n = nextValue()
+        if n > 0 { value = n }
+    }
+}
+
 struct DashboardView: View {
     @ObservedObject var viewModel: PingMonitorViewModel
     @StateObject private var speedManager = NetworkSpeedManager.shared
     @State private var selectedWindow: NetworkQualityWindow = .fiveMinutes
     @ObservedObject private var languageManager = LanguageManager.shared
+    // 容器宽下方按 2 列 Grid / 单列 VStack 切换；Grid 让同行卡等高(取最高内容高)，不塌不拉伸。
+    @State private var detailWidth: CGFloat = 800
 
     private var globalSnapshot: GlobalQualitySnapshot {
         viewModel.globalQualitySnapshot(window: selectedWindow)
@@ -15,38 +26,56 @@ struct DashboardView: View {
         viewModel.qualityTrend(window: selectedWindow)
     }
 
+    private var showsTwoColumns: Bool {
+        detailWidth >= Theme.Layout.twoColumnMinWidth * 2 + Theme.Layout.gridSpacing
+    }
+
     var body: some View {
         ScrollView {
-            Grid(horizontalSpacing: Theme.Layout.gridSpacing, verticalSpacing: Theme.Layout.gridSpacing) {
-                GridRow {
+            VStack(spacing: Theme.Layout.gridSpacing) {
+                if showsTwoColumns {
+                    // 每行独立 Grid：单 GridRow 2 个 cell → 列等分跟随窗口；cell maxHeight:.infinity 撑满行高实现同行等高。
+                    Grid(horizontalSpacing: Theme.Layout.gridSpacing, verticalSpacing: Theme.Layout.gridSpacing) {
+                        GridRow {
+                            QualityScoreCard(snapshot: globalSnapshot, selectedWindow: $selectedWindow)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            QualityDimensionsCard(snapshot: globalSnapshot)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        }
+                    }
+                    Grid(horizontalSpacing: Theme.Layout.gridSpacing, verticalSpacing: Theme.Layout.gridSpacing) {
+                        GridRow {
+                            QualityTrendCard(snapshot: globalSnapshot, trendPoints: trendPoints)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            RecentEventsCard(events: globalSnapshot.recentEvents)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        }
+                    }
+                } else {
                     QualityScoreCard(snapshot: globalSnapshot, selectedWindow: $selectedWindow)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .frame(maxWidth: .infinity)
                     QualityDimensionsCard(snapshot: globalSnapshot)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
-
-                GridRow {
+                        .frame(maxWidth: .infinity)
                     QualityTrendCard(snapshot: globalSnapshot, trendPoints: trendPoints)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .frame(maxWidth: .infinity)
                     RecentEventsCard(events: globalSnapshot.recentEvents)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .frame(maxWidth: .infinity)
                 }
 
-                GridRow {
-                    HostHealthCard(
-                        snapshots: globalSnapshot.worstHosts
-                    )
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    
-                    TrafficContextCard(
-                        speedManager: speedManager,
-                        snapshot: globalSnapshot
-                    )
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
+                // 长卡：整行全宽自然高度，无并排对手 → 不存在等高/重叠问题。
+                HostHealthCard(snapshots: globalSnapshot.worstHosts)
+                    .frame(maxWidth: .infinity)
+                TrafficContextCard(speedManager: speedManager, snapshot: globalSnapshot)
+                    .frame(maxWidth: .infinity)
             }
             .padding(Theme.Layout.cardPadding)
         }
+        .background(
+            GeometryReader { proxy in
+                Color.clear.preference(key: DetailWidthKey.self, value: proxy.size.width)
+            }
+        )
+        .onPreferenceChange(DetailWidthKey.self) { detailWidth = $0 }
         .background(Theme.Colors.background)
         .onAppear {
             speedManager.startMonitoring()
@@ -396,9 +425,19 @@ private struct RecentEventsCard: View {
     }
 }
 
+// 读取 HostHealthCard 表格区实际宽，用于按宽度降级列数（不阻塞内容高度）。
+private struct HostHealthTableWidthKey: PreferenceKey {
+    nonisolated(unsafe) static var defaultValue: CGFloat = 480
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        let n = nextValue()
+        if n > 0 { value = n }
+    }
+}
+
 private struct HostHealthCard: View {
     let snapshots: [HostQualitySnapshot]
     @ObservedObject private var languageManager = LanguageManager.shared
+    @State private var tableWidth: CGFloat = 480
 
     var body: some View {
         ModernCard {
@@ -411,39 +450,23 @@ private struct HostHealthCard: View {
                         .foregroundStyle(Theme.Colors.textSecondary)
                         .frame(maxWidth: .infinity, minHeight: 180, alignment: .leading)
                 } else {
+                    let mode = hostHealthDisplayMode(width: tableWidth)
                     VStack(spacing: 8) {
                         HStack(spacing: 10) {
-                            headerCell(languageManager.t("traceroute.ip"), width: 140, alignment: .leading)
-                            headerCell(languageManager.t("dashboard.quality_score"), width: 52, alignment: .trailing)
-                            headerCell(languageManager.t("dashboard.p95_latency"), width: 68, alignment: .trailing)
-                            headerCell(languageManager.t("host_detail.jitter"), width: 58, alignment: .trailing)
-                            headerCell(languageManager.t("stats.loss_rate"), width: 58, alignment: .trailing)
-                            headerCell(languageManager.t("host_detail.path"), width: 60, alignment: .trailing)
+                            headerCell(languageManager.t("traceroute.ip"), width: mode.ipWidth, alignment: .leading)
+                            headerCell(languageManager.t("dashboard.quality_score"), width: mode.scoreWidth, alignment: .trailing)
+                            if mode.showsP95 {
+                                headerCell(languageManager.t("dashboard.p95_latency"), width: mode.valueWidth, alignment: .trailing)
+                            }
+                            if mode.showsExtra {
+                                headerCell(languageManager.t("host_detail.jitter"), width: mode.valueWidth, alignment: .trailing)
+                                headerCell(languageManager.t("stats.loss_rate"), width: mode.valueWidth, alignment: .trailing)
+                                headerCell(languageManager.t("host_detail.path"), width: mode.valueWidth, alignment: .trailing)
+                            }
                         }
 
                         ForEach(snapshots) { snapshot in
-                            HStack(spacing: 10) {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(snapshot.hostName)
-                                        .font(.system(size: 12, weight: .semibold))
-                                        .foregroundStyle(Theme.Colors.textPrimary)
-                                        .lineLimit(1)
-                                    if let failure = snapshot.lastFailureText {
-                                        Text(failure)
-                                            .font(.system(size: 10))
-                                            .foregroundStyle(Theme.Colors.textTertiary)
-                                            .lineLimit(1)
-                                    }
-                                }
-                                .frame(width: 140, alignment: .leading)
-
-                                valueCell("\(snapshot.score)", width: 52, color: qualityColor(snapshot.score))
-                                valueCell(snapshot.p95Latency.map { String(format: "%.0f", $0) } ?? "—", width: 68, suffix: "ms")
-                                valueCell(String(format: "%.1f", snapshot.jitter), width: 58, suffix: "ms")
-                                valueCell(String(format: "%.1f", snapshot.packetLoss), width: 58, suffix: "%", color: snapshot.packetLoss > 3 ? Theme.Colors.accentRed : Theme.Colors.textPrimary)
-                                valueCell(pathLabel(snapshot.pathKind), width: 60, color: pathColor(snapshot.pathKind))
-                            }
-                            .padding(.vertical, 6)
+                            hostHealthRow(snapshot: snapshot, mode: mode)
 
                             if snapshot.id != snapshots.last?.id {
                                 Divider().opacity(0.08)
@@ -453,6 +476,12 @@ private struct HostHealthCard: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .background(
+                GeometryReader { proxy in
+                    Color.clear.preference(key: HostHealthTableWidthKey.self, value: proxy.size.width)
+                }
+            )
+            .onPreferenceChange(HostHealthTableWidthKey.self) { tableWidth = $0 }
         }
     }
 
@@ -469,6 +498,87 @@ private struct HostHealthCard: View {
             .foregroundStyle(color)
             .frame(width: width, alignment: .trailing)
             .lineLimit(1)
+    }
+
+    // 按可用宽度降级：≥480 六列 / 320..<480 三列(IP+score+p95) / <320 单列竖排。
+    private struct HostHealthDisplayMode: Equatable {
+        let ipWidth: CGFloat
+        let scoreWidth: CGFloat
+        let valueWidth: CGFloat
+        let showsP95: Bool
+        let showsExtra: Bool
+    }
+
+    private func hostHealthDisplayMode(width w: CGFloat) -> HostHealthDisplayMode {
+        let cellSpacing: CGFloat = 10
+        if w >= 480 {
+            // 六列(ip/score/p95/jitter/loss/path)：扣 5 个间距后按比例分配
+            let net = max(0, w - cellSpacing * 5)
+            return .init(ipWidth: net * 0.30, scoreWidth: net * 0.14, valueWidth: net * 0.14, showsP95: true, showsExtra: true)
+        } else if w >= 320 {
+            // 三列(ip/score/p95)：扣 2 个间距
+            let net = max(0, w - cellSpacing * 2)
+            return .init(ipWidth: net * 0.50, scoreWidth: net * 0.25, valueWidth: net * 0.25, showsP95: true, showsExtra: false)
+        } else {
+            return .init(ipWidth: w, scoreWidth: 0, valueWidth: 0, showsP95: false, showsExtra: false)
+        }
+    }
+
+    @ViewBuilder
+    private func hostHealthRow(snapshot: HostQualitySnapshot, mode: HostHealthDisplayMode) -> some View {
+        if !mode.showsP95 {
+            // 单列竖排：主机名 + 评分/指标堆叠
+            VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(snapshot.hostName)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Theme.Colors.textPrimary)
+                        .lineLimit(1)
+                    if let failure = snapshot.lastFailureText {
+                        Text(failure)
+                            .font(.system(size: 10))
+                            .foregroundStyle(Theme.Colors.textTertiary)
+                            .lineLimit(1)
+                    }
+                }
+                HStack(spacing: 12) {
+                    valueCell("\(snapshot.score)", width: 60, color: qualityColor(snapshot.score))
+                    valueCell(snapshot.p95Latency.map { String(format: "%.0f", $0) } ?? "—", width: 70, suffix: "ms")
+                    Text(pathLabel(snapshot.pathKind))
+                        .font(.system(size: 11))
+                        .foregroundStyle(pathColor(snapshot.pathKind))
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 6)
+        } else {
+            HStack(spacing: 10) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(snapshot.hostName)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Theme.Colors.textPrimary)
+                        .lineLimit(1)
+                    if let failure = snapshot.lastFailureText {
+                        Text(failure)
+                            .font(.system(size: 10))
+                            .foregroundStyle(Theme.Colors.textTertiary)
+                            .lineLimit(1)
+                    }
+                }
+                .frame(width: mode.ipWidth, alignment: .leading)
+
+                valueCell("\(snapshot.score)", width: mode.scoreWidth, color: qualityColor(snapshot.score))
+                if mode.showsP95 {
+                    valueCell(snapshot.p95Latency.map { String(format: "%.0f", $0) } ?? "—", width: mode.valueWidth, suffix: "ms")
+                }
+                if mode.showsExtra {
+                    valueCell(String(format: "%.1f", snapshot.jitter), width: mode.valueWidth, suffix: "ms")
+                    valueCell(String(format: "%.1f", snapshot.packetLoss), width: mode.valueWidth, suffix: "%", color: snapshot.packetLoss > 3 ? Theme.Colors.accentRed : Theme.Colors.textPrimary)
+                    valueCell(pathLabel(snapshot.pathKind), width: mode.valueWidth, color: pathColor(snapshot.pathKind))
+                }
+            }
+            .padding(.vertical, 6)
+        }
     }
 
     private func pathLabel(_ kind: ProbePathKind) -> String {

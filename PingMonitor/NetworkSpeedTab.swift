@@ -444,7 +444,7 @@ struct NetworkSpeedTab: View {
                         .foregroundStyle(.orange)
                 }
             }
-            .frame(minWidth: 150, alignment: .leading)
+            .frame(minWidth: 110, alignment: .leading)
             
             Spacer()
             

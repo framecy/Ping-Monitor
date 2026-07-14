@@ -5,6 +5,7 @@ struct TracerouteView: View {
     @StateObject private var manager = TracerouteManager()
     @State private var targetHost = ""
     @State private var showCopied = false
+    @State private var tableContentWidth: CGFloat = 640
     @ObservedObject private var languageManager = LanguageManager.shared
     
     var body: some View {
@@ -394,23 +395,24 @@ struct TracerouteView: View {
     // MARK: - Hop Table
     
     private var hopTableView: some View {
-        VStack(spacing: 0) {
+        let w = HopColumnWidths.scaled(total: max(0, tableContentWidth - 32))
+        return VStack(spacing: 0) {
             // Table header
             HStack(spacing: 0) {
                 Text("#")
-                    .frame(width: 40, alignment: .center)
+                    .frame(width: w.hop, alignment: .center)
                 Text(languageManager.t("traceroute.ip"))
-                    .frame(width: 200, alignment: .leading)
-                
+                    .frame(width: w.ip, alignment: .leading)
+
                 ForEach(0..<3, id: \.self) { i in
                     Text("\(languageManager.t("traceroute.latency")) \(i + 1)")
-                        .frame(width: 90, alignment: .trailing)
+                        .frame(width: w.latency, alignment: .trailing)
                 }
-                
+
                 Text(languageManager.t("traceroute.avg"))
-                    .frame(width: 70, alignment: .trailing)
+                    .frame(width: w.avg, alignment: .trailing)
                 Text(languageManager.t("traceroute.loss"))
-                    .frame(width: 60, alignment: .trailing)
+                    .frame(width: w.loss, alignment: .trailing)
                 Text("Location") // Note: should localize if possible, but hardcoded here if missing translation
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.leading, 8)
@@ -420,18 +422,18 @@ struct TracerouteView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
             .background(Theme.Colors.cardBackground.opacity(0.5))
-            
+
             Divider().opacity(0.3)
-            
+
             // Table rows
             ForEach(Array(manager.hops.enumerated()), id: \.element.id) { index, hop in
-                HopRowView(hop: hop, isEven: index % 2 == 0)
-                
+                HopRowView(hop: hop, isEven: index % 2 == 0, columnWidths: w)
+
                 if index < manager.hops.count - 1 {
                     Divider().opacity(0.15).padding(.horizontal, 16)
                 }
             }
-            
+
             // Loading indicator for running trace
             if manager.isRunning {
                 HStack(spacing: 8) {
@@ -446,6 +448,12 @@ struct TracerouteView: View {
                 .padding(.vertical, 12)
             }
         }
+        .background(
+            GeometryReader { proxy in
+                Color.clear.preference(key: HopTableWidthKey.self, value: proxy.size.width)
+            }
+        )
+        .onPreferenceChange(HopTableWidthKey.self) { tableContentWidth = $0 }
         .background(
             RoundedRectangle(cornerRadius: 12)
                 .fill(Theme.Colors.cardBackground)
@@ -571,9 +579,43 @@ struct TracerouteView: View {
 
 // MARK: - Subviews
 
+// 跳表列宽：原图固定列总宽 ~640pt。按容器宽等比缩放，避免窄屏横向溢出。
+// Location 列保持弹性（maxWidth:.infinity），不纳入缩放。
+struct HopColumnWidths {
+    let hop: CGFloat
+    let ip: CGFloat
+    let latency: CGFloat
+    let avg: CGFloat
+    let loss: CGFloat
+
+    // 原始固定列宽（不含 Location）：40 + 200 + 90×3 + 70 + 60 = 640
+    private static let baseTotal: CGFloat = 640
+
+    static func scaled(total: CGFloat) -> HopColumnWidths {
+        let s = max(0.55, total / baseTotal) // 不缩到 55% 以下，避免数字不可读
+        return .init(
+            hop: 40 * s,
+            ip: 200 * s,
+            latency: 90 * s,
+            avg: 70 * s,
+            loss: 60 * s
+        )
+    }
+}
+
+// 读取跳表实际渲染宽，用于按比例缩放列宽（不阻塞内容高度）。
+private struct HopTableWidthKey: PreferenceKey {
+    nonisolated(unsafe) static var defaultValue: CGFloat = 640
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        let n = nextValue()
+        if n > 0 { value = n }
+    }
+}
+
 struct HopRowView: View {
     let hop: TracerouteHop
     let isEven: Bool
+    var columnWidths: HopColumnWidths = .scaled(total: 640)
     @State private var isHovered = false
     
     var body: some View {
@@ -588,8 +630,8 @@ struct HopRowView: View {
                     .font(.system(size: 12, weight: .semibold, design: .monospaced))
                     .foregroundStyle(Theme.Colors.textPrimary)
             }
-            .frame(width: 40, alignment: .center)
-            
+            .frame(width: columnWidths.hop, alignment: .center)
+
             // Host / IP
             VStack(alignment: .leading, spacing: 2) {
                 if hop.isTimeout {
@@ -609,34 +651,34 @@ struct HopRowView: View {
                     }
                 }
             }
-            .frame(width: 200, alignment: .leading)
-            
+            .frame(width: columnWidths.ip, alignment: .leading)
+
             // Individual latencies
             ForEach(0..<3, id: \.self) { i in
                 if i < hop.latencies.count, let lat = hop.latencies[i] {
                     Text(String(format: "%.1f", lat))
                         .font(.system(size: 12, design: .monospaced))
                         .foregroundStyle(latencyColor(lat))
-                        .frame(width: 90, alignment: .trailing)
+                        .frame(width: columnWidths.latency, alignment: .trailing)
                 } else {
                     Text(i < hop.latencies.count ? "*" : "-")
                         .font(.system(size: 12, design: .monospaced))
                         .foregroundStyle(Theme.Colors.textTertiary)
-                        .frame(width: 90, alignment: .trailing)
+                        .frame(width: columnWidths.latency, alignment: .trailing)
                 }
             }
-            
+
             // Average
             Text(hop.formattedAvg)
                 .font(.system(size: 12, weight: .semibold, design: .monospaced))
                 .foregroundStyle(hop.latencyColor)
-                .frame(width: 70, alignment: .trailing)
-            
+                .frame(width: columnWidths.avg, alignment: .trailing)
+
             // Loss
             Text(hop.formattedLoss)
                 .font(.system(size: 12, weight: .medium, design: .monospaced))
                 .foregroundStyle(hop.packetLoss > 0 ? Theme.Colors.accentOrange : Theme.Colors.accentGreen)
-                .frame(width: 60, alignment: .trailing)
+                .frame(width: columnWidths.loss, alignment: .trailing)
                 
             // Location
             VStack(alignment: .leading, spacing: 2) {
