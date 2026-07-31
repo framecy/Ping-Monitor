@@ -468,7 +468,47 @@ body::after {
     animation: pulse 2.2s ease-in-out infinite;
 }
 
-.mockup-body { padding: 6px 0; }
+/* 侧边栏 + 列表两栏，还原当前 app 的实际形态 */
+.mockup-main { display: flex; align-items: stretch; }
+
+.mockup-sidebar {
+    flex: 0 0 84px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 6px;
+    border-right: 1px solid rgba(255,255,255,0.07);
+    background: rgba(255,255,255,0.018);
+}
+
+.ms-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 6px;
+    border-radius: 5px;
+    font-family: var(--font-sans);
+    font-size: 9.5px;
+    line-height: 1.2;
+    color: rgba(255,255,255,0.42);
+    white-space: nowrap;
+}
+
+.ms-item.active {
+    background: rgba(255,255,255,0.06);
+    color: rgba(255,255,255,0.82);
+}
+
+.ms-dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    opacity: 0.55;
+}
+
+.ms-item.active .ms-dot { opacity: 1; }
+
+.mockup-body { flex: 1; min-width: 0; padding: 6px 0; }
 
 .mockup-host {
     display: flex;
