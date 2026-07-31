@@ -6,16 +6,30 @@ struct TailscaleTab: View {
     @ObservedObject var viewModel: PingMonitorViewModel
     @ObservedObject private var tailscale = TailscaleManager.shared
     @ObservedObject private var languageManager = LanguageManager.shared
-    
+    /// 管理模式总闸，在设置页开启；关闭时清单是纯只读的。
+    @AppStorage("pm.tailscaleAdminMode") private var adminMode: Bool = false
+
+    @State private var confirmTarget: ConfirmTarget?
+    @State private var tagTarget: TailnetDevice?
+    @State private var tagDraft: String = ""
+
+    /// 破坏性动作的二次确认目标。
+    struct ConfirmTarget: Identifiable {
+        enum Kind { case deauthorize, delete }
+        let device: TailnetDevice
+        let kind: Kind
+        var id: String { device.id + String(describing: kind) }
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
                 // Status Card
                 statusCard
                 
-                // Exit Node Card
-                exitNodeCard
-                
+                // 全局监管清单（控制面）
+                tailnetInventoryCard
+
                 // NAT / Netcheck Card
                 netcheckCard
                 
@@ -39,212 +53,389 @@ struct TailscaleTab: View {
         .onAppear {
             tailscale.fetchStatus()
             tailscale.fetchNetcheck()
+            tailscale.refreshInventory()
+        }
+        .alert(item: $confirmTarget) { target in
+            switch target.kind {
+            case .deauthorize:
+                return Alert(
+                    title: Text(languageManager.t("tailscale.admin.confirm_deauthorize_title")),
+                    message: Text(String(format: languageManager.t("tailscale.admin.confirm_deauthorize_body"), target.device.hostname)),
+                    primaryButton: .destructive(Text(languageManager.t("tailscale.admin.deauthorize"))) {
+                        tailscale.perform(.authorize(false), on: target.device)
+                    },
+                    secondaryButton: .cancel(Text(languageManager.t("common.cancel")))
+                )
+            case .delete:
+                return Alert(
+                    title: Text(languageManager.t("tailscale.admin.confirm_delete_title")),
+                    message: Text(String(format: languageManager.t("tailscale.admin.confirm_delete_body"), target.device.hostname)),
+                    primaryButton: .destructive(Text(languageManager.t("tailscale.admin.delete"))) {
+                        tailscale.perform(.delete, on: target.device)
+                    },
+                    secondaryButton: .cancel(Text(languageManager.t("common.cancel")))
+                )
+            }
+        }
+        .sheet(item: $tagTarget) { device in
+            tagEditor(device)
         }
     }
+
+    // MARK: - 标签编辑
+
+    private func tagEditor(_ device: TailnetDevice) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(String(format: languageManager.t("tailscale.admin.edit_tags_title"), device.hostname))
+                .font(Theme.Fonts.ui(Theme.Fonts.Size.headline, weight: .semibold))
+
+            TextField("tag:server, tag:prod", text: $tagDraft)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 360)
+
+            HStack(alignment: .top, spacing: 6) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
+                    .foregroundStyle(Theme.Colors.accentOrange)
+                Text(languageManager.t("tailscale.admin.tags_note"))
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
+                    .foregroundStyle(Theme.Colors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(width: 360, alignment: .leading)
+
+            HStack {
+                Spacer()
+                Button(languageManager.t("common.cancel")) { tagTarget = nil }
+                Button(languageManager.t("common.save")) {
+                    let tags = tagDraft
+                        .components(separatedBy: ",")
+                        .map { $0.trimmingCharacters(in: .whitespaces) }
+                        .filter { !$0.isEmpty }
+                        // 控制面要求 tag 必须带 tag: 前缀，这里替用户补全。
+                        .map { $0.hasPrefix("tag:") ? $0 : "tag:\($0)" }
+                    tailscale.perform(.tags(tags), on: device)
+                    tagTarget = nil
+                }
+                .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(20)
+    }
     
-    // MARK: - Exit Node Card
-    
-    private var exitNodeCard: some View {
+    // MARK: - Tailnet Inventory Card（控制面全局监管）
+
+    private var monitoredAddresses: Set<String> {
+        Set(viewModel.hosts.map { $0.address })
+    }
+
+    private var tailnetInventoryCard: some View {
         ModernCard {
             VStack(alignment: .leading, spacing: 14) {
                 HStack {
-                    SectionHeader(title: "Exit Node", icon: "arrow.up.forward.app.fill")
+                    SectionHeader(title: languageManager.t("tailscale.inventory.title"), icon: "list.bullet.rectangle.portrait")
                     Spacer()
-                    
-                    Button(action: {
-                        tailscale.testAllExitNodesLatency()
-                    }) {
-                        HStack(spacing: 4) {
-                            if tailscale.isTestingExitNodes {
-                                ProgressView()
-                                    .controlSize(.small)
-                                    .scaleEffect(0.7)
-                            } else {
-                                Image(systemName: "bolt.fill")
-                                    .font(.system(size: 10))
-                            }
-                            Text("Test Latency")
-                                .font(Theme.Fonts.body(10))
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Theme.Colors.accentPurple.opacity(0.15))
-                        .cornerRadius(6)
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(tailscale.isTestingExitNodes || tailscale.availableExitNodes.isEmpty)
-                }
-                
-                // Current Exit Node
-                if let currentExit = tailscale.currentExitNode {
-                    HStack(spacing: 10) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 18))
-                            .foregroundStyle(.green)
-                        
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Current Exit Node")
-                                .font(Theme.Fonts.body(10))
-                                .foregroundStyle(Theme.Colors.textSecondary)
-                            Text(currentExit.hostname)
-                                .font(Theme.Fonts.display(14))
-                                .foregroundStyle(Theme.Colors.textPrimary)
-                        }
-                        
-                        Spacer()
-                        
-                        Button(action: {
-                            tailscale.disableExitNode()
-                        }) {
-                            Text("Disable")
-                                .font(Theme.Fonts.body(10))
-                                .foregroundStyle(.red)
+
+                    if tailscale.hasInventoryCredentials {
+                        Button(action: { tailscale.importAllOnlineDevices(into: viewModel) }) {
+                            Text(languageManager.t("tailscale.inventory.import_all_online"))
+                                .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
-                                .background(Color.red.opacity(0.1))
-                                .cornerRadius(4)
+                                .background(Theme.Colors.accentBlue.opacity(0.15))
+                                .foregroundStyle(Theme.Colors.accentBlue)
+                                .cornerRadius(Theme.Radius.sm)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(tailscale.tailnetDevices.isEmpty)
+
+                        Button(action: { tailscale.refreshInventory() }) {
+                            HStack(spacing: 4) {
+                                if tailscale.isFetchingInventory {
+                                    ProgressView().controlSize(.small).scaleEffect(0.7)
+                                } else {
+                                    Image(systemName: "arrow.clockwise").font(Theme.Fonts.icon(Theme.Fonts.Size.caption))
+                                }
+                                Text(languageManager.t("tailscale.refresh"))
+                                    .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Theme.Colors.cardBackground)
+                            .cornerRadius(Theme.Radius.sm)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: Theme.Radius.sm)
+                                    .stroke(Theme.Colors.cardBorder, lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(tailscale.isFetchingInventory)
+                    }
+                }
+
+                HStack(spacing: 6) {
+                    Text(languageManager.t("tailscale.inventory.subtitle"))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
+                        .foregroundStyle(Theme.Colors.textTertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if adminMode {
+                        Badge(text: languageManager.t("tailscale.admin.mode"), color: Theme.Colors.accentOrange)
+                    }
+                }
+
+                if let actionError = tailscale.lastActionError {
+                    HStack(spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(Theme.Fonts.icon(Theme.Fonts.Size.caption))
+                        Text(actionError)
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer()
+                        Button(action: { tailscale.lastActionError = nil }) {
+                            Image(systemName: "xmark")
+                                .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
                         }
                         .buttonStyle(.plain)
                     }
-                    .padding(10)
-                    .background(Color.green.opacity(0.05))
-                    .cornerRadius(8)
-                } else {
-                    HStack(spacing: 8) {
-                        Image(systemName: "xmark.circle")
-                            .font(.system(size: 14))
-                            .foregroundStyle(Theme.Colors.textTertiary)
-                        Text("No Exit Node active")
-                            .font(Theme.Fonts.body(12))
-                            .foregroundStyle(Theme.Colors.textSecondary)
-                    }
-                    .padding(10)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .foregroundStyle(Theme.Colors.accentRed)
+                    .padding(8)
+                    .background(Theme.Colors.accentRed.opacity(0.1))
+                    .cornerRadius(Theme.Radius.sm)
                 }
-                
-                Divider().opacity(0.15)
-                
-                // Available Exit Nodes
-                if tailscale.availableExitNodes.isEmpty {
-                    Text("No Exit Nodes available")
-                        .font(Theme.Fonts.body(11))
-                        .foregroundStyle(Theme.Colors.textTertiary)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.vertical, 8)
-                } else {
-                    Text("Available Exit Nodes (click to switch)")
-                        .font(Theme.Fonts.body(10))
-                        .foregroundStyle(Theme.Colors.textSecondary)
-                        .padding(.bottom, 4)
-                    
-                    ForEach(tailscale.availableExitNodes) { exitNode in
-                        exitNodeRow(exitNode)
-                        
-                        if exitNode.id != tailscale.availableExitNodes.last?.id {
-                            Divider().opacity(0.1)
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
-    private func exitNodeRow(_ exitNode: ExitNode) -> some View {
-        let isActive = tailscale.currentExitNode?.tailscaleIP == exitNode.node.tailscaleIP
-        let scoreColor: Color = {
-            switch exitNode.score {
-            case 80...100: return .green
-            case 60..<80: return Theme.Colors.accentOrange
-            default: return .red
-            }
-        }()
-        
-        return Button(action: {
-            if !isActive {
-                tailscale.switchExitNode(to: exitNode.node)
-            }
-        }) {
-            HStack(spacing: 10) {
-                Image(systemName: exitNode.node.osIcon)
-                    .font(.system(size: 14))
-                    .foregroundStyle(isActive ? .green : Theme.Colors.accentBlue)
-                    .frame(width: 24)
-                
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
-                        Text(exitNode.node.hostname)
-                            .font(Theme.Fonts.body(12))
-                            .foregroundStyle(isActive ? .green : Theme.Colors.textPrimary)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                        
-                        if isActive {
-                            Text("Active")
-                                .font(.system(size: 8, weight: .bold))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 4)
-                                .padding(.vertical, 1)
-                                .background(.green)
-                                .cornerRadius(3)
-                        }
-                    }
-                    
-                    Text(exitNode.node.tailscaleIP)
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(Theme.Colors.textTertiary)
-                }
-                
-                Spacer()
-                
-                // Score and Latency indicator
-                VStack(alignment: .trailing, spacing: 2) {
-                    if let _ = exitNode.latency {
-                        HStack(spacing: 4) {
-                            Text("Score: \(exitNode.score)")
-                                .font(.system(size: 9, weight: .bold))
-                                .foregroundStyle(scoreColor)
-                                .padding(.horizontal, 4)
-                                .padding(.vertical, 1)
-                                .background(scoreColor.opacity(0.1))
-                                .cornerRadius(3)
-                            
-                            HStack(spacing: 4) {
-                                Circle()
-                                    .fill(scoreColor)
-                                    .frame(width: 6, height: 6)
-                                Text(exitNode.latencyString)
-                                    .font(.system(size: 11, weight: .medium, design: .monospaced))
-                                    .foregroundStyle(scoreColor)
+
+                switch tailscale.inventoryState {
+                case .notConfigured:
+                    inventoryPlaceholder(
+                        icon: "key.slash",
+                        text: languageManager.t("tailscale.inventory.not_configured"),
+                        color: Theme.Colors.accentOrange
+                    )
+                case .failed(let message):
+                    inventoryPlaceholder(icon: "exclamationmark.triangle.fill", text: message, color: Theme.Colors.accentRed)
+                case .ok:
+                    if tailscale.tailnetDevices.isEmpty {
+                        inventoryPlaceholder(
+                            icon: "tray",
+                            text: languageManager.t("tailscale.inventory.empty"),
+                            color: Theme.Colors.textTertiary
+                        )
+                    } else {
+                        inventorySummaryRow
+                        Divider().opacity(0.15)
+                        ForEach(tailscale.tailnetDevices) { device in
+                            inventoryRow(device)
+                            if device.id != tailscale.tailnetDevices.last?.id {
+                                Divider().opacity(0.1)
                             }
                         }
-                        
-                        if let loss = exitNode.packetLoss, loss > 0 {
-                            Text("Loss: \(String(format: "%.1f%%", loss))")
-                                .font(.system(size: 8))
-                                .foregroundStyle(.red)
-                        }
-                    } else {
-                        Text("—")
-                            .font(.system(size: 11))
+                    }
+                }
+
+                if let synced = tailscale.lastInventorySync {
+                    Text("\(languageManager.t("tailscale.inventory.last_sync"))  \(synced.formatted(date: .omitted, time: .standard))")
+                        .font(Theme.Fonts.number(Theme.Fonts.Size.micro))
+                        .foregroundStyle(Theme.Colors.textTertiary)
+                }
+            }
+        }
+    }
+
+    private func inventoryPlaceholder(icon: String, text: String, color: Color) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(Theme.Fonts.icon(Theme.Fonts.Size.body))
+                .foregroundStyle(color)
+            Text(text)
+                .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
+                .foregroundStyle(Theme.Colors.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer()
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(color.opacity(0.08))
+        .cornerRadius(Theme.Radius.md)
+    }
+
+    private var inventorySummaryRow: some View {
+        let summary = tailscale.inventorySummary(monitoredAddresses: monitoredAddresses)
+        return HStack(spacing: 8) {
+            inventoryStat(languageManager.t("tailscale.inventory.total"), summary.total, Theme.Colors.accentBlue)
+            inventoryStat(languageManager.t("tailscale.online"), summary.online, Theme.Colors.accentGreen)
+            inventoryStat(languageManager.t("tailscale.inventory.monitored"), summary.monitored, Theme.Colors.accentPurple)
+            if summary.updateAvailable > 0 {
+                inventoryStat(languageManager.t("tailscale.inventory.update_available"), summary.updateAvailable, Theme.Colors.accentOrange)
+            }
+            if summary.keyExpiring > 0 {
+                inventoryStat(languageManager.t("tailscale.inventory.key_expiring"), summary.keyExpiring, Theme.Colors.accentOrange)
+            }
+            if summary.unauthorized > 0 {
+                inventoryStat(languageManager.t("tailscale.inventory.unauthorized"), summary.unauthorized, Theme.Colors.accentRed)
+            }
+            Spacer()
+        }
+    }
+
+    private func inventoryStat(_ label: String, _ value: Int, _ color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("\(value)")
+                .font(Theme.Fonts.ui(Theme.Fonts.Size.headline, weight: .semibold))
+                .foregroundStyle(color)
+            Text(label)
+                .font(Theme.Fonts.ui(Theme.Fonts.Size.micro))
+                .foregroundStyle(Theme.Colors.textTertiary)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(color.opacity(0.08))
+        .cornerRadius(Theme.Radius.sm)
+    }
+
+    private func inventoryRow(_ device: TailnetDevice) -> some View {
+        let isMonitored = monitoredAddresses.contains(device.tailscaleIP)
+        let localPath = tailscale.localNode(forIP: device.tailscaleIP)
+
+        return HStack(spacing: 10) {
+            Circle()
+                .fill(device.isOnline ? Theme.Colors.accentGreen : Theme.Colors.textTertiary)
+                .frame(width: 8, height: 8)
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(device.hostname)
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
+                        .foregroundStyle(Theme.Colors.textPrimary)
+                        .lineLimit(1)
+
+                    ForEach(device.tags, id: \.self) { tag in
+                        Badge(text: tag.replacingOccurrences(of: "tag:", with: ""), color: Theme.Colors.accentCyan)
+                    }
+                    if device.keyExpired {
+                        Badge(text: languageManager.t("tailscale.inventory.key_expired"), color: Theme.Colors.accentRed)
+                    } else if device.keyExpiringSoon {
+                        Badge(text: languageManager.t("tailscale.inventory.key_expiring"), color: Theme.Colors.accentOrange)
+                    }
+                    if !device.authorized {
+                        Badge(text: languageManager.t("tailscale.inventory.unauthorized"), color: Theme.Colors.accentRed)
+                    }
+                    if device.updateAvailable {
+                        Badge(text: languageManager.t("tailscale.inventory.update_available"), color: Theme.Colors.accentOrange)
+                    }
+                }
+
+                HStack(spacing: 8) {
+                    Text(device.tailscaleIP)
+                        .font(Theme.Fonts.number(Theme.Fonts.Size.caption))
+                        .foregroundStyle(Theme.Colors.textTertiary)
+                    Text(device.os)
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.micro))
+                        .foregroundStyle(Theme.Colors.textTertiary)
+                    if let localPath, localPath.connectionType != .unknown {
+                        Text(localPath.connectionType.rawValue)
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.micro))
+                            .foregroundStyle(localPath.connectionType == .p2p ? Theme.Colors.accentGreen : Theme.Colors.accentOrange)
+                    }
+                    if !device.isOnline, let lastSeen = device.lastSeen {
+                        Text("\(languageManager.t("tailscale.inventory.last_seen")) \(lastSeen.formatted(date: .abbreviated, time: .shortened))")
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.micro))
                             .foregroundStyle(Theme.Colors.textTertiary)
                     }
                 }
             }
-            .padding(.vertical, 6)
-            .padding(.horizontal, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(isActive ? Color.green.opacity(0.08) : Color.clear)
-            )
+
+            Spacer()
+
+            if isMonitored {
+                Text(languageManager.t("tailscale.already_monitored"))
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
+                    .foregroundStyle(Theme.Colors.accentGreen)
+            } else {
+                Button(action: { tailscale.importDevice(device, into: viewModel) }) {
+                    Text(languageManager.t("tailscale.import"))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Theme.Colors.accentBlue.opacity(0.15))
+                        .foregroundStyle(Theme.Colors.accentBlue)
+                        .cornerRadius(Theme.Radius.xs)
+                }
+                .buttonStyle(.plain)
+                .disabled(device.tailscaleIP.isEmpty)
+            }
+
+            if adminMode {
+                adminMenu(device)
+            }
         }
-        .buttonStyle(.plain)
-        .disabled(isActive)
+        .padding(.vertical, 6)
     }
-    
+
+    // MARK: - 管理动作（仅管理模式可见）
+
+    @ViewBuilder
+    private func adminMenu(_ device: TailnetDevice) -> some View {
+        if tailscale.pendingActionDeviceID == device.id {
+            ProgressView().controlSize(.small).scaleEffect(0.6).frame(width: 22)
+        } else {
+            Menu {
+                Button(device.authorized
+                       ? languageManager.t("tailscale.admin.deauthorize")
+                       : languageManager.t("tailscale.admin.authorize")) {
+                    if device.authorized {
+                        confirmTarget = ConfirmTarget(device: device, kind: .deauthorize)
+                    } else {
+                        tailscale.perform(.authorize(true), on: device)
+                    }
+                }
+
+                Button(device.keyExpiryDisabled
+                       ? languageManager.t("tailscale.admin.enable_key_expiry")
+                       : languageManager.t("tailscale.admin.disable_key_expiry")) {
+                    tailscale.perform(.keyExpiryDisabled(!device.keyExpiryDisabled), on: device)
+                }
+
+                if !device.advertisedRoutes.isEmpty {
+                    Menu(languageManager.t("tailscale.admin.routes")) {
+                        ForEach(device.advertisedRoutes, id: \.self) { route in
+                            let enabled = device.enabledRoutes.contains(route)
+                            Button {
+                                tailscale.toggleRoute(route, on: device)
+                            } label: {
+                                HStack {
+                                    Text(route == "0.0.0.0/0" || route == "::/0"
+                                         ? "\(route)  (\(languageManager.t("tailscale.admin.exit_route")))"
+                                         : route)
+                                    if enabled { Image(systemName: "checkmark") }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Button(languageManager.t("tailscale.admin.edit_tags")) {
+                    tagDraft = device.tags.joined(separator: ", ")
+                    tagTarget = device
+                }
+
+                Divider()
+
+                Button(languageManager.t("tailscale.admin.delete"), role: .destructive) {
+                    confirmTarget = ConfirmTarget(device: device, kind: .delete)
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+                    .font(Theme.Fonts.icon(Theme.Fonts.Size.callout))
+                    .foregroundStyle(Theme.Colors.textSecondary)
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .frame(width: 22)
+            .disabled(tailscale.pendingActionDeviceID != nil)
+        }
+    }
+
     // MARK: - Status Card
-    
-    // MARK: - Status Card
-    
+
     private var statusCard: some View {
         ModernCard {
             VStack(alignment: .leading, spacing: 16) {
@@ -262,18 +453,18 @@ struct TailscaleTab: View {
                                     .scaleEffect(0.7)
                             } else {
                                 Image(systemName: "arrow.clockwise")
-                                    .font(.system(size: 11, weight: .semibold))
+                                    .font(Theme.Fonts.icon(Theme.Fonts.Size.footnote, weight: .semibold))
                             }
                             Text(languageManager.t("tailscale.refresh"))
-                                .font(Theme.Fonts.body(11))
+                                .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                         }
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4)
                         .background(Theme.Colors.cardBackground)
-                        .cornerRadius(6)
+                        .cornerRadius(Theme.Radius.sm)
                         .overlay(
-                            RoundedRectangle(cornerRadius: 6)
-                                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                            RoundedRectangle(cornerRadius: Theme.Radius.sm)
+                                .stroke(Theme.Colors.cardBorder, lineWidth: 1)
                         )
                     }
                     .buttonStyle(.plain)
@@ -283,15 +474,15 @@ struct TailscaleTab: View {
                 HStack(spacing: 24) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(languageManager.t("tailscale.status"))
-                            .font(Theme.Fonts.body(10))
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                             .foregroundStyle(Theme.Colors.textSecondary)
                         HStack(spacing: 6) {
                             Circle()
-                                .fill(tailscale.isConnected ? Color.green : Color.red)
+                                .fill(tailscale.isConnected ? Theme.Colors.accentGreen : Theme.Colors.accentRed)
                                 .frame(width: 8, height: 8)
                             Text(tailscale.isConnected ? languageManager.t("tailscale.connected") : languageManager.t("tailscale.disconnected"))
-                                .font(Theme.Fonts.display(16))
-                                .foregroundStyle(tailscale.isConnected ? .green : .red)
+                                .font(Theme.Fonts.ui(Theme.Fonts.Size.headline, weight: .semibold))
+                                .foregroundStyle(tailscale.isConnected ? Theme.Colors.accentGreen : Theme.Colors.accentRed)
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.8)
                         }
@@ -301,10 +492,10 @@ struct TailscaleTab: View {
                     
                     VStack(alignment: .leading, spacing: 4) {
                         Text(languageManager.t("tailscale.my_ip"))
-                            .font(Theme.Fonts.body(10))
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                             .foregroundStyle(Theme.Colors.textSecondary)
                         Text(tailscale.selfIP.isEmpty ? "—" : tailscale.selfIP)
-                            .font(.system(size: 16, weight: .bold, design: .monospaced))
+                            .font(Theme.Fonts.number(Theme.Fonts.Size.headline, weight: .bold))
                             .foregroundStyle(Theme.Colors.accentBlue)
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
@@ -314,10 +505,10 @@ struct TailscaleTab: View {
                     
                     VStack(alignment: .leading, spacing: 4) {
                         Text(languageManager.t("tailscale.nodes"))
-                            .font(Theme.Fonts.body(10))
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                             .foregroundStyle(Theme.Colors.textSecondary)
                         Text("\(tailscale.nodes.count)")
-                            .font(Theme.Fonts.display(16))
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.headline, weight: .semibold))
                             .foregroundStyle(Theme.Colors.textPrimary)
                     }
                     
@@ -326,11 +517,11 @@ struct TailscaleTab: View {
                 
                 if let error = tailscale.lastError {
                     Text(error)
-                        .font(Theme.Fonts.body(11))
-                        .foregroundStyle(.red)
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
+                        .foregroundStyle(Theme.Colors.accentRed)
                         .padding(8)
-                        .background(Color.red.opacity(0.1))
-                        .cornerRadius(6)
+                        .background(Theme.Colors.accentRed.opacity(0.1))
+                        .cornerRadius(Theme.Radius.sm)
                 }
             }
         }
@@ -347,7 +538,6 @@ struct TailscaleTab: View {
                     CommandButton(title: "Status", icon: "terminal", action: { tailscale.fetchStatus() })
                     CommandButton(title: "Netcheck", icon: "shield.checkered", action: { tailscale.fetchNetcheck() })
                     CommandButton(title: "Ping All", icon: "waveform", action: { executeTailscale("ping --all") })
-                    CommandButton(title: "Reset Exit", icon: "arrow.uturn.backward.circle", action: { tailscale.disableExitNode() })
                 }
             }
         }
@@ -369,17 +559,17 @@ struct TailscaleTab: View {
             Button(action: action) {
                 VStack(spacing: 6) {
                     Image(systemName: icon)
-                        .font(.system(size: 14))
+                        .font(Theme.Fonts.icon(Theme.Fonts.Size.callout))
                     Text(title)
-                        .font(Theme.Fonts.body(10))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
                 .background(Theme.Colors.cardBackground)
-                .cornerRadius(8)
+                .cornerRadius(Theme.Radius.md)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: Theme.Radius.md)
+                        .stroke(Theme.Colors.cardBorder, lineWidth: 1)
                 )
             }
             .buttonStyle(.plain)
@@ -404,18 +594,18 @@ struct TailscaleTab: View {
                 // NAT Type (prominent)
                 HStack(spacing: 12) {
                     Image(systemName: natIcon)
-                        .font(.system(size: 22))
+                        .font(Theme.Fonts.icon(Theme.Fonts.Size.display))
                         .foregroundStyle(natColor)
                         .frame(width: 36, height: 36)
                         .background(natColor.opacity(0.12))
-                        .cornerRadius(8)
+                        .cornerRadius(Theme.Radius.md)
                     
                     VStack(alignment: .leading, spacing: 2) {
                         Text(languageManager.t("tailscale.nat_type"))
-                            .font(Theme.Fonts.body(10))
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                             .foregroundStyle(Theme.Colors.textSecondary)
                         Text(tailscale.natType)
-                            .font(Theme.Fonts.display(16))
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.headline, weight: .semibold))
                             .foregroundStyle(natColor)
                     }
                     
@@ -423,10 +613,10 @@ struct TailscaleTab: View {
                     
                     VStack(alignment: .trailing, spacing: 2) {
                         Text(languageManager.t("tailscale.preferred_derp"))
-                            .font(Theme.Fonts.body(10))
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                             .foregroundStyle(Theme.Colors.textSecondary)
                         Text(tailscale.preferredDERP)
-                            .font(Theme.Fonts.display(14))
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .semibold))
                             .foregroundStyle(Theme.Colors.accentBlue)
                     }
                 }
@@ -449,18 +639,18 @@ struct TailscaleTab: View {
                     HStack(spacing: 20) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Global IPv4")
-                                .font(Theme.Fonts.body(10))
+                                .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                                 .foregroundStyle(Theme.Colors.textSecondary)
                             Text(tailscale.globalIPv4)
-                                .font(.system(size: 12, design: .monospaced))
+                                .font(Theme.Fonts.number(Theme.Fonts.Size.body))
                                 .foregroundStyle(Theme.Colors.textPrimary)
                         }
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Global IPv6")
-                                .font(Theme.Fonts.body(10))
+                                .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                                 .foregroundStyle(Theme.Colors.textSecondary)
                             Text(tailscale.globalIPv6)
-                                .font(.system(size: 12, design: .monospaced))
+                                .font(Theme.Fonts.number(Theme.Fonts.Size.body))
                                 .foregroundStyle(Theme.Colors.textPrimary)
                                 .lineLimit(1)
                                 .truncationMode(.middle)
@@ -482,21 +672,21 @@ struct TailscaleTab: View {
                 ForEach(tailscale.regionLatencies.prefix(10)) { region in
                     HStack(spacing: 10) {
                         Text(region.regionName)
-                            .font(Theme.Fonts.body(12))
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
                             .foregroundStyle(Theme.Colors.textPrimary)
                             .frame(width: 120, alignment: .leading)
                         
                         GeometryReader { geo in
                             let maxLatency = tailscale.regionLatencies.map(\.latency).max() ?? 1
                             let ratio = min(region.latency / maxLatency, 1.0)
-                            RoundedRectangle(cornerRadius: 3)
+                            RoundedRectangle(cornerRadius: Theme.Radius.xs)
                                 .fill(latencyBarColor(region.latency))
                                 .frame(width: max(geo.size.width * ratio, 4))
                         }
                         .frame(height: 8)
                         
                         Text(String(format: "%.0fms", region.latency))
-                            .font(.system(size: 11, weight: .medium, design: .monospaced))
+                            .font(Theme.Fonts.number(Theme.Fonts.Size.footnote, weight: .medium))
                             .foregroundStyle(latencyBarColor(region.latency))
                             .frame(width: 55, alignment: .trailing)
                     }
@@ -511,20 +701,20 @@ struct TailscaleTab: View {
     private func protocolBadge(label: String, enabled: Bool, invertColor: Bool = false) -> some View {
         HStack(spacing: 6) {
             Circle()
-                .fill(invertColor ? (enabled ? Color.green : Color.red) : (enabled ? Color.green : Color.red.opacity(0.5)))
+                .fill(invertColor ? (enabled ? Theme.Colors.accentGreen : Theme.Colors.accentRed) : (enabled ? Theme.Colors.accentGreen : Theme.Colors.accentRed.opacity(0.5)))
                 .frame(width: 6, height: 6)
             Text(label)
-                .font(Theme.Fonts.body(11))
+                .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                 .foregroundStyle(Theme.Colors.textPrimary)
             Spacer()
             Text(enabled ? "✓" : "✗")
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(enabled ? Color.green : Color.red.opacity(0.6))
+                .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote, weight: .bold))
+                .foregroundStyle(enabled ? Theme.Colors.accentGreen : Theme.Colors.accentRed.opacity(0.6))
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(Theme.Colors.cardBackground)
-        .cornerRadius(6)
+        .cornerRadius(Theme.Radius.sm)
     }
     
     private var natIcon: String {
@@ -537,16 +727,14 @@ struct TailscaleTab: View {
     
     private var natColor: Color {
         switch tailscale.natType {
-        case "Easy NAT", "Full Cone NAT": return .green
+        case "Easy NAT", "Full Cone NAT": return Theme.Colors.accentGreen
         case "Symmetric NAT": return Theme.Colors.accentOrange
-        default: return .red
+        default: return Theme.Colors.accentRed
         }
     }
     
     private func latencyBarColor(_ ms: Double) -> Color {
-        if ms < 50 { return .green }
-        if ms < 150 { return Theme.Colors.accentOrange }
-        return .red
+        Theme.Status.latency(ms, .overlay)
     }
     
     private var healthAdviceCard: some View {
@@ -559,20 +747,20 @@ struct TailscaleTab: View {
                         ForEach(tailscale.healthAdvice, id: \.self) { advice in
                             HStack(alignment: .top, spacing: 8) {
                                 Image(systemName: "lightbulb.fill")
-                                    .font(.system(size: 12))
+                                    .font(Theme.Fonts.icon(Theme.Fonts.Size.body))
                                     .foregroundStyle(Theme.Colors.accentOrange)
                                     .padding(.top, 2)
                                 Text(advice)
-                                    .font(Theme.Fonts.body(11))
+                                    .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                                     .foregroundStyle(Theme.Colors.textPrimary)
                                     .fixedSize(horizontal: false, vertical: true)
                             }
                             .padding(10)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(Theme.Colors.cardBackground.opacity(0.5))
-                            .cornerRadius(8)
+                            .cornerRadius(Theme.Radius.md)
                             .overlay(
-                                RoundedRectangle(cornerRadius: 8)
+                                RoundedRectangle(cornerRadius: Theme.Radius.md)
                                     .stroke(Theme.Colors.accentOrange.opacity(0.2), lineWidth: 1)
                             )
                         }
@@ -586,7 +774,7 @@ struct TailscaleTab: View {
     private func connectionTypeBadge(_ type: TailscaleConnectionType) -> some View {
         let (color, icon): (Color, String) = {
             switch type {
-            case .p2p: return (.green, "bolt.fill")
+            case .p2p: return (Theme.Colors.accentGreen, "bolt.fill")
             case .relay: return (Theme.Colors.accentOrange, "arrow.triangle.2.circlepath")
             case .derp: return (Theme.Colors.accentPurple, "cloud.fill")
             case .unknown: return (Theme.Colors.textTertiary, "questionmark.circle")
@@ -595,15 +783,15 @@ struct TailscaleTab: View {
         
         HStack(spacing: 3) {
             Image(systemName: icon)
-                .font(.system(size: 8))
+                .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
             Text(type.rawValue)
-                .font(.system(size: 9, weight: .medium))
+                .font(Theme.Fonts.ui(Theme.Fonts.Size.micro, weight: .medium))
         }
         .foregroundStyle(color)
         .padding(.horizontal, 6)
         .padding(.vertical, 2)
         .background(color.opacity(0.12))
-        .cornerRadius(4)
+        .cornerRadius(Theme.Radius.xs)
     }
     
     // MARK: - Nodes Card
@@ -620,14 +808,14 @@ struct TailscaleTab: View {
                     }) {
                         HStack(spacing: 4) {
                             Image(systemName: "square.and.arrow.down.on.square")
-                                .font(.system(size: 10, weight: .semibold))
+                                .font(Theme.Fonts.icon(Theme.Fonts.Size.caption, weight: .semibold))
                             Text(languageManager.t("tailscale.import_all"))
-                                .font(Theme.Fonts.body(11))
+                                .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                         }
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4)
                         .background(Theme.Colors.accentBlue.opacity(0.15))
-                        .cornerRadius(6)
+                        .cornerRadius(Theme.Radius.sm)
                     }
                     .buttonStyle(.plain)
                 }
@@ -641,7 +829,7 @@ struct TailscaleTab: View {
                     }
                 } else if tailscale.nodes.isEmpty {
                     Text(languageManager.t("tailscale.not_available"))
-                        .font(Theme.Fonts.body(12))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
                         .foregroundStyle(Theme.Colors.textSecondary)
                         .frame(maxWidth: .infinity, alignment: .center)
                         .padding(.vertical, 30)
@@ -667,32 +855,32 @@ struct TailscaleTab: View {
         return VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 12) {
                 Image(systemName: node.osIcon)
-                    .font(.system(size: 16))
+                    .font(Theme.Fonts.icon(Theme.Fonts.Size.headline))
                     .foregroundStyle(node.online ? Theme.Colors.accentBlue : Theme.Colors.textTertiary)
                     .frame(width: 28)
                 
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
                         Text(node.hostname)
-                            .font(Theme.Fonts.display(13))
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .semibold))
                             .foregroundStyle(Theme.Colors.textPrimary)
                             .lineLimit(1)
                             .truncationMode(.tail)
                         
                         if node.isSelf {
                             Text(languageManager.t("tailscale.self"))
-                                .font(.system(size: 9, weight: .bold))
-                                .foregroundStyle(.white)
+                                .font(Theme.Fonts.ui(Theme.Fonts.Size.micro, weight: .bold))
+                                .foregroundStyle(Theme.Colors.onAccent)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
                                 .background(Theme.Colors.accentBlue)
-                                .cornerRadius(4)
+                                .cornerRadius(Theme.Radius.xs)
                                 .layoutPriority(1)
                         }
                     }
                     
                     Text(node.tailscaleIP)
-                        .font(.system(size: 11, design: .monospaced))
+                        .font(Theme.Fonts.number(Theme.Fonts.Size.footnote))
                         .foregroundStyle(Theme.Colors.textTertiary)
                 }
                 
@@ -701,11 +889,11 @@ struct TailscaleTab: View {
                 HStack(spacing: 6) {
                     HStack(spacing: 4) {
                         Circle()
-                            .fill(node.online ? Color.green : Color.red.opacity(0.5))
+                            .fill(node.online ? Theme.Colors.accentGreen : Theme.Colors.accentRed.opacity(0.5))
                             .frame(width: 6, height: 6)
                         Text(node.online ? languageManager.t("tailscale.online") : languageManager.t("tailscale.offline"))
-                            .font(Theme.Fonts.body(11))
-                            .foregroundStyle(node.online ? .green : Theme.Colors.textTertiary)
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
+                            .foregroundStyle(node.online ? Theme.Colors.accentGreen : Theme.Colors.textTertiary)
                             .lineLimit(1)
                             .layoutPriority(1)
                     }
@@ -727,7 +915,7 @@ struct TailscaleTab: View {
                                     .frame(width: 20)
                             } else {
                                 Image(systemName: "waveform.path.ecg")
-                                    .font(.system(size: 10))
+                                    .font(Theme.Fonts.icon(Theme.Fonts.Size.caption))
                                     .foregroundStyle(Theme.Colors.accentBlue)
                                     .frame(width: 20)
                             }
@@ -738,7 +926,7 @@ struct TailscaleTab: View {
                     
                     if node.exitNode || node.exitNodeOption {
                         Image(systemName: "arrow.up.right.circle.fill")
-                            .font(.system(size: 10))
+                            .font(Theme.Fonts.icon(Theme.Fonts.Size.caption))
                             .foregroundStyle(Theme.Colors.accentPurple)
                             .help(node.exitNode ? "Active Exit Node" : "Exit Node Available")
                     }
@@ -746,12 +934,12 @@ struct TailscaleTab: View {
                     if !node.isSelf {
                         if isMonitored {
                             Text(languageManager.t("tailscale.already_monitored"))
-                                .font(Theme.Fonts.body(10))
+                                .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                                 .foregroundStyle(Theme.Colors.textSecondary)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
                                 .background(Theme.Colors.cardBackground)
-                                .cornerRadius(4)
+                                .cornerRadius(Theme.Radius.xs)
                                 .layoutPriority(1)
                         } else {
                             Button(action: {
@@ -759,15 +947,15 @@ struct TailscaleTab: View {
                             }) {
                                 HStack(spacing: 4) {
                                     Image(systemName: "plus.circle.fill")
-                                        .font(.system(size: 10))
+                                        .font(Theme.Fonts.icon(Theme.Fonts.Size.caption))
                                     Text(languageManager.t("tailscale.import"))
-                                        .font(Theme.Fonts.body(10))
+                                        .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                                         .lineLimit(1)
                                 }
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
                                 .background(Theme.Colors.accentBlue.opacity(0.15))
-                                .cornerRadius(4)
+                                .cornerRadius(Theme.Radius.xs)
                             }
                             .buttonStyle(.plain)
                             .layoutPriority(1)
@@ -780,12 +968,12 @@ struct TailscaleTab: View {
                 HStack {
                     Spacer().frame(width: 40)
                     Text(result)
-                        .font(.system(size: 9, design: .monospaced))
-                        .foregroundStyle(result.contains("P2P") ? .green : (result.contains("Error") ? .red : Theme.Colors.accentOrange))
+                        .font(Theme.Fonts.number(Theme.Fonts.Size.micro))
+                        .foregroundStyle(result.contains("P2P") ? Theme.Colors.accentGreen : (result.contains("Error") ? Theme.Colors.accentRed : Theme.Colors.accentOrange))
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(Color.black.opacity(0.1))
-                        .cornerRadius(4)
+                        .cornerRadius(Theme.Radius.xs)
                     Spacer()
                 }
                 .padding(.top, -2)
