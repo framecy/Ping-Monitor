@@ -237,47 +237,66 @@ final class NetworkSpeedManagerTests: XCTestCase {
 
     // MARK: - aggregateTotals (Bug #1 fix)
 
-    func testAggregateTotals_AllUsesMaxOfPhysicalAndTunnel_VPNScenario() {
-        // Pure VPN: same user payload goes encrypted on en0 and decrypted on utun.
-        // physical_in ≈ tunnel_in (encryption adds a small overhead, modeled here
-        // as physical 1.05 MB vs tunnel 1.00 MB). max() ≈ physical avoids
-        // double-counting and matches what the user actually downloaded.
+    func testAggregateTotals_AllReportsCarrierRate_VPNScenario() {
+        // Pure VPN: the same user payload appears encrypted on en0 and decrypted
+        // on utun. "All" must report the carrier (en0) - the tunnel figure is the
+        // same bytes counted a second time one layer up.
         let interfaces: [NetworkInterfaceStats] = [
             speedStub(name: "en0", speedIn: 1_050_000, speedOut: 250_000),
             speedStub(name: "utun3", speedIn: 1_000_000, speedOut: 240_000),
         ]
         let totals = NetworkSpeedManager.aggregateTotals(from: interfaces, selection: "all")
-        XCTAssertEqual(totals.totalSpeedIn, 1_050_000, "max(en0=1.05M, utun3=1.0M)")
+        XCTAssertEqual(totals.totalSpeedIn, 1_050_000, "carrier rate, not carrier + tunnel")
         XCTAssertEqual(totals.totalSpeedOut, 250_000)
-        // Tunnel speeds are also exposed so the UI can show "of which X went via VPN":
+        // Tunnel speeds stay exposed so the UI can show "of which X went via VPN":
         XCTAssertEqual(totals.tunnelSpeedIn, 1_000_000)
         XCTAssertEqual(totals.tunnelSpeedOut, 240_000)
     }
 
-    func testAggregateTotals_AllReportsTunnelWhenPhysicalIsIdle() {
-        // The pre-fix bug. User has a Tailscale-only flow on utun, en0 is idle.
-        // Old behavior: total = 0 (only physical counted). New behavior: total = utun.
+    func testAggregateTotals_AllNeverExceedsPhysicalCarrier_StackedTunnels() {
+        // The reported bug. macOS keeps a dozen utun devices and chained
+        // encapsulation (VPN inside VPN, private relay) makes one payload show up
+        // on several of them. Summing tunnels produced a headline number several
+        // times the physical link rate - selecting en0 by hand was the only way to
+        // get a believable figure.
         let interfaces: [NetworkInterfaceStats] = [
-            speedStub(name: "en0", speedIn: 0, speedOut: 0),
-            speedStub(name: "utun3", speedIn: 5_000_000, speedOut: 1_000_000),
+            speedStub(name: "en0", speedIn: 5_700_000, speedOut: 5_600_000),
+            speedStub(name: "utun4", speedIn: 10_600_000, speedOut: 5_400_000),
+            speedStub(name: "utun9", speedIn: 10_700_000, speedOut: 5_400_000),
         ]
         let totals = NetworkSpeedManager.aggregateTotals(from: interfaces, selection: "all")
-        XCTAssertEqual(totals.totalSpeedIn, 5_000_000,
-                       "VPN-only traffic must surface in the headline number, not just in the tunnel breakout")
-        XCTAssertEqual(totals.totalSpeedOut, 1_000_000)
+        XCTAssertEqual(totals.totalSpeedIn, 5_700_000,
+                       "a tunnel cannot deliver more than the link that carries it")
+        XCTAssertEqual(totals.totalSpeedOut, 5_600_000)
+        XCTAssertEqual(totals.tunnelSpeedIn, 10_700_000,
+                       "tunnel breakout takes the busiest tunnel, never the sum of stacked ones")
+        XCTAssertEqual(totals.tunnelSpeedOut, 5_400_000)
     }
 
     func testAggregateTotals_AllSplitTunnelDoesNotDoubleCount() {
-        // Split tunnel: most traffic on en0, a smaller VPN flow on utun. The
-        // bug we want to *avoid* introducing is summing physical + tunnel and
-        // overcounting the VPN payload (which is already in en0's number).
+        // Split tunnel: most traffic on en0, a smaller VPN flow on utun. Summing
+        // physical + tunnel would overcount the VPN payload, which en0 already
+        // carries.
         let interfaces: [NetworkInterfaceStats] = [
             speedStub(name: "en0", speedIn: 5_000_000, speedOut: 1_000_000),
             speedStub(name: "utun3", speedIn: 500_000, speedOut: 100_000),
         ]
         let totals = NetworkSpeedManager.aggregateTotals(from: interfaces, selection: "all")
-        XCTAssertEqual(totals.totalSpeedIn, 5_000_000, "physical sum, since it's larger")
+        XCTAssertEqual(totals.totalSpeedIn, 5_000_000, "carrier only")
         XCTAssertEqual(totals.totalSpeedOut, 1_000_000)
+    }
+
+    func testAggregateTotals_AllPrefersDefaultRouteOverBusiestPhysical() {
+        // en0 holds the default route; en5 is a Thunderbolt bridge member that
+        // happens to be busier. The headline must follow the actual egress.
+        let interfaces: [NetworkInterfaceStats] = [
+            speedStub(name: "en0", speedIn: 1_000_000, speedOut: 200_000),
+            speedStub(name: "en5", speedIn: 9_000_000, speedOut: 800_000),
+        ]
+        let totals = NetworkSpeedManager.aggregateTotals(
+            from: interfaces, selection: "all", primaryInterface: "en0")
+        XCTAssertEqual(totals.totalSpeedIn, 1_000_000)
+        XCTAssertEqual(totals.totalSpeedOut, 200_000)
     }
 
     func testAggregateTotals_SpecificInterfaceSelection() {
@@ -298,7 +317,7 @@ final class NetworkSpeedManagerTests: XCTestCase {
             stub(name: "utun3", bytesIn: 9_000_000, bytesOut: 4_000_000),
         ]
         let totals = NetworkSpeedManager.aggregateTotals(from: interfaces, selection: "all")
-        XCTAssertEqual(totals.totalBytesIn, 1_000_000, "all-bytes uses physical sum, not max")
+        XCTAssertEqual(totals.totalBytesIn, 1_000_000, "all-bytes follows the carrier")
         XCTAssertEqual(totals.totalBytesOut, 500_000)
         XCTAssertEqual(totals.tunnelBytesIn, 9_000_000)
         XCTAssertEqual(totals.tunnelBytesOut, 4_000_000)
