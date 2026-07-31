@@ -53,56 +53,6 @@ struct TailscaleNode: Identifiable, Codable {
     }
 }
 
-// MARK: - Exit Node Model
-
-struct ExitNode: Identifiable {
-    var id: String { node.tailscaleIP }
-    let node: TailscaleNode
-    var latency: Double?  // average milliseconds, nil = not tested
-    var packetLoss: Double?  // percentage, nil = not tested
-    var jitter: Double? // stddev, nil = not tested
-    var isReachable: Bool = true
-    
-    var latencyString: String {
-        guard let lat = latency else { return "—" }
-        return String(format: "%.0fms", lat)
-    }
-    
-    var score: Int {
-        guard let lat = latency else { return 0 }
-        
-        // RTT score (40%)
-        let rttScore: Double
-        if lat < 30 { rttScore = 100 }
-        else if lat < 100 { rttScore = 80 }
-        else if lat < 200 { rttScore = 50 }
-        else { rttScore = 20 }
-        
-        // Packet Loss score (30%)
-        let loss = packetLoss ?? 0
-        let lossScore: Double
-        if loss == 0 { lossScore = 100 }
-        else if loss < 2 { lossScore = 70 }
-        else if loss < 5 { lossScore = 40 }
-        else { lossScore = 0 }
-        
-        // Jitter score (20%)
-        let jit = jitter ?? 0
-        let jitterScore: Double
-        if jit < 5 { jitterScore = 100 }
-        else if jit < 15 { jitterScore = 70 }
-        else if jit < 30 { jitterScore = 40 }
-        else { jitterScore = 10 }
-        
-        // Network Type score (10%)
-        // P2P = 100, Relay = 20
-        let typeScore: Double = node.connectionType == .p2p ? 100 : 20
-        
-        let totalScore = (rttScore * 0.4) + (lossScore * 0.3) + (jitterScore * 0.2) + (typeScore * 0.1)
-        return Int(totalScore)
-    }
-}
-
 // MARK: - Tailscale Status Response
 
 private struct TailscaleStatus: Codable {
@@ -202,11 +152,6 @@ class TailscaleManager: ObservableObject {
     @Published var isLoading = false
     @Published var lastError: String?
     
-    // Exit Node properties
-    @Published var currentExitNode: TailscaleNode? = nil
-    @Published var availableExitNodes: [ExitNode] = []
-    @Published var isTestingExitNodes = false
-    
     // Netcheck properties
     @Published var netcheckLoading = false
     @Published var natType: String = "—"
@@ -223,13 +168,31 @@ class TailscaleManager: ObservableObject {
     
     // Health Advice
     @Published var healthAdvice: [String] = []
-    
+
+    // MARK: 控制面（全局监管）状态
+    // 数据来自 Tailscale API，覆盖整个 tailnet；本机 CLI 只提供「本机视角」的路径信息。
+    @Published var tailnetDevices: [TailnetDevice] = []
+    @Published var inventoryState: InventoryState = .notConfigured
+    @Published var isFetchingInventory = false
+    @Published var lastInventorySync: Date?
+    /// 凭据是否就绪的缓存。视图里直接读钥匙串会造成每帧一次 Keychain 查询。
+    @Published private(set) var hasInventoryCredentials = false
+
+    enum InventoryState: Equatable {
+        case notConfigured          // 未填 OAuth client
+        case ok
+        case failed(String)         // 已本地化的错误文案
+    }
+
     public var cliPath: String?
-    
+
+    private var inventoryTimer: Timer?
+
     private init() {
         detectCLI()
+        refreshInventoryConfiguration()
     }
-    
+
     // MARK: - CLI Detection
     
     func detectCLI() {
@@ -398,8 +361,7 @@ class TailscaleManager: ObservableObject {
                     self.selfIP = selfIP
                     self.selfHostname = selfHostname
                     self.magicDNSSuffix = status.MagicDNSSuffix ?? ""
-                    self.nodes = parsedNodes
-                    self.updateExitNodeInfo()
+                    self.mergeLocalNodes(parsedNodes)
                 }
                 
             } catch {
@@ -440,116 +402,207 @@ class TailscaleManager: ObservableObject {
             importNode(node, into: viewModel)
         }
     }
-    
-    // MARK: - Exit Node Management
-    
-    private func updateExitNodeInfo() {
-        currentExitNode = nodes.first { $0.exitNode }
-        let optionNodes = nodes.filter { $0.exitNodeOption && $0.online && !$0.isSelf }
-        var updatedNodes: [ExitNode] = []
-        for node in optionNodes {
-            if let existing = availableExitNodes.first(where: { $0.node.tailscaleIP == node.tailscaleIP }) {
-                updatedNodes.append(ExitNode(
-                    node: node,
-                    latency: existing.latency,
-                    packetLoss: existing.packetLoss,
-                    isReachable: existing.isReachable
-                ))
-            } else {
-                updatedNodes.append(ExitNode(node: node, latency: nil, packetLoss: nil))
-            }
+
+    // MARK: - Tailnet Inventory (control plane)
+
+    /// 本机 CLI 拉到的节点列表落库；控制面清单独立存在，两者按 IP 关联。
+    private func mergeLocalNodes(_ parsed: [TailscaleNode]) {
+        nodes = parsed
+    }
+
+    /// 本机视角的节点信息（连接方式 / 收发字节），供控制面清单行做增强展示。
+    func localNode(forIP ip: String) -> TailscaleNode? {
+        nodes.first { $0.tailscaleIP == ip }
+    }
+
+    var isInventoryConfigured: Bool {
+        KeychainStore.has(.tailscaleOAuthClientID) && KeychainStore.has(.tailscaleOAuthClientSecret)
+    }
+
+    struct InventorySummary {
+        var total = 0
+        var online = 0
+        var updateAvailable = 0
+        var keyExpiring = 0
+        var unauthorized = 0
+        var monitored = 0
+    }
+
+    func inventorySummary(monitoredAddresses: Set<String>) -> InventorySummary {
+        var summary = InventorySummary()
+        summary.total = tailnetDevices.count
+        for device in tailnetDevices {
+            if device.isOnline { summary.online += 1 }
+            if device.updateAvailable { summary.updateAvailable += 1 }
+            if device.keyExpiringSoon || device.keyExpired { summary.keyExpiring += 1 }
+            if !device.authorized { summary.unauthorized += 1 }
+            if monitoredAddresses.contains(device.tailscaleIP) { summary.monitored += 1 }
         }
-        availableExitNodes = updatedNodes.sorted { a, b in
-            if a.latency != nil && b.latency != nil {
-                return a.latency! < b.latency!
+        return summary
+    }
+
+    /// 凭据变更 / 开关切换后调用：重置 token 缓存并重建轮询。
+    func refreshInventoryConfiguration() {
+        Task { await TailscaleAPIClient.shared.invalidateToken() }
+        hasInventoryCredentials = isInventoryConfigured
+
+        guard hasInventoryCredentials else {
+            stopInventoryPolling()
+            tailnetDevices = []
+            lastInventorySync = nil
+            inventoryState = .notConfigured
+            return
+        }
+
+        refreshInventory()
+        startInventoryPolling()
+    }
+
+    /// 主线程 Timer：避免后台 DispatchSource 回调捕获 @MainActor self
+    /// （见 CLAUDE.md 中 macOS 26 executor-isolation 的说明）。
+    private func startInventoryPolling() {
+        stopInventoryPolling()
+        let stored = UserDefaults.standard.double(forKey: "pm.tailscaleInventoryInterval")
+        let interval = stored >= 30 ? stored : 60
+        inventoryTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { _ in
+            Task { @MainActor in
+                TailscaleManager.shared.refreshInventory()
             }
-            if a.latency != nil { return true }
-            if b.latency != nil { return false }
-            return a.node.hostname < b.node.hostname
         }
     }
-    
-    nonisolated func testAllExitNodesLatency() {
-        Task { @MainActor in
-            guard !availableExitNodes.isEmpty else { return }
-            isTestingExitNodes = true
-            let nodesToTest = availableExitNodes
-            let results = await withTaskGroup(of: ExitNode.self) { group in
-                for exitNode in nodesToTest {
-                    group.addTask {
-                        let metrics = await self.pingNodeMetrics(exitNode.node.tailscaleIP, count: 5)
-                        return ExitNode(
-                            node: exitNode.node,
-                            latency: metrics.avg,
-                            packetLoss: metrics.loss,
-                            jitter: metrics.stddev,
-                            isReachable: metrics.avg != nil
-                        )
-                    }
+
+    private func stopInventoryPolling() {
+        inventoryTimer?.invalidate()
+        inventoryTimer = nil
+    }
+
+    func refreshInventory() {
+        guard isInventoryConfigured else {
+            inventoryState = .notConfigured
+            return
+        }
+        guard !isFetchingInventory else { return }
+        isFetchingInventory = true
+
+        Task {
+            do {
+                let devices = try await TailscaleAPIClient.shared.fetchDevices()
+                self.tailnetDevices = devices
+                self.lastInventorySync = Date()
+                self.inventoryState = .ok
+                self.isFetchingInventory = false
+            } catch let error as TailscaleAPIError {
+                self.inventoryState = .failed(Self.describe(error))
+                self.isFetchingInventory = false
+                LogManager.shared.warning("Tailnet inventory sync failed: \(error.rawDescription)")
+            } catch {
+                self.inventoryState = .failed(error.localizedDescription)
+                self.isFetchingInventory = false
+                LogManager.shared.warning("Tailnet inventory sync failed: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    static func describe(_ error: TailscaleAPIError) -> String {
+        if let key = error.localizationKey {
+            return LanguageManager.shared.t(key)
+        }
+        return error.rawDescription
+    }
+
+    // MARK: - 控制面写操作
+    //
+    // 改的是 tailnet 配置，不是本机路由 —— 依旧不承载任何 tailnet 流量。
+    // 所有动作完成后立即回拉清单，界面以服务端结果为准，不做乐观更新。
+
+    @Published var pendingActionDeviceID: String?
+    @Published var lastActionError: String?
+
+    enum DeviceAction {
+        case authorize(Bool)
+        case keyExpiryDisabled(Bool)
+        case tags([String])
+        case enabledRoutes([String])
+        case delete
+    }
+
+    func perform(_ action: DeviceAction, on device: TailnetDevice) {
+        guard pendingActionDeviceID == nil else { return }
+        pendingActionDeviceID = device.id
+        lastActionError = nil
+
+        Task {
+            do {
+                let client = TailscaleAPIClient.shared
+                switch action {
+                case .authorize(let value):
+                    try await client.setAuthorized(deviceID: device.id, authorized: value)
+                    LogManager.shared.info("Tailnet: \(value ? "authorized" : "deauthorized") \(device.hostname)")
+                case .keyExpiryDisabled(let value):
+                    try await client.setKeyExpiryDisabled(deviceID: device.id, disabled: value)
+                    LogManager.shared.info("Tailnet: key expiry \(value ? "disabled" : "enabled") for \(device.hostname)")
+                case .tags(let tags):
+                    try await client.setTags(deviceID: device.id, tags: tags)
+                    LogManager.shared.info("Tailnet: tags of \(device.hostname) set to \(tags.joined(separator: ","))")
+                case .enabledRoutes(let routes):
+                    try await client.setEnabledRoutes(deviceID: device.id, routes: routes)
+                    LogManager.shared.info("Tailnet: routes of \(device.hostname) set to \(routes.joined(separator: ","))")
+                case .delete:
+                    try await client.deleteDevice(deviceID: device.id)
+                    LogManager.shared.warning("Tailnet: deleted device \(device.hostname)")
                 }
-                var results: [ExitNode] = []
-                for await result in group { results.append(result) }
-                return results
+                pendingActionDeviceID = nil
+                refreshInventory()
+            } catch let error as TailscaleAPIError {
+                lastActionError = Self.describe(error)
+                pendingActionDeviceID = nil
+                LogManager.shared.error("Tailnet action failed on \(device.hostname): \(error.rawDescription)")
+            } catch {
+                lastActionError = error.localizedDescription
+                pendingActionDeviceID = nil
+                LogManager.shared.error("Tailnet action failed on \(device.hostname): \(error.localizedDescription)")
             }
-            availableExitNodes = results.sorted { a, b in
-                if a.score != b.score { return a.score > b.score }
-                if let al = a.latency, let bl = b.latency { return al < bl }
-                return a.node.hostname < b.node.hostname
-            }
-            isTestingExitNodes = false
         }
     }
-    
-    private struct PingMetrics {
-        var avg: Double?
-        var loss: Double?
-        var stddev: Double?
+
+    /// 切换单条路由的启用状态，按 routes 接口的全量覆盖语义拼出新集合。
+    func toggleRoute(_ route: String, on device: TailnetDevice) {
+        var routes = Set(device.enabledRoutes)
+        if routes.contains(route) {
+            routes.remove(route)
+        } else {
+            routes.insert(route)
+        }
+        perform(.enabledRoutes(Array(routes).sorted()), on: device)
     }
-    
-    private func pingNodeMetrics(_ ip: String, count: Int) async -> PingMetrics {
-        let process = Process()
-        let pipe = Pipe()
-        process.executableURL = URL(fileURLWithPath: "/sbin/ping")
-        process.arguments = ["-c", "\(count)", "-W", "2", ip]
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
-        var metrics = PingMetrics()
-        do {
-            try process.run()
-            process.waitUntilExit()
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            guard let output = String(data: data, encoding: .utf8) else { return metrics }
-            let lossPattern = #"([\d.]+)\% packet loss"#
-            if let regex = try? NSRegularExpression(pattern: lossPattern),
-               let match = regex.firstMatch(in: output, range: NSRange(output.startIndex..., in: output)),
-               let range = Range(match.range(at: 1), in: output) {
-                metrics.loss = Double(output[range])
-            }
-            let rttPattern = #"min/avg/max/stddev = ([\d.]+)/([\d.]+)/([\d.]+)/([\d.]+)"#
-            if let regex = try? NSRegularExpression(pattern: rttPattern),
-               let match = regex.firstMatch(in: output, range: NSRange(output.startIndex..., in: output)) {
-                if let avgRange = Range(match.range(at: 2), in: output) { metrics.avg = Double(output[avgRange]) }
-                if let stddevRange = Range(match.range(at: 4), in: output) { metrics.stddev = Double(output[stddevRange]) }
-            }
-            return metrics
-        } catch { return metrics }
-    }
-    
-    func switchExitNode(to node: TailscaleNode) {
-        Task {
-            await runTailscaleCommand(["set", "--exit-node="], background: true)
-            await runTailscaleCommand(["set", "--exit-node=\(node.tailscaleIP)"], background: true)
-            fetchStatus()
+
+    /// 把控制面设备导入监控列表；探测仍走本机已有的 Tailscale 数据面。
+    func importDevice(_ device: TailnetDevice, into viewModel: PingMonitorViewModel) {
+        let address = device.tailscaleIP
+        guard !address.isEmpty else { return }
+        guard !viewModel.hosts.contains(where: { $0.address == address }) else { return }
+
+        var newHost = HostConfig(name: device.hostname, address: address)
+        newHost.isTailscaleNode = true
+        newHost.tailscaleHostname = device.hostname
+        newHost.displayRules = []
+
+        viewModel.hosts.append(newHost)
+        viewModel.hostStats[newHost.id] = HostStats(hostId: newHost.id)
+        viewModel.saveSettings()
+
+        if viewModel.isRunning, let index = viewModel.hosts.firstIndex(where: { $0.id == newHost.id }) {
+            viewModel.startPingProcess(for: viewModel.hosts[index], at: index)
         }
     }
-    
-    func disableExitNode() {
-        Task {
-            await runTailscaleCommand(["set", "--exit-node="], background: true)
-            fetchStatus()
+
+    func importAllOnlineDevices(into viewModel: PingMonitorViewModel) {
+        // 跳过本机：ping 自己没有监控价值。
+        for device in tailnetDevices where device.isOnline && device.tailscaleIP != selfIP {
+            importDevice(device, into: viewModel)
         }
     }
-    
+
     // MARK: - Netcheck
     
     private let derpRegionNames: [String: String] = [

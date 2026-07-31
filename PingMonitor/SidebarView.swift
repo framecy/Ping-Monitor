@@ -4,10 +4,11 @@ struct SidebarView: View {
     @Binding var selectedItem: SidebarItem
     @ObservedObject private var languageManager = LanguageManager.shared
     @AppStorage("pm.enableTailscale") private var enableTailscale: Bool = false
+    @ObservedObject private var tailscale = TailscaleManager.shared
 
-    /// Tailscale 入口可见性总闸：CLI 可用且用户在设置页开启。
+    /// Tailscale 入口可见性总闸：用户在设置页开启，且「本机 CLI 可用」或「已配置控制面凭据」。
     private var tailscaleVisible: Bool {
-        TailscaleManager.shared.isAvailable && enableTailscale
+        (tailscale.isAvailable || tailscale.hasInventoryCredentials) && enableTailscale
     }
     
     var body: some View {
@@ -15,7 +16,7 @@ struct SidebarView: View {
             // App Branding
             HStack(spacing: 12) {
                 Image(systemName: "network.badge.shield.half.filled")
-                    .font(.system(size: 24))
+                    .font(Theme.Fonts.icon(Theme.Fonts.Size.display))
                     .foregroundStyle(
                         .linearGradient(
                             colors: [Theme.Colors.accentBlue, Theme.Colors.accentPurple],
@@ -25,7 +26,7 @@ struct SidebarView: View {
                     )
                 
                 Text("PingMonitor")
-                    .font(Theme.Fonts.display(18))
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.title, weight: .semibold))
                     .foregroundStyle(Theme.Colors.textPrimary)
                 
                 Spacer()
@@ -77,17 +78,17 @@ struct SidebarView: View {
                     VStack(alignment: .leading) {
                          let userName = NSFullUserName().isEmpty ? NSUserName() : NSFullUserName()
                          Text(userName)
-                            .font(Theme.Fonts.body(12))
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
                             .foregroundStyle(Theme.Colors.textPrimary)
                          if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String {
                              Text("v\(version)")
-                                 .font(Theme.Fonts.body(10))
+                                 .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                                  .foregroundStyle(Theme.Colors.textSecondary)
                          }
                     }
                     Spacer()
                     Image(systemName: "gear")
-                        .font(.system(size: 14))
+                        .font(Theme.Fonts.icon(Theme.Fonts.Size.callout))
                         .foregroundStyle(Theme.Colors.textSecondary)
                         .onTapGesture {
                             selectedItem = .settings
@@ -114,17 +115,17 @@ struct SidebarRow: View {
         Button(action: { selectedItem = item }) {
             HStack(spacing: 10) {
                 // Colored Bar Indicator
-                RoundedRectangle(cornerRadius: 2)
+                RoundedRectangle(cornerRadius: Theme.Radius.xs)
                     .fill(isSelected ? item.activeColor : Color.clear)
                     .frame(width: 4, height: 16)
                 
                 Image(systemName: icon)
-                    .font(.system(size: 14))
+                    .font(Theme.Fonts.icon(Theme.Fonts.Size.callout))
                     .foregroundStyle(isSelected ? item.activeColor : Theme.Colors.textSecondary)
                     .frame(width: 20)
                 
                 Text(title)
-                    .font(Theme.Fonts.body(13))
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.callout))
                     .foregroundStyle(isSelected ? Theme.Colors.textPrimary : Theme.Colors.textSecondary)
                 
                 Spacer()
@@ -134,7 +135,7 @@ struct SidebarRow: View {
             .background(
                 isSelected ? Theme.Colors.cardBackground : Color.clear
             )
-            .cornerRadius(8)
+            .cornerRadius(Theme.Radius.md)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -147,7 +148,7 @@ struct SidebarSectionHeader: View {
     var body: some View {
         HStack {
             Text(title)
-                .font(Theme.Fonts.body(10))
+                .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                 .foregroundStyle(Theme.Colors.textTertiary)
                 .textCase(.uppercase)
             Spacer()

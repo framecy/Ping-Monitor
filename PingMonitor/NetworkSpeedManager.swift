@@ -11,6 +11,33 @@ enum InterfaceRole {
     case virtual
 }
 
+/// 接口归类：用于分组展示，也决定谁参与总速率统计。
+enum InterfaceFamily: String, CaseIterable {
+    case wifi
+    case ethernet
+    case tunnel
+    case bridge
+    case airdrop
+    case management   // anpi* / vmenet* / vnic* 等系统内部口
+    case loopback
+    case other
+
+    var iconName: String {
+        switch self {
+        case .wifi: return "wifi"
+        case .ethernet: return "cable.connector"
+        case .tunnel: return "lock.shield"
+        case .bridge: return "arrow.triangle.branch"
+        case .airdrop: return "airplayaudio"
+        case .management: return "cpu"
+        case .loopback: return "arrow.triangle.2.circlepath"
+        case .other: return "network"
+        }
+    }
+
+    var localizationKey: String { "netspeed.family.\(rawValue)" }
+}
+
 struct NetworkInterfaceStats: Identifiable {
     let id: String  // interface name, e.g. "en0"
     var name: String
@@ -43,22 +70,28 @@ struct NetworkInterfaceStats: Identifiable {
         bytesIn > 0 || bytesOut > 0
     }
 
+    /// 接口族。注意判定顺序：`anpi*` 必须排在 `ap*` 之前，否则会被误判成 AP。
+    var family: InterfaceFamily {
+        let n = name.replacingOccurrences(of: "*", with: "")
+        if n.hasPrefix("utun") || n.hasPrefix("ipsec") { return .tunnel }
+        if n.hasPrefix("lo") { return .loopback }
+        if n.hasPrefix("awdl") || n.hasPrefix("llw") { return .airdrop }
+        // gif/stf 是 IPv6-over-IPv4 伪接口，归虚拟而非 tunnel ——
+        // tunnel 的速率会进「隧道流量」指标，那是给 VPN/Tailscale 看的。
+        if n.hasPrefix("bridge") || n.hasPrefix("gif") || n.hasPrefix("stf") { return .bridge }
+        // anpi = Apple Network Processor Interface，系统内部管理口，永远不该计入用户网速。
+        if n.hasPrefix("anpi") || n.hasPrefix("vmenet") || n.hasPrefix("vnic") || n.hasPrefix("ap") { return .management }
+        if n == "en0" { return .wifi }
+        if n.hasPrefix("en") { return .ethernet }
+        return .other
+    }
+
     var role: InterfaceRole {
-        switch name {
-        case let n where n.starts(with: "utun") || n.starts(with: "ipsec"):
-            return .tunnel
-        case let n where n.starts(with: "lo"):
-            return .loopback
-        case let n where
-            n.starts(with: "awdl") ||
-            n.starts(with: "llw") ||
-            n.starts(with: "gif") ||
-            n.starts(with: "stf") ||
-            n.starts(with: "bridge") ||
-            n.starts(with: "ap"):
-            return .virtual
-        default:
-            return .physical
+        switch family {
+        case .tunnel: return .tunnel
+        case .loopback: return .loopback
+        case .airdrop, .bridge, .management: return .virtual
+        case .wifi, .ethernet, .other: return .physical
         }
     }
 }
@@ -154,9 +187,13 @@ class NetworkSpeedManager: ObservableObject {
     @Published var processList: [ProcessSummary] = []
     @Published var isProcessMonitoring = false
     
+    /// 当前承载默认路由的接口（`route -n get default`），总速率只认它。
+    @Published private(set) var defaultRouteInterface: String?
+
     private var timer: Timer?
     private var snapshotTimer: Timer?
     private var processTimer: Timer?
+    private var routeTimer: Timer?
     private var previousStats: [String: (bytesIn: UInt64, bytesOut: UInt64)] = [:]
     private var previousTimestamp: Date?
     private var isFetchingStats = false
@@ -196,6 +233,55 @@ class NetworkSpeedManager: ObservableObject {
                 self?.saveTrafficSnapshot()
             }
         }
+        // 默认路由变化频率很低（切 Wi-Fi / 插网线），15s 一次足够，不必每秒开一个进程。
+        refreshDefaultRoute()
+        routeTimer = Timer.scheduledTimer(withTimeInterval: 15.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.refreshDefaultRoute()
+            }
+        }
+    }
+
+    private func refreshDefaultRoute() {
+        Task.detached(priority: .utility) { [weak self] in
+            let iface = Self.readDefaultRouteInterface()
+            await MainActor.run {
+                guard let self else { return }
+                if self.defaultRouteInterface != iface {
+                    LogManager.shared.info("Default route interface: \(iface ?? "none")")
+                    self.defaultRouteInterface = iface
+                }
+            }
+        }
+    }
+
+    nonisolated static func readDefaultRouteInterface() -> String? {
+        let process = Process()
+        let pipe = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/sbin/route")
+        process.arguments = ["-n", "get", "default"]
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+        do {
+            try process.run()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            guard let output = String(data: data, encoding: .utf8) else { return nil }
+            return parseDefaultRouteInterface(output)
+        } catch {
+            return nil
+        }
+    }
+
+    nonisolated static func parseDefaultRouteInterface(_ output: String) -> String? {
+        for line in output.components(separatedBy: "\n") {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard trimmed.hasPrefix("interface:") else { continue }
+            let value = trimmed.replacingOccurrences(of: "interface:", with: "")
+                .trimmingCharacters(in: .whitespaces)
+            return value.isEmpty ? nil : value
+        }
+        return nil
     }
     
     func setRefreshInterval(_ interval: TimeInterval) {
@@ -215,6 +301,8 @@ class NetworkSpeedManager: ObservableObject {
         timer = nil
         snapshotTimer?.invalidate()
         snapshotTimer = nil
+        routeTimer?.invalidate()
+        routeTimer = nil
         isMonitoring = false
         saveTrafficSnapshot() // Save final snapshot
     }
@@ -521,13 +609,27 @@ class NetworkSpeedManager: ObservableObject {
     /// Tunnel speeds/bytes are also returned separately for UI breakdowns.
     nonisolated static func aggregateTotals(
         from interfaces: [NetworkInterfaceStats],
-        selection: String
+        selection: String,
+        primaryInterface: String? = nil
     ) -> (totalSpeedIn: Double, totalSpeedOut: Double,
           totalBytesIn: UInt64, totalBytesOut: UInt64,
           tunnelSpeedIn: Double, tunnelSpeedOut: Double,
           tunnelBytesIn: UInt64, tunnelBytesOut: UInt64) {
-        let physical = interfaces.filter { $0.role == .physical }
         let tunnel = interfaces.filter { $0.role == .tunnel }
+
+        // 物理侧只统计「真正承载默认路由的那一个口」。
+        // 把所有 physical 求和会把 anpi*/en1..en8 这类内部口、桥接成员一起算进来，
+        // 同一份流量被重复计数，总速率因此虚高。
+        let candidates = interfaces.filter { $0.role == .physical }
+        let physical: [NetworkInterfaceStats]
+        if let primaryInterface, let primary = candidates.first(where: { $0.id == primaryInterface }) {
+            physical = [primary]
+        } else if let busiest = candidates.max(by: { ($0.speedIn + $0.speedOut) < ($1.speedIn + $1.speedOut) }) {
+            // 拿不到默认路由（断网 / route 不可用）时退化为速率最高的物理口。
+            physical = [busiest]
+        } else {
+            physical = []
+        }
 
         let physSpeedIn  = physical.reduce(0) { $0 + $1.speedIn }
         let physSpeedOut = physical.reduce(0) { $0 + $1.speedOut }
@@ -612,7 +714,11 @@ class NetworkSpeedManager: ObservableObject {
                         return a.displayName < b.displayName
                     }
 
-                    let totals = Self.aggregateTotals(from: self.interfaces, selection: self.selectedInterface)
+                    let totals = Self.aggregateTotals(
+                        from: self.interfaces,
+                        selection: self.selectedInterface,
+                        primaryInterface: self.defaultRouteInterface
+                    )
                     self.totalSpeedIn = totals.totalSpeedIn
                     self.totalSpeedOut = totals.totalSpeedOut
                     self.totalBytesIn = totals.totalBytesIn

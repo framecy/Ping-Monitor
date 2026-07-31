@@ -104,7 +104,7 @@ struct HostDetailView: View {
                             viewModel.resetStats(for: host.id)
                         }
                         .buttonStyle(.bordered)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Theme.Colors.accentRed)
                     }
                     
                     // Row 5: Display Rules
@@ -168,9 +168,9 @@ struct HostDetailView: View {
             Button(action: onClose) {
                 HStack(spacing: 6) {
                     Image(systemName: "chevron.left")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(Theme.Fonts.icon(Theme.Fonts.Size.body, weight: .semibold))
                     Text(languageManager.t("monitor.title"))
-                        .font(.system(size: 13, weight: .medium))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .medium))
                 }
                 .foregroundStyle(Theme.Colors.accentBlue)
             }
@@ -182,16 +182,16 @@ struct HostDetailView: View {
             
             // Host indicator
             Circle()
-                .fill(currentHost?.isReachable == true ? Color.green : Color.red.opacity(0.6))
+                .fill(currentHost?.isReachable == true ? Theme.Colors.accentGreen : Theme.Colors.accentRed.opacity(0.6))
                 .frame(width: 8, height: 8)
-                .shadow(color: currentHost?.isReachable == true ? .green.opacity(0.5) : .clear, radius: 4)
+                .shadow(color: currentHost?.isReachable == true ? Theme.Colors.accentGreen.opacity(0.5) : .clear, radius: 4)
             
             VStack(alignment: .leading, spacing: 1) {
                 Text(host.name)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .semibold))
                     .foregroundStyle(Theme.Colors.textPrimary)
                 Text(host.address)
-                    .font(.system(size: 11, design: .monospaced))
+                    .font(Theme.Fonts.number(Theme.Fonts.Size.footnote))
                     .foregroundStyle(Theme.Colors.textTertiary)
             }
             
@@ -204,13 +204,13 @@ struct HostDetailView: View {
                         .fill(latencyColor(latency))
                         .frame(width: 6, height: 6)
                     Text("\(Int(latency)) ms")
-                        .font(.system(size: 16, weight: .bold, design: .monospaced))
+                        .font(Theme.Fonts.number(Theme.Fonts.Size.headline, weight: .bold))
                         .foregroundStyle(latencyColor(latency))
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 6)
                 .background(
-                    RoundedRectangle(cornerRadius: 8)
+                    RoundedRectangle(cornerRadius: Theme.Radius.md)
                         .fill(latencyColor(latency).opacity(0.1))
                 )
             } else if currentHost?.isChecking == true {
@@ -219,7 +219,7 @@ struct HostDetailView: View {
                         .controlSize(.small)
                         .scaleEffect(0.7)
                     Text(languageManager.t("host_detail.checking"))
-                        .font(.system(size: 12))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
                         .foregroundStyle(Theme.Colors.textSecondary)
                 }
             }
@@ -238,7 +238,7 @@ struct HostDetailView: View {
                     Image(systemName: "antenna.radiowaves.left.and.right")
                         .foregroundStyle(Theme.Colors.accentBlue)
                     Text(languageManager.t("host_detail.connection_status"))
-                        .font(Theme.Fonts.display(14))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .semibold))
                         .foregroundStyle(Theme.Colors.textPrimary)
                     Spacer()
                 }
@@ -246,15 +246,15 @@ struct HostDetailView: View {
                 HStack(spacing: 20) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(languageManager.t("host_detail.status"))
-                            .font(Theme.Fonts.body(10))
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                             .foregroundStyle(Theme.Colors.textSecondary)
                         HStack(spacing: 6) {
                             Circle()
-                                .fill(currentHost?.isReachable == true ? Color.green : Color.red)
+                                .fill(currentHost?.isReachable == true ? Theme.Colors.accentGreen : Theme.Colors.accentRed)
                                 .frame(width: 10, height: 10)
                             Text(currentHost?.isReachable == true ? languageManager.t("host_detail.online") : languageManager.t("host_detail.offline"))
-                                .font(Theme.Fonts.display(18))
-                                .foregroundStyle(currentHost?.isReachable == true ? .green : .red)
+                                .font(Theme.Fonts.ui(Theme.Fonts.Size.title, weight: .semibold))
+                                .foregroundStyle(currentHost?.isReachable == true ? Theme.Colors.accentGreen : Theme.Colors.accentRed)
                         }
                     }
                     
@@ -262,15 +262,15 @@ struct HostDetailView: View {
                     
                     VStack(alignment: .leading, spacing: 4) {
                         Text(languageManager.t("host_detail.uptime"))
-                            .font(Theme.Fonts.body(10))
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                             .foregroundStyle(Theme.Colors.textSecondary)
                         if let stats = stats {
                             Text(formatDuration(from: stats.startTime))
-                                .font(Theme.Fonts.display(18))
+                                .font(Theme.Fonts.ui(Theme.Fonts.Size.title, weight: .semibold))
                                 .foregroundStyle(Theme.Colors.accentBlue)
                         } else {
                             Text("--")
-                                .font(Theme.Fonts.display(18))
+                                .font(Theme.Fonts.ui(Theme.Fonts.Size.title, weight: .semibold))
                                 .foregroundStyle(Theme.Colors.textTertiary)
                         }
                     }
@@ -335,16 +335,16 @@ struct HostDetailView: View {
     private func diagnosticInfoRow(title: String, icon: String, text: String, color: Color) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(title)
-                .font(Theme.Fonts.body(10))
+                .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                 .foregroundStyle(Theme.Colors.textSecondary)
                 .frame(width: 72, alignment: .leading)
 
             HStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(.system(size: 10))
+                    .font(Theme.Fonts.icon(Theme.Fonts.Size.caption))
                     .foregroundStyle(color)
                 Text(text)
-                    .font(.system(size: 11, design: .monospaced))
+                    .font(Theme.Fonts.number(Theme.Fonts.Size.footnote))
                     .foregroundStyle(color)
                     .lineLimit(1)
             }
@@ -360,7 +360,7 @@ struct HostDetailView: View {
                     Image(systemName: "gauge.with.dots.needle.67percent")
                         .foregroundStyle(Theme.Colors.accentGreen)
                     Text(languageManager.t("host_detail.latency_stats"))
-                        .font(Theme.Fonts.display(14))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .semibold))
                         .foregroundStyle(Theme.Colors.textPrimary)
                     Spacer()
                 }
@@ -375,13 +375,13 @@ struct HostDetailView: View {
                     DetailStatItem(
                         label: languageManager.t("host_detail.min"),
                         value: stats?.minLatency != nil ? String(format: "%.1f ms", stats!.minLatency!) : "--",
-                        color: .green
+                        color: Theme.Colors.accentGreen
                     )
                     Divider().frame(height: 30).padding(.horizontal, 8).opacity(0.3)
                     DetailStatItem(
                         label: languageManager.t("host_detail.max"),
                         value: stats?.maxLatency != nil ? String(format: "%.1f ms", stats!.maxLatency!) : "--",
-                        color: .red
+                        color: Theme.Colors.accentRed
                     )
                     Divider().frame(height: 30).padding(.horizontal, 8).opacity(0.3)
                     DetailStatItem(
@@ -397,10 +397,10 @@ struct HostDetailView: View {
                 if let min = stats?.minLatency, let max = stats?.maxLatency {
                     HStack(spacing: 6) {
                         Text(languageManager.t("host_detail.jitter"))
-                            .font(Theme.Fonts.body(10))
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                             .foregroundStyle(Theme.Colors.textSecondary)
                         Text(String(format: "%.1f ms", max - min))
-                            .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                            .font(Theme.Fonts.number(Theme.Fonts.Size.body, weight: .semibold))
                             .foregroundStyle(Theme.Colors.accentOrange)
                     }
                 }
@@ -419,7 +419,7 @@ struct HostDetailView: View {
                     Image(systemName: "chart.xyaxis.line")
                         .foregroundStyle(Theme.Colors.accentPurple)
                     Text(languageManager.t("host_detail.latency_chart"))
-                        .font(Theme.Fonts.display(14))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .semibold))
                         .foregroundStyle(Theme.Colors.textPrimary)
                     Spacer()
                     
@@ -447,7 +447,7 @@ struct HostDetailView: View {
                                 .interpolationMethod(.monotone)
                                 .foregroundStyle(
                                     .linearGradient(
-                                        colors: [Theme.Colors.accentBlue, .cyan, Theme.Colors.accentGreen],
+                                        colors: [Theme.Colors.accentBlue, Theme.Colors.accentCyan, Theme.Colors.accentGreen],
                                         startPoint: .leading,
                                         endPoint: .trailing
                                     )
@@ -486,7 +486,7 @@ struct HostDetailView: View {
                                 .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 3]))
                                 .annotation(position: .top, alignment: .trailing) {
                                     Text(String(format: "%.0f ms", avg))
-                                        .font(.system(size: 9, design: .monospaced))
+                                        .font(Theme.Fonts.number(Theme.Fonts.Size.micro))
                                         .foregroundStyle(Theme.Colors.accentOrange)
                                 }
                         }
@@ -496,13 +496,13 @@ struct HostDetailView: View {
                     .chartYAxis {
                         AxisMarks(position: .leading) { value in
                             AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [4, 4]))
-                                .foregroundStyle(Color.white.opacity(0.08))
+                                .foregroundStyle(Theme.Colors.chartGrid)
                             AxisValueLabel {
                                 if let val = value.as(Double.self) {
                                     Text("\(Int(val))")
                                         .frame(width: 40, alignment: .trailing)
                                         .foregroundStyle(Theme.Colors.textTertiary)
-                                        .font(.system(size: 9))
+                                        .font(Theme.Fonts.ui(Theme.Fonts.Size.micro))
                                 }
                             }
                         }
@@ -512,7 +512,7 @@ struct HostDetailView: View {
                             if let date = value.as(Date.self) {
                                 AxisValueLabel {
                                     Text(date.formatted(.dateTime.hour().minute().second()))
-                                        .font(.system(size: 8))
+                                        .font(Theme.Fonts.ui(Theme.Fonts.Size.micro))
                                         .foregroundStyle(Theme.Colors.textTertiary)
                                 }
                             }
@@ -542,7 +542,7 @@ struct HostDetailView: View {
                     Image(systemName: "shippingbox")
                         .foregroundStyle(Theme.Colors.accentOrange)
                     Text(languageManager.t("host_detail.packet_stats"))
-                        .font(Theme.Fonts.display(14))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .semibold))
                         .foregroundStyle(Theme.Colors.textPrimary)
                     Spacer()
                 }
@@ -557,13 +557,13 @@ struct HostDetailView: View {
                     DetailStatItem(
                         label: languageManager.t("host_detail.success"),
                         value: "\(stats?.successfulPings ?? 0)",
-                        color: .green
+                        color: Theme.Colors.accentGreen
                     )
                     Divider().frame(height: 30).padding(.horizontal, 8).opacity(0.3)
                     DetailStatItem(
                         label: languageManager.t("host_detail.failed"),
                         value: "\(stats?.failedPings ?? 0)",
-                        color: .red
+                        color: Theme.Colors.accentRed
                     )
                 }
                 
@@ -572,15 +572,15 @@ struct HostDetailView: View {
                 // Success rate bar
                 HStack(spacing: 8) {
                     Text(languageManager.t("host_detail.success_rate"))
-                        .font(Theme.Fonts.body(10))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                         .foregroundStyle(Theme.Colors.textSecondary)
                     
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
-                            RoundedRectangle(cornerRadius: 3)
+                            RoundedRectangle(cornerRadius: Theme.Radius.xs)
                                 .fill(Theme.Colors.cardBackground.opacity(0.5))
                             
-                            RoundedRectangle(cornerRadius: 3)
+                            RoundedRectangle(cornerRadius: Theme.Radius.xs)
                                 .fill(successRateColor)
                                 .frame(width: geo.size.width * CGFloat((stats?.successRate ?? 0) / 100.0))
                         }
@@ -589,7 +589,7 @@ struct HostDetailView: View {
                     .frame(height: 6)
                     
                     Text(String(format: "%.1f%%", stats?.successRate ?? 0))
-                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .font(Theme.Fonts.number(Theme.Fonts.Size.footnote, weight: .semibold))
                         .foregroundStyle(successRateColor)
                         .frame(width: 50, alignment: .trailing)
                 }
@@ -606,7 +606,7 @@ struct HostDetailView: View {
                     Image(systemName: "arrow.up.arrow.down.circle")
                         .foregroundStyle(Theme.Colors.accentPurple)
                     Text(languageManager.t("host_detail.traffic"))
-                        .font(Theme.Fonts.display(14))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .semibold))
                         .foregroundStyle(Theme.Colors.textPrimary)
                     Spacer()
                 }
@@ -615,15 +615,15 @@ struct HostDetailView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 4) {
                             Image(systemName: "arrow.up")
-                                .font(.system(size: 9))
-                                .foregroundStyle(.green)
+                                .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
+                                .foregroundStyle(Theme.Colors.accentGreen)
                             Text(languageManager.t("host_detail.sent"))
-                                .font(Theme.Fonts.body(10))
+                                .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                                 .foregroundStyle(Theme.Colors.textSecondary)
                         }
                         Text(formatTrafficBytes(stats?.totalBytesSent ?? 0))
-                            .font(Theme.Fonts.display(18))
-                            .foregroundStyle(.green)
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.title, weight: .semibold))
+                            .foregroundStyle(Theme.Colors.accentGreen)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     
@@ -632,14 +632,14 @@ struct HostDetailView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 4) {
                             Image(systemName: "arrow.down")
-                                .font(.system(size: 9))
+                                .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
                                 .foregroundStyle(Theme.Colors.accentBlue)
                             Text(languageManager.t("host_detail.received"))
-                                .font(Theme.Fonts.body(10))
+                                .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                                 .foregroundStyle(Theme.Colors.textSecondary)
                         }
                         Text(formatTrafficBytes(stats?.totalBytesReceived ?? 0))
-                            .font(Theme.Fonts.display(18))
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.title, weight: .semibold))
                             .foregroundStyle(Theme.Colors.accentBlue)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -650,10 +650,10 @@ struct HostDetailView: View {
                 // Total traffic
                 HStack(spacing: 6) {
                     Text(languageManager.t("host_detail.total_traffic"))
-                        .font(Theme.Fonts.body(10))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                         .foregroundStyle(Theme.Colors.textSecondary)
                     Text(stats?.totalTraffic ?? "0 B")
-                        .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                        .font(Theme.Fonts.number(Theme.Fonts.Size.body, weight: .semibold))
                         .foregroundStyle(Theme.Colors.textPrimary)
                 }
             }
@@ -669,7 +669,7 @@ struct HostDetailView: View {
                     Image(systemName: "tag")
                         .foregroundStyle(Theme.Colors.accentBlue)
                     Text(languageManager.t("host_detail.display_rules"))
-                        .font(Theme.Fonts.display(14))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .semibold))
                         .foregroundStyle(Theme.Colors.textPrimary)
                     Spacer()
                 }
@@ -679,30 +679,30 @@ struct HostDetailView: View {
                         // Status dot
                         let isActive = isRuleActive(rule)
                         Circle()
-                            .fill(isActive ? Color.green : Color.gray.opacity(0.4))
+                            .fill(isActive ? Theme.Colors.accentGreen : Theme.Colors.textTertiary.opacity(0.4))
                             .frame(width: 8, height: 8)
                         
                         // Rule label
                         Text(rule.label)
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .semibold))
                             .foregroundStyle(isActive ? Theme.Colors.textPrimary : Theme.Colors.textTertiary)
                         
                         // Condition
                         Text(rule.condition == "less" ? "< \(Int(rule.threshold)) ms" : "> \(Int(rule.threshold)) ms")
-                            .font(.system(size: 11, design: .monospaced))
+                            .font(Theme.Fonts.number(Theme.Fonts.Size.footnote))
                             .foregroundStyle(Theme.Colors.textSecondary)
                         
                         Spacer()
                         
                         // Enabled badge
                         Text(rule.enabled ? languageManager.t("host_detail.enabled") : languageManager.t("host_detail.disabled"))
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(rule.enabled ? .green : Theme.Colors.textTertiary)
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.caption, weight: .medium))
+                            .foregroundStyle(rule.enabled ? Theme.Colors.accentGreen : Theme.Colors.textTertiary)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 3)
                             .background(
                                 Capsule()
-                                    .fill(rule.enabled ? Color.green.opacity(0.1) : Theme.Colors.cardBackground)
+                                    .fill(rule.enabled ? Theme.Colors.accentGreen.opacity(0.1) : Theme.Colors.cardBackground)
                             )
                     }
                     .padding(.vertical, 4)
@@ -718,9 +718,7 @@ struct HostDetailView: View {
     // MARK: - Helpers
     
     private func latencyColor(_ latency: Double) -> Color {
-        if latency < 50 { return .green }
-        if latency < 100 { return .orange }
-        return .red
+        Theme.Status.latency(latency, .hop)
     }
     
     private func chartMaxLatency(for points: [ProbeSample]) -> Double {
@@ -744,7 +742,7 @@ struct HostDetailView: View {
                     Image(systemName: "square.grid.2x2.fill")
                         .foregroundStyle(Theme.Colors.accentGreen)
                     Text(languageManager.t("services.title"))
-                        .font(Theme.Fonts.display(14))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .semibold))
                         .foregroundStyle(Theme.Colors.textPrimary)
                     Spacer()
                     
@@ -754,14 +752,14 @@ struct HostDetailView: View {
                     }) {
                         HStack(spacing: 4) {
                             Image(systemName: "plus")
-                                .font(.system(size: 10, weight: .semibold))
+                                .font(Theme.Fonts.icon(Theme.Fonts.Size.caption, weight: .semibold))
                             Text(languageManager.t("services.add"))
-                                .font(Theme.Fonts.body(11))
+                                .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                         }
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4)
                         .background(Theme.Colors.accentGreen.opacity(0.15))
-                        .cornerRadius(6)
+                        .cornerRadius(Theme.Radius.sm)
                     }
                     .buttonStyle(.plain)
                 }
@@ -770,7 +768,7 @@ struct HostDetailView: View {
                 
                 if shortcuts.isEmpty {
                     Text(languageManager.t("services.empty"))
-                        .font(Theme.Fonts.body(12))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
                         .foregroundStyle(Theme.Colors.textSecondary)
                         .frame(maxWidth: .infinity, alignment: .center)
                         .padding(.vertical, 16)
@@ -782,34 +780,34 @@ struct HostDetailView: View {
                             }) {
                                 HStack(spacing: 8) {
                                     Image(systemName: shortcut.icon)
-                                        .font(.system(size: 14))
+                                        .font(Theme.Fonts.icon(Theme.Fonts.Size.callout))
                                         .foregroundStyle(shortcutColor(for: shortcut.type))
                                         .frame(width: 28, height: 28)
                                         .background(shortcutColor(for: shortcut.type).opacity(0.12))
-                                        .cornerRadius(6)
+                                        .cornerRadius(Theme.Radius.sm)
                                     
                                     VStack(alignment: .leading, spacing: 1) {
                                         Text(shortcut.name)
-                                            .font(Theme.Fonts.body(11))
+                                            .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                                             .foregroundStyle(Theme.Colors.textPrimary)
                                             .lineLimit(1)
                                         Text(shortcut.type.rawValue.uppercased())
-                                            .font(.system(size: 8, weight: .bold))
+                                            .font(Theme.Fonts.ui(Theme.Fonts.Size.micro, weight: .bold))
                                             .foregroundStyle(shortcutColor(for: shortcut.type))
                                     }
                                     
                                     Spacer()
                                     
                                     Image(systemName: "arrow.up.right")
-                                        .font(.system(size: 9))
+                                        .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
                                         .foregroundStyle(Theme.Colors.textTertiary)
                                 }
                                 .padding(8)
                                 .background(Theme.Colors.cardBackground)
-                                .cornerRadius(8)
+                                .cornerRadius(Theme.Radius.md)
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                                    RoundedRectangle(cornerRadius: Theme.Radius.md)
+                                        .stroke(Theme.Colors.cardBorder, lineWidth: 1)
                                 )
                             }
                             .buttonStyle(.plain)
@@ -839,11 +837,7 @@ struct HostDetailView: View {
     }
     
     private func shortcutColor(for type: ServiceShortcut.ServiceType) -> Color {
-        switch type {
-        case .web: return Theme.Colors.accentBlue
-        case .ssh: return Theme.Colors.accentGreen
-        case .custom: return Theme.Colors.accentOrange
-        }
+        Theme.Status.service(type)
     }
     
     private func openShortcut(_ shortcut: ServiceShortcut) {
@@ -882,9 +876,9 @@ struct HostDetailView: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Image(systemName: "note.text")
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(Theme.Colors.accentOrange)
                     Text("Records")
-                        .font(Theme.Fonts.display(14))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .semibold))
                         .foregroundStyle(Theme.Colors.textPrimary)
                     Spacer()
                     
@@ -894,14 +888,14 @@ struct HostDetailView: View {
                     }) {
                         HStack(spacing: 4) {
                             Image(systemName: "plus")
-                                .font(.system(size: 10, weight: .semibold))
+                                .font(Theme.Fonts.icon(Theme.Fonts.Size.caption, weight: .semibold))
                             Text("Add")
-                                .font(Theme.Fonts.body(11))
+                                .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                         }
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4)
-                        .background(Color.orange.opacity(0.15))
-                        .cornerRadius(6)
+                        .background(Theme.Colors.accentOrange.opacity(0.15))
+                        .cornerRadius(Theme.Radius.sm)
                     }
                     .buttonStyle(.plain)
                 }
@@ -910,7 +904,7 @@ struct HostDetailView: View {
                 
                 if records.isEmpty {
                     Text("No records yet")
-                        .font(Theme.Fonts.body(12))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
                         .foregroundStyle(Theme.Colors.textSecondary)
                         .frame(maxWidth: .infinity, alignment: .center)
                         .padding(.vertical, 16)
@@ -920,22 +914,22 @@ struct HostDetailView: View {
                             VStack(alignment: .leading, spacing: 6) {
                                 HStack(alignment: .top) {
                                     Text(record.title)
-                                        .font(.system(size: 13, weight: .semibold))
+                                        .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .semibold))
                                         .foregroundStyle(Theme.Colors.textPrimary)
                                     Spacer()
                                     Text(record.createdAt.formatted(date: .abbreviated, time: .shortened))
-                                        .font(.system(size: 10))
+                                        .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                                         .foregroundStyle(Theme.Colors.textTertiary)
                                 }
                                 
                                 Text(record.content)
-                                    .font(Theme.Fonts.body(12))
+                                    .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
                                     .foregroundStyle(Theme.Colors.textSecondary)
                                     .lineLimit(3)
                             }
                             .padding(12)
                             .background(Theme.Colors.background.opacity(0.5))
-                            .cornerRadius(8)
+                            .cornerRadius(Theme.Radius.md)
                             .contextMenu {
                                 Button {
                                     editingRecord = record
@@ -969,7 +963,7 @@ struct HostDetailView: View {
                     Image(systemName: "list.bullet.rectangle")
                         .foregroundStyle(Theme.Colors.accentOrange)
                     Text(languageManager.t("logs.title"))
-                        .font(Theme.Fonts.display(14))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .semibold))
                         .foregroundStyle(Theme.Colors.textPrimary)
                     Spacer()
                     
@@ -980,17 +974,17 @@ struct HostDetailView: View {
                     }) {
                         HStack(spacing: 4) {
                             Image(systemName: "square.and.arrow.up")
-                                .font(.system(size: 10, weight: .semibold))
+                                .font(Theme.Fonts.icon(Theme.Fonts.Size.caption, weight: .semibold))
                             Text(languageManager.t("logs.export"))
-                                .font(Theme.Fonts.body(11))
+                                .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                         }
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4)
                         .background(Theme.Colors.cardBackground)
-                        .cornerRadius(6)
+                        .cornerRadius(Theme.Radius.sm)
                         .overlay(
-                            RoundedRectangle(cornerRadius: 6)
-                                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                            RoundedRectangle(cornerRadius: Theme.Radius.sm)
+                                .stroke(Theme.Colors.cardBorder, lineWidth: 1)
                         )
                     }
                     .buttonStyle(.plain)
@@ -1000,7 +994,7 @@ struct HostDetailView: View {
                 
                 if hostLogs.isEmpty {
                     Text(languageManager.t("logs.empty"))
-                        .font(Theme.Fonts.body(12))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
                         .foregroundStyle(Theme.Colors.textSecondary)
                         .frame(maxWidth: .infinity, alignment: .center)
                         .padding(.vertical, 20)
@@ -1009,17 +1003,17 @@ struct HostDetailView: View {
                          ForEach(Array(hostLogs), id: \.id) { log in
                              HStack(alignment: .top, spacing: 8) {
                                  Text(log.formattedTimestamp)
-                                     .font(.system(size: 11, weight: .regular, design: .monospaced))
+                                     .font(Theme.Fonts.number(Theme.Fonts.Size.footnote, weight: .regular))
                                      .foregroundStyle(Theme.Colors.textSecondary)
                                      .frame(width: 140, alignment: .leading)
                                  
                                  Text(log.level.rawValue)
-                                     .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                     .font(Theme.Fonts.number(Theme.Fonts.Size.caption, weight: .bold))
                                      .foregroundStyle(logColor(for: log.level))
                                      .frame(width: 45, alignment: .leading)
                                  
                                  Text(log.message)
-                                     .font(Theme.Fonts.body(12))
+                                     .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
                                      .foregroundStyle(Theme.Colors.textPrimary)
                              }
                         }
@@ -1030,20 +1024,12 @@ struct HostDetailView: View {
     }
     
     private func logColor(for level: LogManager.LogLevel) -> Color {
-        switch level {
-        case .debug: return Theme.Colors.textSecondary
-        case .info: return Theme.Colors.accentBlue
-        case .warning: return Theme.Colors.accentOrange
-        case .error: return Theme.Colors.accentRed
-        }
+        Theme.Status.logLevel(level)
     }
 
     
     private var successRateColor: Color {
-        let rate = stats?.successRate ?? 0
-        if rate >= 95 { return .green }
-        if rate >= 80 { return .orange }
-        return .red
+        Theme.Status.ratio(stats?.successRate ?? 0, good: 95, warning: 80)
     }
     
     private func isRuleActive(_ rule: DisplayRule) -> Bool {
@@ -1080,10 +1066,10 @@ struct DetailStatItem: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label)
-                .font(Theme.Fonts.body(10))
+                .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                 .foregroundStyle(Theme.Colors.textSecondary)
             Text(value)
-                .font(Theme.Fonts.display(18))
+                .font(Theme.Fonts.ui(Theme.Fonts.Size.title, weight: .semibold))
                 .foregroundStyle(color)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1105,11 +1091,11 @@ struct RecordEditorSheet: View {
             // Header
             HStack {
                 Text(existingRecord == nil ? "Add Record" : "Edit Record")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .semibold))
                 Spacer()
                 Button(action: { presentationMode.wrappedValue.dismiss() }) {
                     Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.gray)
+                        .foregroundStyle(Theme.Colors.textTertiary)
                 }
                 .buttonStyle(.plain)
             }
@@ -1127,8 +1113,8 @@ struct RecordEditorSheet: View {
                     TextEditor(text: $content)
                         .frame(minHeight: 120)
                         .overlay(
-                            RoundedRectangle(cornerRadius: 6)
-                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                            RoundedRectangle(cornerRadius: Theme.Radius.sm)
+                                .stroke(Theme.Colors.textTertiary.opacity(0.2), lineWidth: 1)
                         )
                 }
             }

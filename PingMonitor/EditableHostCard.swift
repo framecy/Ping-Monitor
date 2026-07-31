@@ -44,7 +44,7 @@ struct EditableHostCard: View {
     }
 
     var borderColor: Color {
-        isHovered ? statusColor.opacity(0.5) : Color.white.opacity(0.05)
+        isHovered ? statusColor.opacity(0.5) : Theme.Colors.cardBorder
     }
 
     private var diagnosticText: String? {
@@ -108,18 +108,7 @@ struct EditableHostCard: View {
     }
 
     private var qualityColor: Color {
-        switch qualitySnapshot.score {
-        case 90...:
-            return Theme.Colors.accentGreen
-        case 75..<90:
-            return Theme.Colors.accentBlue
-        case 60..<75:
-            return Theme.Colors.accentOrange
-        case 40..<60:
-            return Color.orange
-        default:
-            return Theme.Colors.accentRed
-        }
+        Theme.Status.score(qualitySnapshot.score)
     }
 
     /// Score is only meaningful once we have collected enough samples.
@@ -141,9 +130,7 @@ struct EditableHostCard: View {
 
     private var availabilityColor: Color {
         guard hasEnoughQualityData else { return Theme.Colors.textSecondary }
-        if qualitySnapshot.availability >= 99 { return Theme.Colors.accentGreen }
-        if qualitySnapshot.availability >= 95 { return Theme.Colors.accentOrange }
-        return Theme.Colors.accentRed
+        return Theme.Status.ratio(qualitySnapshot.availability, good: 99, warning: 95)
     }
 
     private var availabilityText: String {
@@ -179,12 +166,12 @@ struct EditableHostCard: View {
     private func compactMetric(title: String, value: String, color: Color) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
-                .font(.system(size: 9))
+                .font(Theme.Fonts.ui(Theme.Fonts.Size.micro))
                 .foregroundStyle(Theme.Colors.textSecondary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
             Text(value)
-                .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                .font(Theme.Fonts.number(Theme.Fonts.Size.footnote, weight: .semibold))
                 .foregroundStyle(color)
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
@@ -194,7 +181,7 @@ struct EditableHostCard: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
         .background(Theme.Colors.cardBackground.opacity(0.65))
-        .cornerRadius(8)
+        .cornerRadius(Theme.Radius.md)
     }
 
     @ViewBuilder
@@ -205,10 +192,10 @@ struct EditableHostCard: View {
 
         HStack(spacing: 4) {
             Text(scoreText)
-                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote, weight: .bold))
                 .foregroundStyle(badgeColor)
             Text(labelText)
-                .font(.system(size: 9, weight: .medium))
+                .font(Theme.Fonts.ui(Theme.Fonts.Size.micro, weight: .medium))
                 .foregroundStyle(badgeColor)
                 .lineLimit(1)
         }
@@ -227,14 +214,14 @@ struct EditableHostCard: View {
     private func infoPill(icon: String, title: String, value: String, color: Color) -> some View {
         HStack(spacing: 6) {
             Image(systemName: icon)
-                .font(.system(size: 10))
+                .font(Theme.Fonts.icon(Theme.Fonts.Size.caption))
                 .foregroundStyle(color)
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
-                    .font(.system(size: 9))
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.micro))
                     .foregroundStyle(Theme.Colors.textSecondary)
                 Text(value)
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .font(Theme.Fonts.number(Theme.Fonts.Size.caption, weight: .semibold))
                     .foregroundStyle(color)
                     .lineLimit(1)
             }
@@ -242,7 +229,7 @@ struct EditableHostCard: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
         .background(Theme.Colors.background.opacity(0.45))
-        .cornerRadius(8)
+        .cornerRadius(Theme.Radius.md)
     }
 
     var body: some View {
@@ -253,26 +240,26 @@ struct EditableHostCard: View {
                         .fill(statusColor.opacity(0.15))
                         .frame(width: 32, height: 32)
                     Image(systemName: "server.rack")
-                        .font(.system(size: 14))
+                        .font(Theme.Fonts.icon(Theme.Fonts.Size.callout))
                         .foregroundStyle(statusColor)
                 }
                 
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 4) {
                         Text(host.name)
-                            .font(Theme.Fonts.display(14))
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .semibold))
                             .foregroundStyle(host.isPaused ? Theme.Colors.textSecondary : Theme.Colors.textPrimary)
                             .lineLimit(1)
                             
                         if host.isPaused {
                             Image(systemName: "pause.circle.fill")
-                                .font(.system(size: 10))
+                                .font(Theme.Fonts.icon(Theme.Fonts.Size.caption))
                                 .foregroundStyle(Theme.Colors.textTertiary)
                         }
                     }
                     
                     Text(host.address)
-                        .font(Theme.Fonts.body(11))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                         .foregroundStyle(Theme.Colors.textSecondary)
                         .lineLimit(1)
                 }
@@ -282,15 +269,15 @@ struct EditableHostCard: View {
                 VStack(alignment: .trailing, spacing: 4) {
                     if let latency = host.lastLatency, viewModel.isRunning {
                         Text("\(Int(latency)) ms")
-                            .font(.system(size: 16, weight: .bold, design: .monospaced))
+                            .font(Theme.Fonts.number(Theme.Fonts.Size.headline, weight: .bold))
                             .foregroundStyle(statusColor)
                     } else if !host.isReachable && viewModel.isRunning && !host.isChecking {
                         Text(languageManager.t("card.timeout"))
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .semibold))
                             .foregroundStyle(Theme.Colors.accentRed)
                     } else if host.isChecking {
                         Text("…")
-                            .font(.system(size: 16, weight: .semibold))
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.headline, weight: .semibold))
                             .foregroundStyle(Theme.Colors.textSecondary)
                     }
 
@@ -357,8 +344,8 @@ struct EditableHostCard: View {
                 .chartYAxis(.hidden)
                 .chartYScale(domain: .automatic(includesZero: true))
                 .frame(height: 32) // Slightly increased for visibility
-                .background(Color.white.opacity(0.02))
-                .cornerRadius(4)
+                .background(Theme.Colors.surfaceOverlay)
+                .cornerRadius(Theme.Radius.xs)
                 .padding(.horizontal, 2)
             } else {
                 Color.clear.frame(height: 32)
@@ -368,10 +355,10 @@ struct EditableHostCard: View {
             HStack {
                 HStack(spacing: 6) {
                     Image(systemName: host.probeMode == .tcp ? "cable.connector" : "waveform.path.ecg")
-                        .font(.system(size: 10))
+                        .font(Theme.Fonts.icon(Theme.Fonts.Size.caption))
                         .foregroundStyle(Theme.Colors.textTertiary)
                     Text(host.probeDisplayLabel)
-                        .font(Theme.Fonts.body(10))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                         .foregroundStyle(Theme.Colors.textTertiary)
 
                     if let diagnosticText {
@@ -379,10 +366,10 @@ struct EditableHostCard: View {
                             .fill(Theme.Colors.textTertiary.opacity(0.5))
                             .frame(width: 3, height: 3)
                         Image(systemName: diagnosticIcon)
-                            .font(.system(size: 10))
+                            .font(Theme.Fonts.icon(Theme.Fonts.Size.caption))
                             .foregroundStyle(diagnosticColor)
                         Text(diagnosticText)
-                            .font(Theme.Fonts.body(10))
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                             .foregroundStyle(diagnosticColor)
                             .lineLimit(1)
                     }
@@ -393,10 +380,10 @@ struct EditableHostCard: View {
                 if !host.displayRules.isEmpty {
                     HStack(spacing: 4) {
                         Image(systemName: "checklist")
-                            .font(.system(size: 10))
+                            .font(Theme.Fonts.icon(Theme.Fonts.Size.caption))
                             .foregroundStyle(Theme.Colors.textTertiary)
                         Text(String(format: languageManager.t("card.rules"), host.displayRules.count))
-                            .font(Theme.Fonts.body(10))
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                             .foregroundStyle(Theme.Colors.textTertiary)
                     }
                 }

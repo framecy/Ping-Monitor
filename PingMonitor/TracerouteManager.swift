@@ -26,10 +26,7 @@ struct TracerouteHop: Identifiable, Sendable {
     var worst: Double?
     
     var latencyColor: Color {
-        guard let avg = avgLatency else { return .gray }
-        if avg < 50 { return .green }
-        if avg < 100 { return .orange }
-        return .red
+        Theme.Status.latency(avgLatency, .hop)
     }
     
     var formattedAvg: String {
