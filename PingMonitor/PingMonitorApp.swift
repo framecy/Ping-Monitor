@@ -825,6 +825,31 @@ class PingMonitorViewModel: ObservableObject {
     func toggle() {
         isRunning ? stopAll() : startAll()
     }
+
+    /// Ping 间隔变更后重新应用到所有「跟随设置」的主机。
+    ///
+    /// 间隔是在 spawn 时烧进命令行的（`ping -i N` / `sleep N`），改设置不会影响已在跑的进程，
+    /// 必须重启才能生效。只重启未配置自定义命令的主机 —— 自定义命令自带节奏，
+    /// 跟这个设置无关，不该被无谓打断。
+    func applyPingIntervalChange() {
+        saveSettings()
+        guard isRunning else { return }
+
+        let followers = hosts.filter {
+            $0.command.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !$0.isPaused
+        }
+        guard !followers.isEmpty else { return }
+
+        for host in followers {
+            stopPingProcess(for: host.id)
+        }
+        for host in followers {
+            if let index = hosts.firstIndex(where: { $0.id == host.id }) {
+                startPingProcess(for: hosts[index], at: index)
+            }
+        }
+        LogManager.shared.info("Ping interval applied to \(followers.count) host(s) following settings")
+    }
     
     func stopPingProcess(for hostId: UUID) {
         if let process = pingProcesses[hostId] {
@@ -1558,10 +1583,15 @@ class PingMonitorViewModel: ObservableObject {
         
         var commandString: String
         if customCommand.isEmpty {
+            // 未配置自定义命令 → 探测节奏一律取设置里的 Ping 间隔。
             if let cli = tailscaleCLIPath {
                 // Use JSON output for Tailscale probes so we can classify failures and extract direct/relay path details.
-                commandString = "while true; do \(cli) ping --c=1 \(address); sleep \(interval); done"
+                // `kill -0 $ownerPID` 是防孤儿看门狗：app 被强杀或崩溃时这个 shell 循环
+                // 会被 launchd 收养并按旧间隔永远跑下去，与新实例的探测叠加。
+                let ownerPID = ProcessInfo.processInfo.processIdentifier
+                commandString = "while kill -0 \(ownerPID) 2>/dev/null; do \(cli) ping --c=1 \(address); sleep \(interval); done"
             } else {
+                // exec 让 sh 被 ping 顶替，进程即探测本身，父进程消失时由内核回收。
                 commandString = "ping -i \(interval) \(address)"
             }
         } else {
