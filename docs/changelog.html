@@ -54,19 +54,63 @@
         <!-- Timeline -->
         <div class="timeline" id="changelog-timeline">
 
-            <!-- v2.3.0 -->
-            <div class="timeline-item animate-fade-in" data-categories="added,updated">
+            <!-- v2.4.0 -->
+            <div class="timeline-item animate-fade-in" data-categories="added,fixed,updated">
                 <div class="timeline-dot latest"></div>
                 <div class="timeline-card">
                     <div class="timeline-header" onclick="toggleTimeline(this)">
                         <div class="timeline-header-left">
-                            <span class="timeline-version">v2.3.0</span>
+                            <span class="timeline-version">v2.4.0</span>
                             <span class="timeline-badge">Latest</span>
-                            <span class="timeline-date">2026-07-14</span>
+                            <span class="timeline-date">2026-07-31</span>
                         </div>
                         <div class="timeline-toggle">▼</div>
                     </div>
                     <div class="timeline-body open">
+                        <div class="timeline-content">
+                            <div class="change-category" data-type="added">
+                                <div class="category-tag tag-added">Added</div>
+                                <ul class="change-list">
+                                    <li><strong>Tailnet 全局监管</strong>：通过 Tailscale OAuth client 只读同步整个 tailnet 的设备清单、在线状态、标签、密钥有效期与可用更新，不依赖本机能否连通对端。PingMonitor 不注册为 tailnet 节点、不承载 tailnet 流量。</li>
+                                    <li><strong>管理模式</strong>：默认关闭；开启后可进行设备授权、子网与 exit-node 路由审批、密钥过期开关、标签编辑与设备删除，破坏性操作强制二次确认。</li>
+                                    <li><strong>凭据安全</strong>：OAuth client id/secret 存入系统钥匙串，不写入明文配置文件，界面永不回显 secret；设置页内置六步获取引导。</li>
+                                    <li><strong>接口分组</strong>：网络接口按族合并展示、可展开，承载默认路由的分组带「默认出口」标识。</li>
+                                </ul>
+                            </div>
+                            <div class="change-category" data-type="fixed">
+                                <div class="category-tag tag-fixed">Fixed</div>
+                                <ul class="change-list">
+                                    <li><strong>网速统计虚高</strong>：总速率此前对全部 12 个物理类接口求和，其中包含 Apple 网络协处理器管理口与雷雳/USB/桥接成员。现只统计默认路由的真实出口。</li>
+                                    <li><strong>探测进程泄漏</strong>：Tailscale 探测循环在应用被强制退出后会被系统接管并按旧参数持续运行，与新实例叠加。现随宿主进程一同退出。</li>
+                                    <li><strong>Ping 间隔不生效</strong>：间隔在探测进程启动时写入，修改设置后会自动重新应用到所有未配置自定义命令的主机。</li>
+                                    <li><strong>侧边栏与表格布局</strong>：侧边栏不再被内容区挤压，分隔条不再出现色块缝隙；主机健康矩阵列宽改为按内容自适应，消除宽窗口下的大片留白。</li>
+                                </ul>
+                            </div>
+                            <div class="change-category" data-type="updated">
+                                <div class="category-tag tag-updated">Updated</div>
+                                <ul class="change-list">
+                                    <li><strong>设计令牌统一</strong>：语义状态色取代 20 处重复实现，107 处圆角字面量与 118 行硬编码颜色迁移至令牌，修复浅色模式下不可见的描边。</li>
+                                    <li><strong>字体系统</strong>：中文使用 PingFang SC、英文使用 SF Pro Text，18 种字号收敛为 10 档常规尺度。</li>
+                                    <li><strong>表格斑马纹</strong>：主机健康矩阵与接口列表改用半透明色块区分行，替代分隔线。</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- v2.3.0 -->
+            <div class="timeline-item animate-fade-in" data-categories="added,updated">
+                <div class="timeline-dot"></div>
+                <div class="timeline-card">
+                    <div class="timeline-header" onclick="toggleTimeline(this)">
+                        <div class="timeline-header-left">
+                            <span class="timeline-version">v2.3.0</span>
+                            <span class="timeline-date">2026-07-14</span>
+                        </div>
+                        <div class="timeline-toggle">▼</div>
+                    </div>
+                    <div class="timeline-body">
                         <div class="timeline-content">
                             <div class="change-category" data-type="added">
                                 <div class="category-tag tag-added">Added</div>
