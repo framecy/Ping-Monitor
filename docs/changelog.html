@@ -54,19 +54,51 @@
         <!-- Timeline -->
         <div class="timeline" id="changelog-timeline">
 
-            <!-- v2.4.0 -->
-            <div class="timeline-item animate-fade-in" data-categories="added,fixed,updated">
+            <!-- v2.4.1 -->
+            <div class="timeline-item animate-fade-in" data-categories="fixed,updated">
                 <div class="timeline-dot latest"></div>
                 <div class="timeline-card">
                     <div class="timeline-header" onclick="toggleTimeline(this)">
                         <div class="timeline-header-left">
-                            <span class="timeline-version">v2.4.0</span>
+                            <span class="timeline-version">v2.4.1</span>
                             <span class="timeline-badge">Latest</span>
                             <span class="timeline-date">2026-07-31</span>
                         </div>
                         <div class="timeline-toggle">▼</div>
                     </div>
                     <div class="timeline-body open">
+                        <div class="timeline-content">
+                            <div class="change-category" data-type="fixed">
+                                <div class="category-tag tag-fixed">Fixed</div>
+                                <ul class="change-list">
+                                    <li><strong>网速「全部接口」速率叠加</strong>：系统中并存的十余个隧道设备会对同一份流量重复计数，导致总速率数倍于实际。现只统计承载默认路由的物理接口，隧道流量单独呈现。</li>
+                                    <li><strong>主机详情页卡片挤在左侧</strong>：并排卡片的自适应栅格会排出远多于实际需要的列数，卡片被压在页面左侧并留下大片空白。</li>
+                                    <li><strong>详情页文本溢出</strong>：质量分行不再被截断，延迟统计数值不再折行。</li>
+                                </ul>
+                            </div>
+                            <div class="change-category" data-type="updated">
+                                <div class="category-tag tag-updated">Updated</div>
+                                <ul class="change-list">
+                                    <li><strong>响应式栅格收敛</strong>：统计页与详情页共用同一套宽度断点与等高单元格实现。</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- v2.4.0 -->
+            <div class="timeline-item animate-fade-in" data-categories="added,fixed,updated">
+                <div class="timeline-dot"></div>
+                <div class="timeline-card">
+                    <div class="timeline-header" onclick="toggleTimeline(this)">
+                        <div class="timeline-header-left">
+                            <span class="timeline-version">v2.4.0</span>
+                            <span class="timeline-date">2026-07-31</span>
+                        </div>
+                        <div class="timeline-toggle">▼</div>
+                    </div>
+                    <div class="timeline-body">
                         <div class="timeline-content">
                             <div class="change-category" data-type="added">
                                 <div class="category-tag tag-added">Added</div>
