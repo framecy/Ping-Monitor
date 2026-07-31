@@ -180,6 +180,40 @@ struct Theme {
     }
 }
 
+// MARK: - 容器宽度测量
+// 响应式栅格统一用它拿可用宽度：GeometryReader 放进 .background，
+// 只读宽度不参与主轴布局，避免影响内容高度。
+struct ContainerWidthKey: PreferenceKey {
+    nonisolated(unsafe) static var defaultValue: CGFloat = 800
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        let next = nextValue()
+        if next > 0 { value = next }
+    }
+}
+
+extension View {
+    func measureContainerWidth(_ onChange: @escaping (CGFloat) -> Void) -> some View {
+        background(
+            GeometryReader { proxy in
+                Color.clear.preference(key: ContainerWidthKey.self, value: proxy.size.width)
+            }
+        )
+        .onPreferenceChange(ContainerWidthKey.self) { onChange($0) }
+    }
+
+    /// 两列栅格的成员：等分宽度并撑满行高，保证同行卡片等高。
+    func gridCell() -> some View {
+        frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+extension Theme.Layout {
+    /// 容器宽度能否容纳两列（两个最小列宽 + 一个间距）。
+    static func fitsTwoColumns(_ width: CGFloat) -> Bool {
+        width >= twoColumnMinWidth * 2 + gridSpacing
+    }
+}
+
 // MARK: - 自适应表格
 // 列宽交给 Grid 按内容自适应，禁止按容器宽度的百分比算死像素值 ——
 // 测量值拿不到真实宽度时，百分比会在宽卡片里画出一张窄表并留下大片空白。

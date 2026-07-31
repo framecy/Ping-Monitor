@@ -11,7 +11,12 @@ struct HostDetailView: View {
     @State private var editingShortcut: ServiceShortcut? = nil
     @State private var showRecordEditor = false
     @State private var editingRecord: HostRecord? = nil
-    
+    @State private var detailWidth: CGFloat = 800
+
+    private var showsTwoColumns: Bool {
+        Theme.Layout.fitsTwoColumns(detailWidth)
+    }
+
     private var stats: HostStats? {
         viewModel.hostStats[host.id]
     }
@@ -70,28 +75,38 @@ struct HostDetailView: View {
             
             // Content
             ScrollView {
-                VStack(spacing: 16) {
+                VStack(spacing: Theme.Layout.gridSpacing) {
                     // Row 1: Status + Latency
-                    LazyVGrid(
-                        columns: [GridItem(.adaptive(minimum: Theme.Layout.twoColumnMinWidth), spacing: 16)],
-                        spacing: 16
-                    ) {
-                        statusCard
-                        latencyStatsCard
+                    // 不能用 GridItem(.adaptive(minimum:))：adaptive 会塞进尽可能多的列，
+                    // 宽窗口下排出 6 列而只填 2 个，卡片被挤在左侧、右边留大片空白。
+                    if showsTwoColumns {
+                        Grid(horizontalSpacing: Theme.Layout.gridSpacing, verticalSpacing: Theme.Layout.gridSpacing) {
+                            GridRow {
+                                statusCard.gridCell()
+                                latencyStatsCard.gridCell()
+                            }
+                        }
+                    } else {
+                        statusCard.frame(maxWidth: .infinity)
+                        latencyStatsCard.frame(maxWidth: .infinity)
                     }
 
                     // Row 2: Chart
                     latencyChartCard
 
                     // Row 3: Packet Stats + Traffic
-                    LazyVGrid(
-                        columns: [GridItem(.adaptive(minimum: Theme.Layout.twoColumnMinWidth), spacing: 16)],
-                        spacing: 16
-                    ) {
-                        packetStatsCard
-                        trafficCard
+                    if showsTwoColumns {
+                        Grid(horizontalSpacing: Theme.Layout.gridSpacing, verticalSpacing: Theme.Layout.gridSpacing) {
+                            GridRow {
+                                packetStatsCard.gridCell()
+                                trafficCard.gridCell()
+                            }
+                        }
+                    } else {
+                        packetStatsCard.frame(maxWidth: .infinity)
+                        trafficCard.frame(maxWidth: .infinity)
                     }
-                    
+
                     // Row 4: Actions
                     HStack {
                         Spacer()
@@ -121,8 +136,9 @@ struct HostDetailView: View {
                     // Row 6: Logs
                     logsCard
                 }
-                .padding()
+                .padding(Theme.Layout.cardPadding)
             }
+            .measureContainerWidth { detailWidth = $0 }
         }
         .background(Theme.Colors.background)
         .sheet(isPresented: $showShortcutEditor) {
@@ -346,7 +362,10 @@ struct HostDetailView: View {
                 Text(text)
                     .font(Theme.Fonts.number(Theme.Fonts.Size.footnote))
                     .foregroundStyle(color)
-                    .lineLimit(1)
+                    // 质量分那行含 P95/Loss，窄卡片下换行展示，不要截断成省略号。
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
             }
         }
     }
@@ -1071,6 +1090,9 @@ struct DetailStatItem: View {
             Text(value)
                 .font(Theme.Fonts.ui(Theme.Fonts.Size.title, weight: .semibold))
                 .foregroundStyle(color)
+                // 四个指标共用一行，"999.0 ms" 这类长值宁可整体缩小也不要折行。
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

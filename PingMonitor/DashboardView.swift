@@ -2,14 +2,6 @@ import SwiftUI
 import Charts
 
 // 读取 Dashboard 容器宽，用于在 2 列 Grid / 单列 VStack 间切换。
-private struct DetailWidthKey: PreferenceKey {
-    nonisolated(unsafe) static var defaultValue: CGFloat = 800
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        let n = nextValue()
-        if n > 0 { value = n }
-    }
-}
-
 struct DashboardView: View {
     @ObservedObject var viewModel: PingMonitorViewModel
     @StateObject private var speedManager = NetworkSpeedManager.shared
@@ -27,7 +19,7 @@ struct DashboardView: View {
     }
 
     private var showsTwoColumns: Bool {
-        detailWidth >= Theme.Layout.twoColumnMinWidth * 2 + Theme.Layout.gridSpacing
+        Theme.Layout.fitsTwoColumns(detailWidth)
     }
 
     var body: some View {
@@ -38,17 +30,17 @@ struct DashboardView: View {
                     Grid(horizontalSpacing: Theme.Layout.gridSpacing, verticalSpacing: Theme.Layout.gridSpacing) {
                         GridRow {
                             QualityScoreCard(snapshot: globalSnapshot, selectedWindow: $selectedWindow)
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .gridCell()
                             QualityDimensionsCard(snapshot: globalSnapshot)
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .gridCell()
                         }
                     }
                     Grid(horizontalSpacing: Theme.Layout.gridSpacing, verticalSpacing: Theme.Layout.gridSpacing) {
                         GridRow {
                             QualityTrendCard(snapshot: globalSnapshot, trendPoints: trendPoints)
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .gridCell()
                             RecentEventsCard(events: globalSnapshot.recentEvents)
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .gridCell()
                         }
                     }
                 } else {
@@ -70,12 +62,7 @@ struct DashboardView: View {
             }
             .padding(Theme.Layout.cardPadding)
         }
-        .background(
-            GeometryReader { proxy in
-                Color.clear.preference(key: DetailWidthKey.self, value: proxy.size.width)
-            }
-        )
-        .onPreferenceChange(DetailWidthKey.self) { detailWidth = $0 }
+        .measureContainerWidth { detailWidth = $0 }
         .background(Theme.Colors.background)
         .onAppear {
             speedManager.startMonitoring()

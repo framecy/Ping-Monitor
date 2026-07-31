@@ -427,10 +427,22 @@ struct NetworkSpeedTab: View {
         let family: InterfaceFamily
         let members: [NetworkInterfaceStats]
 
-        var speedIn: Double { members.reduce(0) { $0 + $1.speedIn } }
-        var speedOut: Double { members.reduce(0) { $0 + $1.speedOut } }
-        var bytesIn: UInt64 { members.reduce(0) { $0 + $1.bytesIn } }
-        var bytesOut: UInt64 { members.reduce(0) { $0 + $1.bytesOut } }
+        /// 隧道族的成员会对同一份载荷重复计数（链式封装），求和没有物理意义，
+        /// 取最忙的一条作为该族的代表速率；其余族的成员互相独立，求和即总量。
+        private var isStacked: Bool { family == .tunnel }
+
+        var speedIn: Double {
+            isStacked ? (members.map(\.speedIn).max() ?? 0) : members.reduce(0) { $0 + $1.speedIn }
+        }
+        var speedOut: Double {
+            isStacked ? (members.map(\.speedOut).max() ?? 0) : members.reduce(0) { $0 + $1.speedOut }
+        }
+        var bytesIn: UInt64 {
+            isStacked ? (members.map(\.bytesIn).max() ?? 0) : members.reduce(0) { $0 + $1.bytesIn }
+        }
+        var bytesOut: UInt64 {
+            isStacked ? (members.map(\.bytesOut).max() ?? 0) : members.reduce(0) { $0 + $1.bytesOut }
+        }
         var hasTraffic: Bool { members.contains { $0.isActive } }
     }
 

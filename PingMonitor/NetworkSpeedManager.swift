@@ -633,8 +633,12 @@ class NetworkSpeedManager: ObservableObject {
 
         let physSpeedIn  = physical.reduce(0) { $0 + $1.speedIn }
         let physSpeedOut = physical.reduce(0) { $0 + $1.speedOut }
-        let tunSpeedIn   = tunnel.reduce(0) { $0 + $1.speedIn }
-        let tunSpeedOut  = tunnel.reduce(0) { $0 + $1.speedOut }
+
+        // 隧道侧取「最忙的一条」而不是求和：macOS 上同时存在十余个 utun，
+        // 链式封装（VPN 套 VPN / 私密中继）会让同一份载荷在多条 utun 上各记一次，
+        // 求和得到的数字没有物理意义 —— 实测隧道求和 21.3 MB/s 而物理口只有 5.7 MB/s。
+        let tunSpeedIn   = tunnel.map(\.speedIn).max() ?? 0
+        let tunSpeedOut  = tunnel.map(\.speedOut).max() ?? 0
 
         let totalSpeedIn: Double
         let totalSpeedOut: Double
@@ -642,8 +646,11 @@ class NetworkSpeedManager: ObservableObject {
         let totalBytesOut: UInt64
 
         if selection == "all" {
-            totalSpeedIn  = max(physSpeedIn,  tunSpeedIn)
-            totalSpeedOut = max(physSpeedOut, tunSpeedOut)
+            // 「全部接口」= 整机对外速率 = 承载默认路由的物理口速率。
+            // 隧道流量本就封装在物理口内，再叠加上去会超过物理线速，物理上不可能；
+            // 隧道量另有 tunnelSpeed* 单独呈现，不并入总量。
+            totalSpeedIn  = physSpeedIn
+            totalSpeedOut = physSpeedOut
             totalBytesIn  = physical.reduce(0) { $0 + $1.bytesIn }
             totalBytesOut = physical.reduce(0) { $0 + $1.bytesOut }
         } else {
@@ -657,8 +664,8 @@ class NetworkSpeedManager: ObservableObject {
         return (
             totalSpeedIn, totalSpeedOut, totalBytesIn, totalBytesOut,
             tunSpeedIn, tunSpeedOut,
-            tunnel.reduce(0) { $0 + $1.bytesIn },
-            tunnel.reduce(0) { $0 + $1.bytesOut }
+            tunnel.map(\.bytesIn).max() ?? 0,
+            tunnel.map(\.bytesOut).max() ?? 0
         )
     }
 
