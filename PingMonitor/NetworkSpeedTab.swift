@@ -15,6 +15,8 @@ struct NetworkSpeedTab: View {
     @ObservedObject private var languageManager = LanguageManager.shared
     @State private var trafficRange: TrafficTimeRange = .oneHour
     @State private var tabMode: NetSpeedTabMode = .interfaces
+    /// 默认只展开承载真实流量的两族，其余（管理口、回环等）收起。
+    @State private var expandedFamilies: Set<InterfaceFamily> = [.wifi, .ethernet]
     
     var body: some View {
         VStack(spacing: 0) {
@@ -26,7 +28,7 @@ struct NetworkSpeedTab: View {
                 }
                 .padding(3)
                 .background(Theme.Colors.cardBackground)
-                .cornerRadius(8)
+                .cornerRadius(Theme.Radius.md)
                 .frame(width: 200)
                 Spacer()
             }
@@ -71,13 +73,13 @@ struct NetworkSpeedTab: View {
             }
         }) {
             Text(title)
-                .font(Theme.Fonts.body(13))
+                .font(Theme.Fonts.ui(Theme.Fonts.Size.callout))
                 .fontWeight(tabMode == mode ? .semibold : .regular)
-                .foregroundStyle(tabMode == mode ? .white : Theme.Colors.textSecondary)
+                .foregroundStyle(tabMode == mode ? Theme.Colors.onAccent : Theme.Colors.textSecondary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 5)
                 .background(
-                    RoundedRectangle(cornerRadius: 6)
+                    RoundedRectangle(cornerRadius: Theme.Radius.sm)
                         .fill(tabMode == mode ? Theme.Colors.accentBlue : Color.clear)
                 )
                 .contentShape(Rectangle())
@@ -125,23 +127,23 @@ struct NetworkSpeedTab: View {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(spacing: 5) {
                             Image(systemName: "arrow.up")
-                                .font(.system(size: 10, weight: .bold))
+                                .font(Theme.Fonts.icon(Theme.Fonts.Size.caption, weight: .bold))
                                 .foregroundStyle(Theme.Colors.accentPurple)
                             Text(languageManager.t("netspeed.upload"))
-                                .font(Theme.Fonts.body(11))
+                                .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                                 .foregroundStyle(Theme.Colors.textSecondary)
                         }
                         
                         Text(NetworkSpeedManager.formatSpeed(speedManager.totalSpeedOut))
-                            .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.hero, weight: .bold))
                             .foregroundStyle(Theme.Colors.accentPurple)
                         
                         HStack(spacing: 4) {
                             Image(systemName: "arrow.up.circle")
-                                .font(.system(size: 9))
+                                .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
                                 .foregroundStyle(Theme.Colors.textTertiary)
                             Text(NetworkSpeedManager.formatBytes(speedManager.totalBytesOut))
-                                .font(.system(size: 10, design: .monospaced))
+                                .font(Theme.Fonts.number(Theme.Fonts.Size.caption))
                                 .foregroundStyle(Theme.Colors.textTertiary)
                         }
                     }
@@ -153,23 +155,23 @@ struct NetworkSpeedTab: View {
                     VStack(alignment: .trailing, spacing: 6) {
                         HStack(spacing: 5) {
                             Text(languageManager.t("netspeed.download"))
-                                .font(Theme.Fonts.body(11))
+                                .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                                 .foregroundStyle(Theme.Colors.textSecondary)
                             Image(systemName: "arrow.down")
-                                .font(.system(size: 10, weight: .bold))
+                                .font(Theme.Fonts.icon(Theme.Fonts.Size.caption, weight: .bold))
                                 .foregroundStyle(Theme.Colors.accentCyan)
                         }
                         
                         Text(NetworkSpeedManager.formatSpeed(speedManager.totalSpeedIn))
-                            .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.hero, weight: .bold))
                             .foregroundStyle(Theme.Colors.accentCyan)
                         
                         HStack(spacing: 4) {
                             Text(NetworkSpeedManager.formatBytes(speedManager.totalBytesIn))
-                                .font(.system(size: 10, design: .monospaced))
+                                .font(Theme.Fonts.number(Theme.Fonts.Size.caption))
                                 .foregroundStyle(Theme.Colors.textTertiary)
                             Image(systemName: "arrow.down.circle")
-                                .font(.system(size: 9))
+                                .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
                                 .foregroundStyle(Theme.Colors.textTertiary)
                         }
                     }
@@ -182,14 +184,14 @@ struct NetworkSpeedTab: View {
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Tunnel/VPN")
-                                .font(Theme.Fonts.body(10))
+                                .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                                 .foregroundStyle(Theme.Colors.textSecondary)
                             HStack(spacing: 8) {
                                 Text("↓ \(NetworkSpeedManager.formatSpeed(speedManager.tunnelSpeedIn))")
-                                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                    .font(Theme.Fonts.number(Theme.Fonts.Size.footnote, weight: .semibold))
                                     .foregroundStyle(Theme.Colors.accentCyan)
                                 Text("↑ \(NetworkSpeedManager.formatSpeed(speedManager.tunnelSpeedOut))")
-                                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                    .font(Theme.Fonts.number(Theme.Fonts.Size.footnote, weight: .semibold))
                                     .foregroundStyle(Theme.Colors.accentPurple)
                             }
                         }
@@ -197,7 +199,7 @@ struct NetworkSpeedTab: View {
                         Spacer()
 
                         Text("Physical totals exclude tunnel bytes to avoid double-counting")
-                            .font(.system(size: 10))
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                             .foregroundStyle(Theme.Colors.textTertiary)
                     }
                 }
@@ -214,7 +216,7 @@ struct NetworkSpeedTab: View {
                 
                 if speedManager.speedHistory.count < 2 {
                     Text(languageManager.t("netspeed.collecting"))
-                        .font(Theme.Fonts.body(12))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
                         .foregroundStyle(Theme.Colors.textTertiary)
                         .frame(maxWidth: .infinity, alignment: .center)
                         .padding(.vertical, 30)
@@ -275,12 +277,12 @@ struct NetworkSpeedTab: View {
                     .chartYAxis {
                         AxisMarks(position: .leading) { value in
                             AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [4, 4]))
-                                .foregroundStyle(Color.white.opacity(0.05))
+                                .foregroundStyle(Theme.Colors.chartGrid)
                             
                             if let speed = value.as(Double.self) {
                                 AxisValueLabel {
                                     Text(NetworkSpeedManager.formatSpeed(speed))
-                                        .font(.system(size: 8, design: .monospaced))
+                                        .font(Theme.Fonts.number(Theme.Fonts.Size.micro))
                                         .foregroundStyle(Theme.Colors.textTertiary)
                                 }
                             }
@@ -296,18 +298,18 @@ struct NetworkSpeedTab: View {
                         HStack(spacing: 4) {
                             Circle().fill(Theme.Colors.accentPurple).frame(width: 6, height: 6)
                             Text(languageManager.t("netspeed.upload"))
-                                .font(Theme.Fonts.body(10))
+                                .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                                 .foregroundStyle(Theme.Colors.textSecondary)
                         }
                         HStack(spacing: 4) {
                             Circle().fill(Theme.Colors.accentCyan).frame(width: 6, height: 6)
                             Text(languageManager.t("netspeed.download"))
-                                .font(Theme.Fonts.body(10))
+                                .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                                 .foregroundStyle(Theme.Colors.textSecondary)
                         }
                         Spacer()
                         Text(languageManager.t("netspeed.last_60s"))
-                            .font(Theme.Fonts.body(9))
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.micro))
                             .foregroundStyle(Theme.Colors.textTertiary)
                     }
                 }
@@ -327,7 +329,7 @@ struct NetworkSpeedTab: View {
                         withAnimation { tabMode = .processes }
                     }) {
                         Text(languageManager.t("monitor.title"))
-                            .font(.system(size: 10, weight: .medium))
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.caption, weight: .medium))
                             .foregroundStyle(Theme.Colors.accentBlue)
                     }
                     .buttonStyle(.plain)
@@ -337,7 +339,7 @@ struct NetworkSpeedTab: View {
                 
                 if topProcs.isEmpty {
                     Text(languageManager.t("netspeed.collecting"))
-                        .font(Theme.Fonts.body(11))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                         .foregroundStyle(Theme.Colors.textTertiary)
                         .frame(maxWidth: .infinity, alignment: .center)
                         .padding(.vertical, 10)
@@ -347,11 +349,11 @@ struct NetworkSpeedTab: View {
                             HStack {
                                 VStack(alignment: .leading, spacing: 1) {
                                     Text(proc.processName)
-                                        .font(.system(size: 12, weight: .semibold))
+                                        .font(Theme.Fonts.ui(Theme.Fonts.Size.body, weight: .semibold))
                                         .foregroundStyle(Theme.Colors.textPrimary)
                                         .lineLimit(1)
                                     Text("PID \(proc.pid)")
-                                        .font(.system(size: 9, design: .monospaced))
+                                        .font(Theme.Fonts.number(Theme.Fonts.Size.micro))
                                         .foregroundStyle(Theme.Colors.textTertiary)
                                 }
                                 
@@ -361,10 +363,10 @@ struct NetworkSpeedTab: View {
                                     if proc.speedOut > 1024 {
                                         HStack(spacing: 2) {
                                             Image(systemName: "arrow.up")
-                                                .font(.system(size: 8, weight: .bold))
+                                                .font(Theme.Fonts.icon(Theme.Fonts.Size.micro, weight: .bold))
                                                 .foregroundStyle(Theme.Colors.accentPurple)
                                             Text(NetworkSpeedManager.formatSpeed(proc.speedOut))
-                                                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                                                .font(Theme.Fonts.number(Theme.Fonts.Size.caption, weight: .semibold))
                                                 .foregroundStyle(Theme.Colors.accentPurple)
                                         }
                                     }
@@ -372,10 +374,10 @@ struct NetworkSpeedTab: View {
                                     if proc.speedIn > 1024 {
                                         HStack(spacing: 2) {
                                             Image(systemName: "arrow.down")
-                                                .font(.system(size: 8, weight: .bold))
+                                                .font(Theme.Fonts.icon(Theme.Fonts.Size.micro, weight: .bold))
                                                 .foregroundStyle(Theme.Colors.accentCyan)
                                             Text(NetworkSpeedManager.formatSpeed(proc.speedIn))
-                                                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                                                .font(Theme.Fonts.number(Theme.Fonts.Size.caption, weight: .semibold))
                                                 .foregroundStyle(Theme.Colors.accentCyan)
                                         }
                                     }
@@ -401,33 +403,138 @@ struct NetworkSpeedTab: View {
                 
                 if speedManager.interfaces.isEmpty {
                     Text(languageManager.t("netspeed.no_interfaces"))
-                        .font(Theme.Fonts.body(12))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
                         .foregroundStyle(Theme.Colors.textTertiary)
                         .frame(maxWidth: .infinity, alignment: .center)
                         .padding(.vertical, 16)
                 } else {
-                    ForEach(speedManager.interfaces) { iface in
-                        interfaceRow(iface)
-                        
-                        if iface.id != speedManager.interfaces.last?.id {
-                            Divider().opacity(0.1)
+                    // 同族接口合并成一组，默认收起；行底色用半透明色块交替区分。
+                    let groups = interfaceGroups
+                    VStack(spacing: 0) {
+                        ForEach(Array(groups.enumerated()), id: \.element.family) { index, group in
+                            interfaceGroupRow(group, striped: !index.isMultiple(of: 2))
                         }
                     }
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.sm))
                 }
             }
         }
     }
-    
+
+    // MARK: - 接口分组
+
+    private struct InterfaceGroup {
+        let family: InterfaceFamily
+        let members: [NetworkInterfaceStats]
+
+        var speedIn: Double { members.reduce(0) { $0 + $1.speedIn } }
+        var speedOut: Double { members.reduce(0) { $0 + $1.speedOut } }
+        var bytesIn: UInt64 { members.reduce(0) { $0 + $1.bytesIn } }
+        var bytesOut: UInt64 { members.reduce(0) { $0 + $1.bytesOut } }
+        var hasTraffic: Bool { members.contains { $0.isActive } }
+    }
+
+    private var interfaceGroups: [InterfaceGroup] {
+        let grouped = Dictionary(grouping: speedManager.interfaces) { $0.family }
+        return InterfaceFamily.allCases.compactMap { family in
+            guard let members = grouped[family], !members.isEmpty else { return nil }
+            return InterfaceGroup(
+                family: family,
+                members: members.sorted { ($0.speedIn + $0.speedOut) > ($1.speedIn + $1.speedOut) }
+            )
+        }
+    }
+
+    @ViewBuilder
+    private func interfaceGroupRow(_ group: InterfaceGroup, striped: Bool) -> some View {
+        let isExpanded = expandedFamilies.contains(group.family)
+
+        VStack(spacing: 0) {
+            Button {
+                if isExpanded {
+                    expandedFamilies.remove(group.family)
+                } else {
+                    expandedFamilies.insert(group.family)
+                }
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                        .font(Theme.Fonts.icon(Theme.Fonts.Size.micro, weight: .semibold))
+                        .foregroundStyle(Theme.Colors.textTertiary)
+                        .frame(width: 10)
+
+                    Image(systemName: group.family.iconName)
+                        .font(Theme.Fonts.icon(Theme.Fonts.Size.body))
+                        .foregroundStyle(group.hasTraffic ? Theme.Colors.accentBlue : Theme.Colors.textTertiary)
+                        .frame(width: 18)
+
+                    Text(languageManager.t(group.family.localizationKey))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.body, weight: .medium))
+                        .foregroundStyle(Theme.Colors.textPrimary)
+
+                    Text("\(group.members.count)")
+                        .font(Theme.Fonts.number(Theme.Fonts.Size.micro, weight: .bold))
+                        .foregroundStyle(Theme.Colors.textSecondary)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(Theme.Colors.surfaceOverlay)
+                        .cornerRadius(Theme.Radius.xs)
+
+                    if group.members.contains(where: { $0.id == speedManager.defaultRouteInterface }) {
+                        Badge(text: languageManager.t("netspeed.default_route"), color: Theme.Colors.accentGreen)
+                    }
+
+                    Spacer()
+
+                    speedPair(speedIn: group.speedIn, speedOut: group.speedOut)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if isExpanded {
+                ForEach(group.members) { iface in
+                    interfaceRow(iface)
+                }
+            }
+        }
+        .background(striped ? Theme.Colors.surfaceOverlay : Color.clear)
+    }
+
+    /// 上/下行速率对，组行与成员行共用。
+    private func speedPair(speedIn: Double, speedOut: Double) -> some View {
+        HStack(spacing: 14) {
+            HStack(spacing: 3) {
+                Image(systemName: "arrow.up")
+                    .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
+                    .foregroundStyle(speedOut > 0 ? Theme.Colors.accentPurple : Theme.Colors.textTertiary)
+                Text(NetworkSpeedManager.formatSpeed(speedOut))
+                    .font(Theme.Fonts.number(Theme.Fonts.Size.caption, weight: .medium))
+                    .foregroundStyle(speedOut > 0 ? Theme.Colors.accentPurple : Theme.Colors.textTertiary)
+            }
+            HStack(spacing: 3) {
+                Image(systemName: "arrow.down")
+                    .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
+                    .foregroundStyle(speedIn > 0 ? Theme.Colors.accentCyan : Theme.Colors.textTertiary)
+                Text(NetworkSpeedManager.formatSpeed(speedIn))
+                    .font(Theme.Fonts.number(Theme.Fonts.Size.caption, weight: .medium))
+                    .foregroundStyle(speedIn > 0 ? Theme.Colors.accentCyan : Theme.Colors.textTertiary)
+            }
+        }
+    }
+
     private func interfaceRow(_ iface: NetworkInterfaceStats) -> some View {
         HStack(spacing: 12) {
             // Interface icon + name
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Circle()
-                        .fill(iface.isActive ? Color.green : Color.gray.opacity(0.4))
+                        .fill(iface.isActive ? Theme.Colors.accentGreen : Theme.Colors.textTertiary.opacity(0.4))
                         .frame(width: 6, height: 6)
                     Text(iface.displayName)
-                        .font(Theme.Fonts.body(12))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
                         .foregroundStyle(iface.isActive ? Theme.Colors.textPrimary : Theme.Colors.textTertiary)
                         .lineLimit(1)
                     if iface.role == .tunnel {
@@ -440,8 +547,8 @@ struct NetworkSpeedTab: View {
                 // Errors
                 if iface.errorsIn > 0 || iface.errorsOut > 0 {
                     Text("Errors: ↑\(iface.errorsOut) ↓\(iface.errorsIn)")
-                        .font(.system(size: 9, design: .monospaced))
-                        .foregroundStyle(.orange)
+                        .font(Theme.Fonts.number(Theme.Fonts.Size.micro))
+                        .foregroundStyle(Theme.Colors.accentOrange)
                 }
             }
             .frame(minWidth: 110, alignment: .leading)
@@ -454,14 +561,14 @@ struct NetworkSpeedTab: View {
                 VStack(alignment: .trailing, spacing: 1) {
                     HStack(spacing: 3) {
                         Image(systemName: "arrow.up")
-                            .font(.system(size: 7))
+                            .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
                             .foregroundStyle(Theme.Colors.accentPurple)
                         Text(NetworkSpeedManager.formatSpeed(iface.speedOut))
-                            .font(.system(size: 10, weight: .medium, design: .monospaced))
+                            .font(Theme.Fonts.number(Theme.Fonts.Size.caption, weight: .medium))
                             .foregroundStyle(iface.speedOut > 0 ? Theme.Colors.accentPurple : Theme.Colors.textTertiary)
                     }
                     Text(NetworkSpeedManager.formatBytes(iface.bytesOut))
-                        .font(.system(size: 8, design: .monospaced))
+                        .font(Theme.Fonts.number(Theme.Fonts.Size.micro))
                         .foregroundStyle(Theme.Colors.textTertiary)
                 }
                 
@@ -469,38 +576,36 @@ struct NetworkSpeedTab: View {
                 VStack(alignment: .trailing, spacing: 1) {
                     HStack(spacing: 3) {
                         Image(systemName: "arrow.down")
-                            .font(.system(size: 7))
+                            .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
                             .foregroundStyle(Theme.Colors.accentCyan)
                         Text(NetworkSpeedManager.formatSpeed(iface.speedIn))
-                            .font(.system(size: 10, weight: .medium, design: .monospaced))
+                            .font(Theme.Fonts.number(Theme.Fonts.Size.caption, weight: .medium))
                             .foregroundStyle(iface.speedIn > 0 ? Theme.Colors.accentCyan : Theme.Colors.textTertiary)
                     }
                     Text(NetworkSpeedManager.formatBytes(iface.bytesIn))
-                        .font(.system(size: 8, design: .monospaced))
+                        .font(Theme.Fonts.number(Theme.Fonts.Size.micro))
                         .foregroundStyle(Theme.Colors.textTertiary)
                 }
                 
                 // Packets
                 VStack(alignment: .trailing, spacing: 1) {
                     Text("PKT ↑\(formatPackets(iface.packetsOut))")
-                        .font(.system(size: 8, design: .monospaced))
+                        .font(Theme.Fonts.number(Theme.Fonts.Size.micro))
                         .foregroundStyle(Theme.Colors.textTertiary)
                     Text("PKT ↓\(formatPackets(iface.packetsIn))")
-                        .font(.system(size: 8, design: .monospaced))
+                        .font(Theme.Fonts.number(Theme.Fonts.Size.micro))
                         .foregroundStyle(Theme.Colors.textTertiary)
                 }
             }
         }
-        .padding(.vertical, 4)
+        .padding(.leading, 34)
+        .padding(.trailing, 10)
+        .padding(.vertical, 5)
         .contentShape(Rectangle())
         .onTapGesture {
             speedManager.selectedInterface = (speedManager.selectedInterface == iface.id) ? "all" : iface.id
         }
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(speedManager.selectedInterface == iface.id ? Theme.Colors.accentBlue.opacity(0.08) : Color.clear)
-                .padding(.horizontal, -6)
-        )
+        .background(speedManager.selectedInterface == iface.id ? Theme.Colors.accentBlue.opacity(0.10) : Color.clear)
     }
     
     private func formatPackets(_ count: UInt64) -> String {
@@ -560,19 +665,19 @@ struct NetworkSpeedTab: View {
     private func trafficStatItem(icon: String, color: Color, label: String, value: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Image(systemName: icon)
-                .font(.system(size: 20))
+                .font(Theme.Fonts.icon(Theme.Fonts.Size.display))
                 .foregroundStyle(color)
             Text(label)
-                .font(Theme.Fonts.body(10))
+                .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                 .foregroundStyle(Theme.Colors.textSecondary)
             Text(value)
-                .font(.system(size: 18, weight: .bold, design: .rounded))
+                .font(Theme.Fonts.ui(Theme.Fonts.Size.title, weight: .bold))
                 .foregroundStyle(Theme.Colors.textPrimary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
         .background(
-            RoundedRectangle(cornerRadius: 10)
+            RoundedRectangle(cornerRadius: Theme.Radius.md)
                 .fill(color.opacity(0.06))
         )
     }
@@ -599,29 +704,29 @@ struct NetworkSpeedTab: View {
                         speedManager.resetTrafficStats()
                     } label: { Image(systemName: "trash") }
                     .buttonStyle(.plain)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Theme.Colors.accentRed)
                     .help(languageManager.t("stats.reset_current"))
                 }
                 
                 HStack(spacing: 16) {
                     HStack(spacing: 6) {
                         Image(systemName: "clock")
-                            .font(.system(size: 10))
+                            .font(Theme.Fonts.icon(Theme.Fonts.Size.caption))
                         Text(languageManager.t("netspeed.total_download") + ":")
                         Text(NetworkSpeedManager.formatBytes(totals.bytesIn))
                             .foregroundStyle(Theme.Colors.accentCyan)
                     }
-                    .font(Theme.Fonts.body(11))
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                     .foregroundStyle(Theme.Colors.textSecondary)
                     
                     HStack(spacing: 6) {
                         Image(systemName: "chart.xyaxis.line")
-                            .font(.system(size: 10))
+                            .font(Theme.Fonts.icon(Theme.Fonts.Size.caption))
                         Text(languageManager.t("netspeed.total_upload") + ":")
                         Text(NetworkSpeedManager.formatBytes(totals.bytesOut))
                             .foregroundStyle(Theme.Colors.accentPurple)
                     }
-                    .font(Theme.Fonts.body(11))
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                     .foregroundStyle(Theme.Colors.textSecondary)
                     
                     Spacer()
@@ -633,13 +738,13 @@ struct NetworkSpeedTab: View {
                             .foregroundStyle(Theme.Colors.textPrimary)
                             .bold()
                     }
-                    .font(Theme.Fonts.body(11))
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                 }
                 .padding(.bottom, 4)
                 
                 if snapshots.count < 2 {
                     Text(languageManager.t("netspeed.collecting"))
-                        .font(Theme.Fonts.body(12))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
                         .foregroundStyle(Theme.Colors.textTertiary)
                         .frame(maxWidth: .infinity, alignment: .center)
                         .padding(.vertical, 30)
@@ -702,12 +807,12 @@ struct NetworkSpeedTab: View {
                     .chartYAxis {
                         AxisMarks(position: .leading) { value in
                             AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [4, 4]))
-                                .foregroundStyle(Color.white.opacity(0.05))
+                                .foregroundStyle(Theme.Colors.chartGrid)
                             
                             if let speed = value.as(Double.self) {
                                 AxisValueLabel {
                                     Text(NetworkSpeedManager.formatSpeed(speed))
-                                        .font(.system(size: 8, design: .monospaced))
+                                        .font(Theme.Fonts.number(Theme.Fonts.Size.micro))
                                         .foregroundStyle(Theme.Colors.textTertiary)
                                 }
                             }
@@ -718,7 +823,7 @@ struct NetworkSpeedTab: View {
                             if let date = value.as(Date.self) {
                                 AxisValueLabel {
                                     Text(formatTime(date.timeIntervalSince1970))
-                                        .font(.system(size: 8, design: .monospaced))
+                                        .font(Theme.Fonts.number(Theme.Fonts.Size.micro))
                                         .foregroundStyle(Theme.Colors.textTertiary)
                                 }
                             }
@@ -775,34 +880,34 @@ struct ProcessListView: View {
                 HStack(spacing: 10) {
                     HStack(spacing: 6) {
                         Image(systemName: "magnifyingglass")
-                            .font(.system(size: 11))
+                            .font(Theme.Fonts.icon(Theme.Fonts.Size.footnote))
                             .foregroundStyle(Theme.Colors.textTertiary)
                         TextField(languageManager.t("netspeed.process.search"), text: $searchText)
                             .textFieldStyle(.plain)
-                            .font(Theme.Fonts.body(12))
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
                     .background(
-                        RoundedRectangle(cornerRadius: 8)
+                        RoundedRectangle(cornerRadius: Theme.Radius.md)
                             .fill(Theme.Colors.cardBackground)
                     )
                     .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: Theme.Radius.md)
+                            .stroke(Theme.Colors.cardBorder, lineWidth: 1)
                     )
                     
                     Button(action: { speedManager.refreshProcessList() }) {
                         HStack(spacing: 4) {
                             Image(systemName: "arrow.clockwise")
-                                .font(.system(size: 10, weight: .semibold))
+                                .font(Theme.Fonts.icon(Theme.Fonts.Size.caption, weight: .semibold))
                             Text(languageManager.t("netspeed.process.refresh"))
-                                .font(Theme.Fonts.body(11))
+                                .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                         }
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
                         .background(
-                            RoundedRectangle(cornerRadius: 8)
+                            RoundedRectangle(cornerRadius: Theme.Radius.md)
                                 .fill(Theme.Colors.accentBlue.opacity(0.12))
                         )
                         .foregroundStyle(Theme.Colors.accentBlue)
@@ -811,17 +916,17 @@ struct ProcessListView: View {
                     
                     // Summary badge
                     Text("\(filteredProcesses.count) \(languageManager.t("netspeed.tab.processes"))")
-                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .font(Theme.Fonts.number(Theme.Fonts.Size.caption, weight: .medium))
                         .foregroundStyle(Theme.Colors.textTertiary)
                 }
                 
                 if filteredProcesses.isEmpty {
                     VStack(spacing: 10) {
                         Image(systemName: "network.slash")
-                            .font(.system(size: 32))
+                            .font(Theme.Fonts.icon(Theme.Fonts.Size.hero))
                             .foregroundStyle(Theme.Colors.textTertiary)
                         Text(languageManager.t("netspeed.process.no_connections"))
-                            .font(Theme.Fonts.body(13))
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.callout))
                             .foregroundStyle(Theme.Colors.textSecondary)
                     }
                     .frame(maxWidth: .infinity)
@@ -860,11 +965,11 @@ struct ProcessListView: View {
         .overlay(alignment: .bottom) {
             if let msg = killResultMessage {
                 Text(msg)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.white)
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.body, weight: .medium))
+                    .foregroundStyle(Theme.Colors.onAccent)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
-                    .background(Capsule().fill(msg.contains(languageManager.t("netspeed.process.kill_success")) ? Color.green : Color.red))
+                    .background(Capsule().fill(msg.contains(languageManager.t("netspeed.process.kill_success")) ? Theme.Colors.accentGreen : Theme.Colors.accentRed))
                     .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .padding(.bottom, 16)
@@ -885,32 +990,32 @@ struct ProcessListView: View {
                 HStack(spacing: 10) {
                     // Expand chevron
                     Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                        .font(.system(size: 9, weight: .bold))
+                        .font(Theme.Fonts.icon(Theme.Fonts.Size.micro, weight: .bold))
                         .foregroundStyle(Theme.Colors.textTertiary)
                         .frame(width: 14)
                     
                     // Process icon
                     ZStack {
-                        RoundedRectangle(cornerRadius: 6)
+                        RoundedRectangle(cornerRadius: Theme.Radius.sm)
                             .fill(processColor(proc.processName).opacity(0.15))
                             .frame(width: 28, height: 28)
                         Text(String(proc.processName.prefix(1)).uppercased())
-                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.body, weight: .bold))
                             .foregroundStyle(processColor(proc.processName))
                     }
                     
                     // Name + PID
                     VStack(alignment: .leading, spacing: 1) {
                         Text(proc.processName)
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.body, weight: .semibold))
                             .foregroundStyle(Theme.Colors.textPrimary)
                             .lineLimit(1)
                         HStack(spacing: 6) {
                             Text("PID \(proc.pid)")
-                                .font(.system(size: 9, design: .monospaced))
+                                .font(Theme.Fonts.number(Theme.Fonts.Size.micro))
                                 .foregroundStyle(Theme.Colors.textTertiary)
                             Text(proc.user)
-                                .font(.system(size: 9))
+                                .font(Theme.Fonts.ui(Theme.Fonts.Size.micro))
                                 .foregroundStyle(Theme.Colors.textTertiary)
                         }
                     }
@@ -921,20 +1026,20 @@ struct ProcessListView: View {
                             if proc.speedOut > 10 {
                                 HStack(spacing: 2) {
                                     Image(systemName: "arrow.up")
-                                        .font(.system(size: 8, weight: .bold))
+                                        .font(Theme.Fonts.icon(Theme.Fonts.Size.micro, weight: .bold))
                                         .foregroundStyle(Theme.Colors.accentPurple)
                                     Text(NetworkSpeedManager.formatSpeed(proc.speedOut))
-                                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                                        .font(Theme.Fonts.number(Theme.Fonts.Size.caption, weight: .semibold))
                                         .foregroundStyle(Theme.Colors.accentPurple)
                                 }
                             }
                             if proc.speedIn > 10 {
                                 HStack(spacing: 2) {
                                     Image(systemName: "arrow.down")
-                                        .font(.system(size: 8, weight: .bold))
+                                        .font(Theme.Fonts.icon(Theme.Fonts.Size.micro, weight: .bold))
                                         .foregroundStyle(Theme.Colors.accentCyan)
                                     Text(NetworkSpeedManager.formatSpeed(proc.speedIn))
-                                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                                        .font(Theme.Fonts.number(Theme.Fonts.Size.caption, weight: .semibold))
                                         .foregroundStyle(Theme.Colors.accentCyan)
                                 }
                             }
@@ -965,7 +1070,7 @@ struct ProcessListView: View {
                         showKillAlert = true
                     }) {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 14))
+                            .font(Theme.Fonts.icon(Theme.Fonts.Size.callout))
                             .foregroundStyle(Theme.Colors.accentRed.opacity(0.7))
                     }
                     .buttonStyle(.plain)
@@ -998,7 +1103,7 @@ struct ProcessListView: View {
                         Text(languageManager.t("netspeed.process.state"))
                             .frame(width: 100, alignment: .trailing)
                     }
-                    .font(.system(size: 9, weight: .semibold))
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.micro, weight: .semibold))
                     .foregroundStyle(Theme.Colors.textTertiary)
                     .padding(.horizontal, 4)
                     .padding(.bottom, 4)
@@ -1017,19 +1122,19 @@ struct ProcessListView: View {
         HStack(spacing: 0) {
             // Protocol
             Text(conn.protocolType)
-                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                .font(Theme.Fonts.number(Theme.Fonts.Size.caption, weight: .medium))
                 .foregroundStyle(conn.protocolType == "TCP" ? Theme.Colors.accentBlue : Theme.Colors.accentOrange)
                 .frame(width: 50, alignment: .leading)
             
             // Local address:port
             VStack(alignment: .leading, spacing: 0) {
                 Text(conn.localAddress.isEmpty ? "*" : conn.localAddress)
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(Theme.Fonts.number(Theme.Fonts.Size.caption))
                     .foregroundStyle(Theme.Colors.textPrimary)
                     .lineLimit(1)
                 if !conn.localPort.isEmpty && conn.localPort != "*" {
                     Text(":\(conn.localPort)")
-                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                        .font(Theme.Fonts.number(Theme.Fonts.Size.micro, weight: .semibold))
                         .foregroundStyle(Theme.Colors.accentPurple)
                 }
             }
@@ -1038,7 +1143,7 @@ struct ProcessListView: View {
             // Arrow
             if !conn.remoteAddress.isEmpty {
                 Image(systemName: "arrow.right")
-                    .font(.system(size: 8))
+                    .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
                     .foregroundStyle(Theme.Colors.textTertiary)
                     .padding(.horizontal, 4)
             }
@@ -1046,12 +1151,12 @@ struct ProcessListView: View {
             // Remote address:port
             VStack(alignment: .leading, spacing: 0) {
                 Text(conn.remoteAddress.isEmpty ? "-" : conn.remoteAddress)
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(Theme.Fonts.number(Theme.Fonts.Size.caption))
                     .foregroundStyle(Theme.Colors.textPrimary)
                     .lineLimit(1)
                 if !conn.remotePort.isEmpty && conn.remotePort != "*" {
                     Text(":\(conn.remotePort)")
-                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                        .font(Theme.Fonts.number(Theme.Fonts.Size.micro, weight: .semibold))
                         .foregroundStyle(Theme.Colors.accentCyan)
                 }
             }
@@ -1059,19 +1164,19 @@ struct ProcessListView: View {
             
             // State badge
             Text(conn.state)
-                .font(.system(size: 9, weight: .medium, design: .monospaced))
+                .font(Theme.Fonts.number(Theme.Fonts.Size.micro, weight: .medium))
                 .foregroundStyle(stateColor(conn.state))
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
                 .background(stateColor(conn.state).opacity(0.1))
-                .cornerRadius(4)
+                .cornerRadius(Theme.Radius.xs)
                 .frame(width: 100, alignment: .trailing)
         }
         .padding(.horizontal, 4)
         .padding(.vertical, 3)
         .background(
-            RoundedRectangle(cornerRadius: 4)
-                .fill(Color.white.opacity(0.02))
+            RoundedRectangle(cornerRadius: Theme.Radius.xs)
+                .fill(Theme.Colors.surfaceOverlay)
         )
     }
     
@@ -1081,7 +1186,7 @@ struct ProcessListView: View {
         let colors: [Color] = [
             Theme.Colors.accentBlue, Theme.Colors.accentPurple, Theme.Colors.accentCyan,
             Theme.Colors.accentOrange, Theme.Colors.accentGreen, Theme.Colors.accentRed,
-            .indigo, .mint, .teal, .pink
+            Theme.Colors.accentIndigo, Theme.Colors.accentMint, Theme.Colors.accentTeal, Theme.Colors.accentPink
         ]
         let hash = abs(name.hashValue)
         return colors[hash % colors.count]
