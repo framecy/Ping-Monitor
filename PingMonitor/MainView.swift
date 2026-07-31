@@ -47,15 +47,15 @@ enum SidebarItem: String, CaseIterable, Identifiable {
     
     var activeColor: Color {
         switch self {
-        case .monitor: return .green
-        case .statistics: return .blue
-        case .traceroute: return .cyan
-        case .netspeed: return .teal
-        case .tailscale: return .indigo
-        case .services: return .mint
-        case .hosts: return .purple
-        case .logs: return .orange
-        case .settings: return .gray
+        case .monitor: return Theme.Colors.accentGreen
+        case .statistics: return Theme.Colors.accentBlue
+        case .traceroute: return Theme.Colors.accentCyan
+        case .netspeed: return Theme.Colors.accentTeal
+        case .tailscale: return Theme.Colors.accentIndigo
+        case .services: return Theme.Colors.accentMint
+        case .hosts: return Theme.Colors.accentPurple
+        case .logs: return Theme.Colors.accentOrange
+        case .settings: return Theme.Colors.textSecondary
         }
     }
 }
@@ -65,33 +65,65 @@ struct MainView: View {
     @State private var selectedItem: SidebarItem = .monitor
     @ObservedObject private var languageManager = LanguageManager.shared
     // 固定默认宽度、可拖动调节、持久化；width 为硬约束，detail 内容无法反向挤压。
-    @AppStorage("pm.sidebarWidth") private var sidebarWidth: Double = 220
+    @AppStorage("pm.sidebarWidth") private var sidebarWidth: Double = Double(Theme.Layout.sidebarDefaultWidth)
     // Tailscale 功能总闸：关闭后隐藏侧边栏/header 入口；CLI 不可用且开启时仍不展示。
     @AppStorage("pm.enableTailscale") private var enableTailscale: Bool = false
     @State private var dragStartWidth: Double?
+    @ObservedObject private var tailscale = TailscaleManager.shared
 
+    // CLI 可用（本机视角）或已配置控制面凭据（全局监管）任一成立即展示入口。
     private var tailscaleVisible: Bool {
-        TailscaleManager.shared.isAvailable && enableTailscale
+        (tailscale.isAvailable || tailscale.hasInventoryCredentials) && enableTailscale
+    }
+
+    /// 侧边栏被夹紧后的实际宽度：@AppStorage 里可能残留越界值（旧版本 / 手改 plist）。
+    private var clampedSidebarWidth: CGFloat {
+        min(Theme.Layout.sidebarMaxWidth, max(Theme.Layout.sidebarMinWidth, CGFloat(sidebarWidth)))
+    }
+
+    /// 窗口最小宽度随侧边栏宽度推导，保证 detail 区始终有 detailMinWidth 可用，
+    /// 不会出现「窗口够小 → HStack 空间不足 → 侧边栏被一起压扁」。
+    private var minContentWidth: CGFloat {
+        clampedSidebarWidth + Theme.Layout.detailMinWidth
     }
 
     var body: some View {
         HStack(spacing: 0) {
             SidebarView(selectedItem: $selectedItem)
-                .frame(width: sidebarWidth)
+                .frame(width: clampedSidebarWidth)
+                // fixedSize + 高 layoutPriority：宽度是硬约束，空间不足时先压 detail，绝不压侧边栏。
+                .fixedSize(horizontal: true, vertical: false)
                 .background(Theme.Colors.sidebarBackground)
+                .layoutPriority(1)
 
-            SidebarResizer(width: $sidebarWidth, dragStartWidth: $dragStartWidth)
-                .background(Theme.Colors.separator)
-            
             VStack(spacing: 0) {
                 headerView
-                
+
                 detailContent
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+            // minWidth: 0 让 detail 成为唯一可压缩列；clipped 防止超宽内容盖到侧边栏上。
+            .frame(minWidth: 0, maxWidth: .infinity)
             .background(Theme.Colors.background)
+            // 1pt 发丝线画在 detail 的左边缘，两个色块直接相接，中间不留任何一列。
+            .overlay(alignment: .leading) {
+                Rectangle()
+                    .fill(Theme.Colors.separator)
+                    .frame(width: 1)
+            }
+            .clipped()
+            .layoutPriority(0)
         }
-        .frame(minWidth: 900, minHeight: 650)
+        // 拖拽热区浮在边界上，不参与 HStack 布局 —— 一旦它占一列宽度，
+        // 无论填什么颜色都会在 header 的材质层旁边露出一条色差。
+        .overlay(alignment: .leading) {
+            SidebarResizer(width: $sidebarWidth, dragStartWidth: $dragStartWidth)
+                .offset(x: clampedSidebarWidth - Theme.Layout.sidebarResizerWidth / 2)
+        }
+        .frame(minWidth: minContentWidth, minHeight: 650)
+        // 同步 NSWindow 的最小尺寸：只靠 SwiftUI 的 minWidth 挡不住标题栏拖拽缩小，
+        // 窗口一旦被拖到比内容还窄，HStack 就会连带压缩侧边栏。
+        .background(WindowMinSizeSetter(minSize: NSSize(width: minContentWidth, height: 650)))
         .onChange(of: languageManager.currentLanguage) { _, _ in
             viewModel.updateStatusBarDisplay()
             viewModel.syncToWidget()
@@ -141,24 +173,24 @@ struct MainView: View {
             ZStack {
                 if viewModel.isRunning {
                     Circle()
-                        .fill(.green.opacity(0.25))
+                        .fill(Theme.Colors.accentGreen.opacity(0.25))
                         .frame(width: 24, height: 24)
                         .scaleEffect(viewModel.isRunning ? 1.6 : 1.0)
                         .opacity(viewModel.isRunning ? 0 : 0.6)
                         .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: false), value: viewModel.isRunning)
                 }
                 Circle()
-                    .fill(viewModel.isRunning ? .green : .gray.opacity(0.5))
+                    .fill(viewModel.isRunning ? Theme.Colors.accentGreen : Theme.Colors.textTertiary.opacity(0.5))
                     .frame(width: 10, height: 10)
-                    .shadow(color: viewModel.isRunning ? .green.opacity(0.5) : .clear, radius: 4)
+                    .shadow(color: viewModel.isRunning ? Theme.Colors.accentGreen.opacity(0.5) : .clear, radius: 4)
             }
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(selectedItem.title)
-                    .font(.system(size: 16, weight: .bold))
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.headline, weight: .bold))
                 Text(viewModel.isRunning ? String(format: languageManager.t("header.monitoring"), viewModel.hosts.count) : languageManager.t("header.stopped"))
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
+                    .foregroundStyle(Theme.Colors.textSecondary)
             }
 
             Spacer()
@@ -166,7 +198,7 @@ struct MainView: View {
             // Language Toggle
             Button(action: { languageManager.toggle() }) {
                 Text(languageManager.currentLanguage == .zh ? "EN" : "中")
-                    .font(.system(size: 12, weight: .bold))
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.body, weight: .bold))
                     .foregroundStyle(Theme.Colors.textSecondary)
                     .padding(6)
                     .background(Theme.Colors.cardBackground)
@@ -175,25 +207,25 @@ struct MainView: View {
             .buttonStyle(.plain)
             .help("Switch Language")
 
-            // Tailscale Quick Action（功能总闸关闭时隐藏）
+            // Tailnet 监管状态（只读，点击进入 Tailscale 页）
             if tailscaleVisible {
-                TailscaleQuickActionView()
+                TailnetStatusPill(selectedItem: $selectedItem)
             }
 
             Button(action: { viewModel.toggle() }) {
                 HStack(spacing: 6) {
                     Image(systemName: viewModel.isRunning ? "stop.fill" : "play.fill")
-                        .font(.system(size: 10))
+                        .font(Theme.Fonts.icon(Theme.Fonts.Size.caption))
                     Text(viewModel.isRunning ? languageManager.t("header.stop") : languageManager.t("header.start"))
-                        .font(.system(size: 12, weight: .medium))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.body, weight: .medium))
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 7)
                 .background(
                     Capsule()
-                        .fill(viewModel.isRunning ? .red.opacity(0.15) : .green.opacity(0.15))
+                        .fill(viewModel.isRunning ? Theme.Colors.accentRed.opacity(0.15) : Theme.Colors.accentGreen.opacity(0.15))
                 )
-                .foregroundStyle(viewModel.isRunning ? .red : .green)
+                .foregroundStyle(viewModel.isRunning ? Theme.Colors.accentRed : Theme.Colors.accentGreen)
             }
             .buttonStyle(.plain)
         }
@@ -202,7 +234,7 @@ struct MainView: View {
         .background(
             LinearGradient(
                 colors: [
-                    viewModel.isRunning ? Color.green.opacity(0.04) : Color.gray.opacity(0.03),
+                    viewModel.isRunning ? Theme.Colors.accentGreen.opacity(0.04) : Theme.Colors.textTertiary.opacity(0.03),
                     .clear
                 ],
                 startPoint: .leading,
@@ -215,18 +247,21 @@ struct MainView: View {
 
 // MARK: - Sidebar Resizer
 // 可拖动的侧边栏分隔条：实时改变宽度并通过 @AppStorage 持久化。
-// 宽度被夹在 [180, 360]，避免过窄压坏内容或过宽挤占主区域。
+// 宽度被夹在 Theme.Layout.sidebarMin/MaxWidth，避免过窄压坏内容或过宽挤占主区域。
+//
+// 纯透明的 8pt 拖拽热区，浮在侧栏与 detail 的交界上，不占任何布局宽度。
+// 发丝线由 detail 区自己画，这里不上色 —— 上色就会变成一道灰带或色差缝。
 private struct SidebarResizer: View {
     @Binding var width: Double
     @Binding var dragStartWidth: Double?
 
-    private let minWidth: Double = 180
-    private let maxWidth: Double = 360
+    private let minWidth = Double(Theme.Layout.sidebarMinWidth)
+    private let maxWidth = Double(Theme.Layout.sidebarMaxWidth)
 
     var body: some View {
         Rectangle()
             .fill(Color.clear)
-            .frame(width: 8)
+            .frame(width: Theme.Layout.sidebarResizerWidth)
             .contentShape(Rectangle())
             .onHover { hovering in
                 if hovering {
@@ -253,61 +288,330 @@ private struct SidebarResizer: View {
     }
 }
 
-struct TailscaleQuickActionView: View {
-    @ObservedObject var tailscale = TailscaleManager.shared
-    @ObservedObject var languageManager = LanguageManager.shared
-    
+// MARK: - Window min size bridge
+// 把 SwiftUI 侧算出的最小内容尺寸同步给宿主 NSWindow，随侧边栏宽度变化实时更新。
+private struct WindowMinSizeSetter: NSViewRepresentable {
+    let minSize: NSSize
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: .zero)
+        DispatchQueue.main.async { apply(to: view) }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async { apply(to: nsView) }
+    }
+
+    private func apply(to view: NSView) {
+        guard let window = view.window, window.contentMinSize != minSize else { return }
+        window.contentMinSize = minSize
+        window.minSize = NSSize(
+            width: minSize.width,
+            height: minSize.height + (window.frame.height - window.contentLayoutRect.height)
+        )
+        // 已经比新最小值更窄时，主动放大，避免停留在压缩态。
+        if window.frame.width < minSize.width {
+            var frame = window.frame
+            frame.size.width = minSize.width
+            window.setFrame(frame, display: true, animate: false)
+        }
+    }
+}
+
+// MARK: - Tailscale OAuth 设置卡
+// client id / secret 只进钥匙串，不落 ConfigManager 的明文 JSON。
+struct TailscaleOAuthSettingsCard: View {
+    @ObservedObject private var languageManager = LanguageManager.shared
+    @ObservedObject private var tailscale = TailscaleManager.shared
+    @AppStorage("pm.tailscaleInventoryInterval") private var inventoryInterval: Double = 60
+    /// 管理模式：开启后 Tailscale 页的设备行才出现写操作菜单。
+    @AppStorage("pm.tailscaleAdminMode") private var adminMode: Bool = false
+
+    @State private var clientID: String = ""
+    @State private var clientSecret: String = ""
+    @State private var isValidating = false
+    @State private var resultMessage: String?
+    @State private var resultIsError = false
+    /// 未配置时默认展开引导，配置好后收起。
+    @State private var showGuide: Bool?
+
+    private static let consoleURL = URL(string: "https://login.tailscale.com/admin/settings/oauth")!
+
+    private var isGuideExpanded: Bool {
+        showGuide ?? !tailscale.hasInventoryCredentials
+    }
+
     var body: some View {
-        Menu {
-            if tailscale.availableExitNodes.isEmpty {
-                Text(languageManager.t("tailscale.no_exit_nodes"))
-            } else {
-                Button(action: { tailscale.disableExitNode() }) {
-                    HStack {
-                        Text(languageManager.t("settings.none"))
-                        if tailscale.currentExitNode == nil {
-                            Image(systemName: "checkmark")
-                        }
+        ModernCard {
+            VStack(alignment: .leading, spacing: 14) {
+                SectionHeader(title: languageManager.t("settings.tailscale.oauth"), icon: "key.horizontal.fill")
+
+                Text(languageManager.t("settings.tailscale.oauth.help"))
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
+                    .foregroundStyle(Theme.Colors.textTertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                guideSection
+
+                HStack {
+                    Text(languageManager.t("settings.tailscale.client_id"))
+                    Spacer()
+                    TextField("k123...", text: $clientID)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 260)
+                }
+
+                HStack {
+                    Text(languageManager.t("settings.tailscale.client_secret"))
+                    Spacer()
+                    SecureField("tskey-client-...", text: $clientSecret)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 260)
+                }
+
+                HStack {
+                    Text(languageManager.t("settings.tailscale.interval"))
+                    Spacer()
+                    Picker("", selection: $inventoryInterval) {
+                        Text("30s").tag(30.0)
+                        Text("60s").tag(60.0)
+                        Text("5m").tag(300.0)
+                        Text("15m").tag(900.0)
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 260, alignment: .trailing)
+                    .onChange(of: inventoryInterval) { _, _ in
+                        tailscale.refreshInventoryConfiguration()
                     }
                 }
-                
+
                 Divider()
-                
-                ForEach(tailscale.availableExitNodes) { exitNode in
-                    Button(action: { tailscale.switchExitNode(to: exitNode.node) }) {
-                        HStack {
-                            Text(exitNode.node.hostname)
-                            if let lat = exitNode.latency {
-                                Text("(\(Int(lat))ms)").foregroundStyle(.secondary)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Toggle(languageManager.t("settings.tailscale.admin_mode"), isOn: $adminMode)
+                    Text(languageManager.t("settings.tailscale.admin_mode.help"))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
+                        .foregroundStyle(adminMode ? Theme.Colors.accentOrange : Theme.Colors.textTertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                HStack(spacing: 10) {
+                    Button(action: saveAndValidate) {
+                        HStack(spacing: 6) {
+                            if isValidating {
+                                ProgressView().controlSize(.small).scaleEffect(0.7)
                             }
-                            if tailscale.currentExitNode?.tailscaleIP == exitNode.node.tailscaleIP {
-                                Image(systemName: "checkmark")
-                            }
+                            Text(languageManager.t("settings.tailscale.save_validate"))
                         }
                     }
+                    .disabled(isValidating || clientID.isEmpty || clientSecret.isEmpty)
+
+                    if tailscale.hasInventoryCredentials {
+                        Button(languageManager.t("settings.tailscale.clear"), role: .destructive, action: clearCredentials)
+                            .disabled(isValidating)
+                    }
+
+                    Spacer()
+
+                    if tailscale.hasInventoryCredentials {
+                        Badge(text: languageManager.t("settings.tailscale.configured"), color: Theme.Colors.accentGreen)
+                    }
+                }
+
+                if let resultMessage {
+                    Text(resultMessage)
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
+                        .foregroundStyle(resultIsError ? Theme.Colors.accentRed : Theme.Colors.accentGreen)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
-        } label: {
+        }
+        .onAppear {
+            // 只回填 client id（非机密）；secret 永远不从钥匙串读回界面。
+            clientID = KeychainStore.load(.tailscaleOAuthClientID) ?? ""
+        }
+    }
+
+    // MARK: 获取凭据的分步引导
+
+    private var guideSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Button(action: { showGuide = !isGuideExpanded }) {
+                HStack(spacing: 6) {
+                    Image(systemName: isGuideExpanded ? "chevron.down" : "chevron.right")
+                        .font(Theme.Fonts.icon(Theme.Fonts.Size.micro, weight: .semibold))
+                    Text(languageManager.t("settings.tailscale.howto"))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote, weight: .semibold))
+                    Spacer()
+                }
+                .foregroundStyle(Theme.Colors.accentBlue)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if isGuideExpanded {
+                VStack(alignment: .leading, spacing: 8) {
+                    guideStep(1, "settings.tailscale.howto.step1")
+                    guideStep(2, "settings.tailscale.howto.step2")
+                    guideStep(3, "settings.tailscale.howto.step3")
+                    guideStep(4, "settings.tailscale.howto.step4")
+                    guideStep(5, "settings.tailscale.howto.step5")
+                    guideStep(6, "settings.tailscale.howto.step6")
+
+                    HStack(spacing: 8) {
+                        Button(action: { NSWorkspace.shared.open(Self.consoleURL) }) {
+                            HStack(spacing: 5) {
+                                Image(systemName: "arrow.up.forward.square")
+                                    .font(Theme.Fonts.icon(Theme.Fonts.Size.caption))
+                                Text(languageManager.t("settings.tailscale.open_console"))
+                                    .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote, weight: .medium))
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Theme.Colors.accentBlue.opacity(0.15))
+                            .foregroundStyle(Theme.Colors.accentBlue)
+                            .cornerRadius(Theme.Radius.sm)
+                        }
+                        .buttonStyle(.plain)
+
+                        Button(action: {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(Self.consoleURL.absoluteString, forType: .string)
+                        }) {
+                            Text(languageManager.t("settings.tailscale.copy_link"))
+                                .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(Theme.Colors.cardBackground)
+                                .foregroundStyle(Theme.Colors.textSecondary)
+                                .cornerRadius(Theme.Radius.sm)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: Theme.Radius.sm)
+                                        .stroke(Theme.Colors.cardBorder, lineWidth: 1)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.top, 2)
+
+                    HStack(alignment: .top, spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
+                            .foregroundStyle(Theme.Colors.accentOrange)
+                        Text(languageManager.t("settings.tailscale.howto.note"))
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
+                            .foregroundStyle(Theme.Colors.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(.top, 2)
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Theme.Colors.surfaceOverlay)
+                .cornerRadius(Theme.Radius.md)
+            }
+        }
+    }
+
+    private func guideStep(_ index: Int, _ key: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text("\(index)")
+                .font(Theme.Fonts.number(Theme.Fonts.Size.micro, weight: .bold))
+                .foregroundStyle(Theme.Colors.onAccent)
+                .frame(width: 16, height: 16)
+                .background(Circle().fill(Theme.Colors.accentBlue))
+
+            Text(languageManager.t(key))
+                .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
+                .foregroundStyle(Theme.Colors.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func saveAndValidate() {
+        guard KeychainStore.save(clientID, for: .tailscaleOAuthClientID),
+              KeychainStore.save(clientSecret, for: .tailscaleOAuthClientSecret) else {
+            resultIsError = true
+            resultMessage = languageManager.t("settings.tailscale.keychain_failed")
+            return
+        }
+
+        isValidating = true
+        resultMessage = nil
+        clientSecret = ""
+
+        Task {
+            do {
+                let count = try await TailscaleAPIClient.shared.validateCredentials()
+                resultIsError = false
+                resultMessage = String(format: languageManager.t("settings.tailscale.validated"), count)
+                tailscale.refreshInventoryConfiguration()
+                LogManager.shared.info("Tailscale OAuth validated, \(count) devices visible")
+            } catch let error as TailscaleAPIError {
+                resultIsError = true
+                resultMessage = TailscaleManager.describe(error)
+                LogManager.shared.error("Tailscale OAuth validation failed: \(error.rawDescription)")
+            } catch {
+                resultIsError = true
+                resultMessage = error.localizedDescription
+            }
+            isValidating = false
+        }
+    }
+
+    private func clearCredentials() {
+        KeychainStore.delete(.tailscaleOAuthClientID)
+        KeychainStore.delete(.tailscaleOAuthClientSecret)
+        clientID = ""
+        clientSecret = ""
+        resultIsError = false
+        resultMessage = nil
+        tailscale.refreshInventoryConfiguration()
+    }
+}
+
+// MARK: - Tailnet 状态胶囊
+// 只读：展示控制面同步出来的在线/总数，点击跳转 Tailscale 页。
+// 这里刻意不提供 exit-node 切换 —— 本机的 Tailscale app 才是路由的唯一控制者。
+struct TailnetStatusPill: View {
+    @Binding var selectedItem: SidebarItem
+    @ObservedObject private var tailscale = TailscaleManager.shared
+    @ObservedObject private var languageManager = LanguageManager.shared
+
+    private var summary: (text: String, color: Color) {
+        if tailscale.hasInventoryCredentials {
+            switch tailscale.inventoryState {
+            case .failed:
+                return (languageManager.t("tailscale.inventory.sync_failed"), Theme.Colors.accentRed)
+            case .notConfigured:
+                return ("Tailscale", Theme.Colors.textTertiary)
+            case .ok:
+                let online = tailscale.tailnetDevices.filter { $0.isOnline }.count
+                return ("\(online)/\(tailscale.tailnetDevices.count)", Theme.Colors.accentBlue)
+            }
+        }
+        return (tailscale.isConnected ? "Tailscale" : languageManager.t("tailscale.disconnected"),
+                tailscale.isConnected ? Theme.Colors.accentBlue : Theme.Colors.textTertiary)
+    }
+
+    var body: some View {
+        Button(action: { selectedItem = .tailscale }) {
             HStack(spacing: 4) {
                 Image(systemName: "network")
-                    .font(.system(size: 12))
-                if let current = tailscale.currentExitNode {
-                    Text(current.hostname)
-                        .font(.system(size: 11, weight: .medium))
-                } else {
-                    Text("Tailscale")
-                        .font(.system(size: 11, weight: .medium))
-                }
+                    .font(Theme.Fonts.icon(Theme.Fonts.Size.body))
+                Text(summary.text)
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote, weight: .medium))
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .background(
-                Capsule()
-                    .fill(tailscale.currentExitNode != nil ? Color.blue.opacity(0.15) : Color.gray.opacity(0.1))
-            )
-            .foregroundStyle(tailscale.currentExitNode != nil ? .blue : .primary)
+            .background(Capsule().fill(summary.color.opacity(0.15)))
+            .foregroundStyle(summary.color)
         }
-        .menuStyle(.borderlessButton)
+        .buttonStyle(.plain)
+        .help(languageManager.t("tailscale.inventory.title"))
         .fixedSize()
     }
 }
@@ -335,10 +639,10 @@ struct StatisticsTab: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(languageManager.t("stats.quality_assessment"))
-                            .font(.system(size: 20, weight: .bold))
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.display, weight: .bold))
                             .foregroundStyle(Theme.Colors.textPrimary)
                         Text(languageManager.t("stats.dimension_readability"))
-                            .font(.system(size: 12))
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
                             .foregroundStyle(Theme.Colors.textSecondary)
                     }
 
@@ -585,7 +889,7 @@ struct StatisticsContentView: View {
                         viewModel.resetAllStats()
                     }
                     .buttonStyle(.bordered)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Theme.Colors.accentRed)
                 }
                 .padding(.top, 4)
             }
@@ -648,32 +952,32 @@ private struct StatsQualityHeroCard: View {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(languageManager.t("stats.quality_assessment"))
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .semibold))
                             .foregroundStyle(Theme.Colors.textPrimary)
                         Text(targetName)
-                            .font(.system(size: 12))
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
                             .foregroundStyle(Theme.Colors.textSecondary)
                     }
                     Spacer()
                     Text(windowLabel(window))
-                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .font(Theme.Fonts.number(Theme.Fonts.Size.footnote, weight: .semibold))
                         .foregroundStyle(Theme.Colors.accentBlue)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
                         .background(Theme.Colors.accentBlue.opacity(0.12))
-                        .cornerRadius(999)
+                        .cornerRadius(Theme.Radius.pill)
                 }
 
                 HStack(alignment: .firstTextBaseline, spacing: 12) {
                     Text("\(score)")
-                        .font(.system(size: 48, weight: .bold, design: .rounded))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.giant, weight: .bold))
                         .foregroundStyle(scoreColor(score))
                     VStack(alignment: .leading, spacing: 4) {
                         Text(gradeText(score))
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.headline, weight: .semibold))
                             .foregroundStyle(scoreColor(score))
                         Text(languageManager.t("stats.current_score_hint"))
-                            .font(.system(size: 11))
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                             .foregroundStyle(Theme.Colors.textSecondary)
                     }
                 }
@@ -696,17 +1000,17 @@ private struct StatsQualityHeroCard: View {
     private func compactStat(title: String, value: String, color: Color) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(title)
-                .font(.system(size: 10))
+                .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                 .foregroundStyle(Theme.Colors.textSecondary)
             Text(value)
-                .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                .font(Theme.Fonts.number(Theme.Fonts.Size.callout, weight: .semibold))
                 .foregroundStyle(color)
                 .lineLimit(1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
         .background(Theme.Colors.cardBackground.opacity(0.55))
-        .cornerRadius(10)
+        .cornerRadius(Theme.Radius.md)
     }
 
     private func gradeText(_ score: Int) -> String {
@@ -729,11 +1033,11 @@ private struct StatsDimensionBreakdownCard: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Text(languageManager.t("stats.dimension_scores"))
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .semibold))
                         .foregroundStyle(Theme.Colors.textPrimary)
                     Spacer()
                     Text("\(dimensions.average)")
-                        .font(.system(size: 13, weight: .bold, design: .monospaced))
+                        .font(Theme.Fonts.number(Theme.Fonts.Size.callout, weight: .bold))
                         .foregroundStyle(scoreColor(dimensions.average))
                 }
 
@@ -751,22 +1055,22 @@ private struct StatsDimensionBreakdownCard: View {
         VStack(alignment: .leading, spacing: 5) {
             HStack {
                 Text(title)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote, weight: .medium))
                     .foregroundStyle(Theme.Colors.textPrimary)
                 Spacer()
                 Text(weight)
-                    .font(.system(size: 10))
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                     .foregroundStyle(Theme.Colors.textTertiary)
                 Text("\(value)")
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .font(Theme.Fonts.number(Theme.Fonts.Size.footnote, weight: .bold))
                     .foregroundStyle(color)
             }
 
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 4)
+                    RoundedRectangle(cornerRadius: Theme.Radius.xs)
                         .fill(Theme.Colors.cardBackground)
-                    RoundedRectangle(cornerRadius: 4)
+                    RoundedRectangle(cornerRadius: Theme.Radius.xs)
                         .fill(color)
                         .frame(width: max(6, geo.size.width * CGFloat(value) / 100))
                 }
@@ -788,17 +1092,17 @@ private struct StatsQualityTrendCard: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Text(languageManager.t("stats.quality_trend"))
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .semibold))
                         .foregroundStyle(Theme.Colors.textPrimary)
                     Spacer()
                     Text("\(trendPoints.count)")
-                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .font(Theme.Fonts.number(Theme.Fonts.Size.footnote, weight: .semibold))
                         .foregroundStyle(Theme.Colors.textTertiary)
                 }
 
                 if trendPoints.isEmpty {
                     Text(languageManager.t("dashboard.no_data"))
-                        .font(.system(size: 12))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
                         .foregroundStyle(Theme.Colors.textSecondary)
                         .frame(maxWidth: .infinity, minHeight: 190)
                 } else {
@@ -832,7 +1136,7 @@ private struct StatsQualityTrendCard: View {
                             AxisValueLabel {
                                 if let date = value.as(Date.self) {
                                     Text(date.formatted(.dateTime.hour().minute()))
-                                        .font(.system(size: 9))
+                                        .font(Theme.Fonts.ui(Theme.Fonts.Size.micro))
                                         .foregroundStyle(Theme.Colors.textTertiary)
                                 }
                             }
@@ -841,11 +1145,11 @@ private struct StatsQualityTrendCard: View {
                     .chartYAxis {
                         AxisMarks(position: .leading) { value in
                             AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [4, 4]))
-                                .foregroundStyle(Color.white.opacity(0.06))
+                                .foregroundStyle(Theme.Colors.chartGrid)
                             AxisValueLabel {
                                 if let score = value.as(Double.self) {
                                     Text("\(Int(score))")
-                                        .font(.system(size: 9, design: .monospaced))
+                                        .font(Theme.Fonts.number(Theme.Fonts.Size.micro))
                                         .foregroundStyle(Theme.Colors.textTertiary)
                                 }
                             }
@@ -866,10 +1170,10 @@ private struct StatsQualityTrendCard: View {
     private func trendBadge(title: String, value: String, color: Color) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
-                .font(.system(size: 10))
+                .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                 .foregroundStyle(Theme.Colors.textSecondary)
             Text(value)
-                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                .font(Theme.Fonts.number(Theme.Fonts.Size.body, weight: .semibold))
                 .foregroundStyle(color)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -884,12 +1188,12 @@ private struct StatsEventTimelineCard: View {
         statsPanel {
             VStack(alignment: .leading, spacing: 12) {
                 Text(languageManager.t("stats.recent_anomalies"))
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .semibold))
                     .foregroundStyle(Theme.Colors.textPrimary)
 
                 if events.isEmpty {
                     Text(languageManager.t("stats.no_events"))
-                        .font(.system(size: 12))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
                         .foregroundStyle(Theme.Colors.textSecondary)
                         .frame(maxWidth: .infinity, minHeight: 190)
                 } else {
@@ -904,29 +1208,29 @@ private struct StatsEventTimelineCard: View {
                                 VStack(alignment: .leading, spacing: 3) {
                                     HStack {
                                         Text(event.title)
-                                            .font(.system(size: 12, weight: .semibold))
+                                            .font(Theme.Fonts.ui(Theme.Fonts.Size.body, weight: .semibold))
                                             .foregroundStyle(Theme.Colors.textPrimary)
                                         Spacer()
                                         Text(event.timestamp.formatted(date: .omitted, time: .shortened))
-                                            .font(.system(size: 10, design: .monospaced))
+                                            .font(Theme.Fonts.number(Theme.Fonts.Size.caption))
                                             .foregroundStyle(Theme.Colors.textTertiary)
                                     }
 
                                     if let hostName = event.hostName {
                                         Text(hostName)
-                                            .font(.system(size: 10, weight: .medium))
+                                            .font(Theme.Fonts.ui(Theme.Fonts.Size.caption, weight: .medium))
                                             .foregroundStyle(eventColor(event.severity))
                                     }
 
                                     Text(event.detail)
-                                        .font(.system(size: 11))
+                                        .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                                         .foregroundStyle(Theme.Colors.textSecondary)
                                         .fixedSize(horizontal: false, vertical: true)
                                 }
                             }
                             .padding(10)
                             .background(Theme.Colors.cardBackground.opacity(0.65))
-                            .cornerRadius(10)
+                            .cornerRadius(Theme.Radius.md)
                         }
                     }
                 }
@@ -935,14 +1239,7 @@ private struct StatsEventTimelineCard: View {
     }
 
     private func eventColor(_ severity: QualityEventSeverity) -> Color {
-        switch severity {
-        case .info:
-            return Theme.Colors.accentBlue
-        case .warning:
-            return Theme.Colors.accentOrange
-        case .critical:
-            return Theme.Colors.accentRed
-        }
+        Theme.Status.severity(severity)
     }
 }
 
@@ -954,11 +1251,11 @@ private struct StatsDimensionStandardsCard: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Text(languageManager.t("stats.scoring_standard"))
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .semibold))
                         .foregroundStyle(Theme.Colors.textPrimary)
                     Spacer()
                     Text(languageManager.t("stats.scoring_hint"))
-                        .font(.system(size: 10))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                         .foregroundStyle(Theme.Colors.textTertiary)
                 }
 
@@ -1014,20 +1311,20 @@ private struct StatsDimensionStandardsCard: View {
         HStack(alignment: .top, spacing: 14) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(dimension)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.body, weight: .semibold))
                     .foregroundStyle(Theme.Colors.textPrimary)
                 Text(weight)
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .font(Theme.Fonts.number(Theme.Fonts.Size.footnote, weight: .bold))
                     .foregroundStyle(accent)
             }
             .frame(width: 86, alignment: .leading)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(signal)
-                    .font(.system(size: 11))
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                     .foregroundStyle(Theme.Colors.textSecondary)
                 Text(standard)
-                    .font(.system(size: 11))
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                     .foregroundStyle(Theme.Colors.textPrimary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -1035,9 +1332,9 @@ private struct StatsDimensionStandardsCard: View {
         }
         .padding(12)
         .background(Theme.Colors.cardBackground.opacity(0.55))
-        .cornerRadius(10)
+        .cornerRadius(Theme.Radius.md)
         .overlay(
-            RoundedRectangle(cornerRadius: 10)
+            RoundedRectangle(cornerRadius: Theme.Radius.md)
                 .stroke(accent.opacity(0.14), lineWidth: 1)
         )
     }
@@ -1059,7 +1356,7 @@ private struct StatsRawMetricsCard: View {
         statsPanel {
             VStack(alignment: .leading, spacing: 14) {
                 Text(languageManager.t("stats.raw_metrics"))
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .semibold))
                     .foregroundStyle(Theme.Colors.textPrimary)
 
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: 10)], spacing: 10) {
@@ -1084,11 +1381,11 @@ private struct StatsRawMetricsCard: View {
     private func metricCard(label: String, value: String, color: Color) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label)
-                .font(.system(size: 10))
+                .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                 .foregroundStyle(Theme.Colors.textSecondary)
                 .lineLimit(1)
             Text(value)
-                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                .font(Theme.Fonts.number(Theme.Fonts.Size.body, weight: .semibold))
                 .foregroundStyle(color)
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
@@ -1096,7 +1393,7 @@ private struct StatsRawMetricsCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
         .background(Theme.Colors.cardBackground.opacity(0.55))
-        .cornerRadius(10)
+        .cornerRadius(Theme.Radius.md)
     }
 }
 
@@ -1108,12 +1405,12 @@ private struct StatsWorstHostsCard: View {
         statsPanel {
             VStack(alignment: .leading, spacing: 12) {
                 Text(languageManager.t("stats.worst_hosts"))
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .semibold))
                     .foregroundStyle(Theme.Colors.textPrimary)
 
                 if snapshots.isEmpty {
                     Text(languageManager.t("dashboard.no_data"))
-                        .font(.system(size: 12))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
                         .foregroundStyle(Theme.Colors.textSecondary)
                         .frame(maxWidth: .infinity, minHeight: 180)
                 } else {
@@ -1122,25 +1419,25 @@ private struct StatsWorstHostsCard: View {
                             HStack(spacing: 10) {
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text(snapshot.hostName)
-                                        .font(.system(size: 12, weight: .semibold))
+                                        .font(Theme.Fonts.ui(Theme.Fonts.Size.body, weight: .semibold))
                                         .foregroundStyle(Theme.Colors.textPrimary)
                                     Text(pathLabel(snapshot.pathKind))
-                                        .font(.system(size: 10))
+                                        .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                                         .foregroundStyle(pathColor(snapshot.pathKind))
                                 }
                                 Spacer()
                                 VStack(alignment: .trailing, spacing: 3) {
                                     Text("\(snapshot.score)")
-                                        .font(.system(size: 13, weight: .bold, design: .monospaced))
+                                        .font(Theme.Fonts.number(Theme.Fonts.Size.callout, weight: .bold))
                                         .foregroundStyle(scoreColor(snapshot.score))
                                     Text(snapshot.p95Latency.map { String(format: "P95 %.0fms", $0) } ?? "P95 —")
-                                        .font(.system(size: 10, design: .monospaced))
+                                        .font(Theme.Fonts.number(Theme.Fonts.Size.caption))
                                         .foregroundStyle(Theme.Colors.textSecondary)
                                 }
                             }
                             .padding(10)
                             .background(Theme.Colors.cardBackground.opacity(0.55))
-                            .cornerRadius(10)
+                            .cornerRadius(Theme.Radius.md)
                         }
                     }
                 }
@@ -1154,25 +1451,19 @@ private func statsPanel<Content: View>(@ViewBuilder content: () -> Content) -> s
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: Theme.Radius.xl)
                 .fill(.ultraThinMaterial)
                 .shadow(color: .black.opacity(0.05), radius: 8, y: 3)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.white.opacity(0.06), lineWidth: 1)
+            RoundedRectangle(cornerRadius: Theme.Radius.xl)
+                .stroke(Theme.Colors.cardBorder, lineWidth: 1)
         )
 }
 
 @MainActor
 private func scoreColor(_ score: Int) -> Color {
-    switch score {
-    case 90...: return Theme.Colors.accentGreen
-    case 75..<90: return Theme.Colors.accentBlue
-    case 60..<75: return Theme.Colors.accentOrange
-    case 40..<60: return Color.orange
-    default: return Theme.Colors.accentRed
-    }
+    Theme.Status.score(score)
 }
 
 @MainActor
@@ -1190,14 +1481,7 @@ private func pathLabel(_ path: ProbePathKind) -> String {
 
 @MainActor
 private func pathColor(_ path: ProbePathKind) -> Color {
-    switch path {
-    case .direct:
-        return Theme.Colors.accentGreen
-    case .relay:
-        return Theme.Colors.accentOrange
-    case .unknown:
-        return Theme.Colors.textTertiary
-    }
+    Theme.Status.path(path)
 }
 
 @MainActor
@@ -1398,10 +1682,10 @@ struct QuickAccessServicesRibbon: View {
                 HStack(spacing: 0) {
                     HStack(spacing: 5) {
                         Image(systemName: "bolt.fill")
-                            .font(.system(size: 9))
+                            .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
                             .foregroundStyle(Theme.Colors.accentOrange)
                         Text(LanguageManager.shared.t("monitor.quick_access"))
-                            .font(.system(size: 11, weight: .semibold))
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote, weight: .semibold))
                             .foregroundStyle(Theme.Colors.textSecondary)
                     }
                     .padding(.leading, 14)
@@ -1414,7 +1698,7 @@ struct QuickAccessServicesRibbon: View {
                         }
                     } label: {
                         Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                            .font(.system(size: 10, weight: .semibold))
+                            .font(Theme.Fonts.icon(Theme.Fonts.Size.caption, weight: .semibold))
                             .foregroundStyle(Theme.Colors.textTertiary)
                             .frame(width: 28, height: 28)
                             .contentShape(Rectangle())
@@ -1427,7 +1711,7 @@ struct QuickAccessServicesRibbon: View {
                 // Expanded content
                 if isExpanded {
                     Rectangle()
-                        .fill(Color.white.opacity(0.05))
+                        .fill(Theme.Colors.separator)
                         .frame(height: 1)
                         .padding(.horizontal, 14)
 
@@ -1442,7 +1726,7 @@ struct QuickAccessServicesRibbon: View {
             .background(Theme.Colors.cardBackground.opacity(0.42))
             .overlay(
                 Rectangle()
-                    .fill(Color.white.opacity(0.04))
+                    .fill(Theme.Colors.separator)
                     .frame(height: 1),
                 alignment: .bottom
             )
@@ -1459,7 +1743,7 @@ struct QuickAccessServicesRibbon: View {
                     .frame(width: 6, height: 6)
                     .shadow(color: hostStatusColor(group.host).opacity(0.6), radius: 2)
                 Text(group.host.name)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote, weight: .medium))
                     .foregroundStyle(Theme.Colors.textSecondary)
                     .lineLimit(1)
             }
@@ -1485,10 +1769,10 @@ struct QuickAccessServicesRibbon: View {
         } label: {
             HStack(spacing: 5) {
                 Image(systemName: shortcut.icon)
-                    .font(.system(size: 11))
+                    .font(Theme.Fonts.icon(Theme.Fonts.Size.footnote))
                     .foregroundStyle(serviceColor(for: shortcut.type))
                 Text(shortcut.name)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote, weight: .medium))
                     .foregroundStyle(Theme.Colors.textPrimary)
                     .lineLimit(1)
                 typePill(shortcut.type)
@@ -1496,7 +1780,7 @@ struct QuickAccessServicesRibbon: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 5)
             .background(serviceColor(for: shortcut.type).opacity(0.10))
-            .cornerRadius(8)
+            .cornerRadius(Theme.Radius.md)
         }
         .buttonStyle(.plain)
         .help(serviceTargetPreview(shortcut))
@@ -1516,20 +1800,16 @@ struct QuickAccessServicesRibbon: View {
 
     private func typePill(_ type: ServiceShortcut.ServiceType) -> some View {
         Text(shortcutTypeLabel(type))
-            .font(.system(size: 9, weight: .semibold))
+            .font(Theme.Fonts.ui(Theme.Fonts.Size.micro, weight: .semibold))
             .foregroundStyle(serviceColor(for: type))
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .background(serviceColor(for: type).opacity(0.12))
-            .cornerRadius(999)
+            .cornerRadius(Theme.Radius.pill)
     }
     
     private func serviceColor(for type: ServiceShortcut.ServiceType) -> Color {
-        switch type {
-        case .web: return Theme.Colors.accentBlue
-        case .ssh: return Theme.Colors.accentGreen
-        case .custom: return Theme.Colors.accentOrange
-        }
+        Theme.Status.service(type)
     }
 
     private func shortcutTypeLabel(_ type: ServiceShortcut.ServiceType) -> String {
@@ -1561,9 +1841,7 @@ struct QuickAccessServicesRibbon: View {
         if host.isChecking { return Theme.Colors.accentBlue }
         if !host.isReachable { return Theme.Colors.accentRed }
         if let latency = host.lastLatency {
-            if latency < 80 { return Theme.Colors.accentGreen }
-            if latency < 180 { return Theme.Colors.accentOrange }
-            return Theme.Colors.accentRed
+            return Theme.Status.latency(latency)
         }
         return Theme.Colors.textSecondary
     }
@@ -1671,7 +1949,7 @@ struct HostManagementTab: View {
             }
             .padding(4)
             .background(Theme.Colors.cardBackground)
-            .cornerRadius(8)
+            .cornerRadius(Theme.Radius.md)
             .padding()
             
             if selectedSection == 0 {
@@ -1690,16 +1968,16 @@ struct HostManagementTab: View {
             }
         } label: {
             Text(title)
-                .font(Theme.Fonts.body(12))
+                .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
                 .fontWeight(selectedSection == section ? .medium : .regular)
-                .foregroundStyle(selectedSection == section ? Color.white : Theme.Colors.textSecondary)
+                .foregroundStyle(selectedSection == section ? Theme.Colors.onAccent : Theme.Colors.textSecondary)
                 .padding(.vertical, 6)
                 .padding(.horizontal, 16)
                 .frame(maxWidth: .infinity)
                 .background(
                     ZStack {
                         if selectedSection == section {
-                            RoundedRectangle(cornerRadius: 6)
+                            RoundedRectangle(cornerRadius: Theme.Radius.sm)
                                 .fill(Theme.Colors.accentBlue)
                                 .matchedGeometryEffect(id: "HostManageTabBackground", in: animation)
                         }
@@ -1729,7 +2007,7 @@ struct HostsManagementView: View {
             HStack {
                 Text(languageManager.t("sidebar.hosts"))
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.Colors.textSecondary)
                 Spacer()
                 Button {
                     showingAddHost = true
@@ -1872,26 +2150,26 @@ struct HostManagementCard: View {
             // Header: name + actions
             HStack {
                 Image(systemName: "server.rack")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.blue)
+                    .font(Theme.Fonts.icon(Theme.Fonts.Size.body))
+                    .foregroundStyle(Theme.Colors.accentBlue)
                 Text(host.name)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .semibold))
                     .lineLimit(1)
                 Spacer()
                 
                 HStack(spacing: 6) {
                     Button { onEdit() } label: {
                         Image(systemName: "pencil.circle.fill")
-                            .font(.system(size: 16))
-                            .foregroundStyle(.blue.opacity(0.7))
+                            .font(Theme.Fonts.icon(Theme.Fonts.Size.headline))
+                            .foregroundStyle(Theme.Colors.accentBlue.opacity(0.7))
                     }
                     .buttonStyle(.plain)
                     .help(languageManager.t("menu.edit"))
                     
                     Button { onDelete() } label: {
                         Image(systemName: "trash.circle.fill")
-                            .font(.system(size: 16))
-                            .foregroundStyle(.red.opacity(0.6))
+                            .font(Theme.Fonts.icon(Theme.Fonts.Size.headline))
+                            .foregroundStyle(Theme.Colors.accentRed.opacity(0.6))
                     }
                     .buttonStyle(.plain)
                     .help(languageManager.t("menu.delete"))
@@ -1902,11 +2180,11 @@ struct HostManagementCard: View {
             // Address
             HStack(spacing: 4) {
                 Image(systemName: "globe")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.secondary)
+                    .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
+                    .foregroundStyle(Theme.Colors.textSecondary)
                 Text(host.address)
-                    .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(.secondary)
+                    .font(Theme.Fonts.number(Theme.Fonts.Size.footnote))
+                    .foregroundStyle(Theme.Colors.textSecondary)
                     .lineLimit(1)
             }
             
@@ -1915,36 +2193,36 @@ struct HostManagementCard: View {
                 HStack(spacing: 4) {
                     ForEach(host.displayRules.filter { $0.enabled }.prefix(3)) { rule in
                         Text("\(rule.condition == "less" ? "<" : ">")\(Int(rule.threshold))ms→\(rule.label)")
-                            .font(.system(size: 9, weight: .medium))
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.micro, weight: .medium))
                             .padding(.horizontal, 5)
                             .padding(.vertical, 2)
                             .background(
                                 Capsule()
-                                    .fill(rule.condition == "less" ? Color.green.opacity(0.15) : Color.orange.opacity(0.15))
+                                    .fill(rule.condition == "less" ? Theme.Colors.accentGreen.opacity(0.15) : Theme.Colors.accentOrange.opacity(0.15))
                             )
-                            .foregroundStyle(rule.condition == "less" ? .green : .orange)
+                            .foregroundStyle(rule.condition == "less" ? Theme.Colors.accentGreen : Theme.Colors.accentOrange)
                     }
                 }
             }
 
             HStack(spacing: 4) {
                 Image(systemName: host.probeMode == .tcp ? "cable.connector" : "waveform.path.ecg")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.secondary)
+                    .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
+                    .foregroundStyle(Theme.Colors.textSecondary)
                 Text(host.probeMode == .tcp ? "TCP \(host.tcpPort)" : "ICMP")
-                    .font(.system(size: 9, design: .monospaced))
-                    .foregroundStyle(.secondary)
+                    .font(Theme.Fonts.number(Theme.Fonts.Size.micro))
+                    .foregroundStyle(Theme.Colors.textSecondary)
             }
             
             // Custom command
             if !host.command.isEmpty {
                 HStack(spacing: 4) {
                     Image(systemName: "terminal")
-                        .font(.system(size: 9))
-                        .foregroundStyle(.purple.opacity(0.7))
+                        .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
+                        .foregroundStyle(Theme.Colors.accentPurple.opacity(0.7))
                     Text(host.command)
-                        .font(.system(size: 9, design: .monospaced))
-                        .foregroundStyle(.secondary)
+                        .font(Theme.Fonts.number(Theme.Fonts.Size.micro))
+                        .foregroundStyle(Theme.Colors.textSecondary)
                         .lineLimit(1)
                 }
             }
@@ -1952,13 +2230,13 @@ struct HostManagementCard: View {
         .frame(maxHeight: .infinity, alignment: .top)
         .padding(14)
         .background(
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: Theme.Radius.lg)
                 .fill(.ultraThinMaterial)
                 .shadow(color: .black.opacity(isHovered ? 0.08 : 0.03), radius: isHovered ? 8 : 4, y: 2)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(isHovered ? Color.blue.opacity(0.15) : Color.gray.opacity(0.08), lineWidth: 1)
+            RoundedRectangle(cornerRadius: Theme.Radius.lg)
+                .stroke(isHovered ? Theme.Colors.accentBlue.opacity(0.15) : Theme.Colors.textTertiary.opacity(0.08), lineWidth: 1)
         )
         .scaleEffect(isHovered ? 1.01 : 1.0)
         .contextMenu {
@@ -1985,7 +2263,7 @@ struct PresetsManagementView: View {
             HStack {
                 Text(languageManager.t("host.manage.quick_add"))
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.Colors.textSecondary)
                 Spacer()
                 Button {
                     showingAddPreset = true
@@ -2087,17 +2365,17 @@ struct PresetManagementCard: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Image(systemName: "bookmark.fill")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.orange)
+                    .font(Theme.Fonts.icon(Theme.Fonts.Size.footnote))
+                    .foregroundStyle(Theme.Colors.accentOrange)
                 Text(preset.name)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .semibold))
                     .lineLimit(1)
                 Spacer()
                 
                 Button { onAdd() } label: {
                     Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 18))
-                        .foregroundStyle(.green)
+                        .font(Theme.Fonts.icon(Theme.Fonts.Size.title))
+                        .foregroundStyle(Theme.Colors.accentGreen)
                 }
                 .buttonStyle(.plain)
                 .help(languageManager.t("menu.add_to_monitor"))
@@ -2105,22 +2383,22 @@ struct PresetManagementCard: View {
             
             HStack(spacing: 4) {
                 Image(systemName: "globe")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.secondary)
+                    .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
+                    .foregroundStyle(Theme.Colors.textSecondary)
                 Text(preset.address)
-                    .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(.secondary)
+                    .font(Theme.Fonts.number(Theme.Fonts.Size.footnote))
+                    .foregroundStyle(Theme.Colors.textSecondary)
                     .lineLimit(1)
             }
             
             if !preset.command.isEmpty {
                 HStack(spacing: 4) {
                     Image(systemName: "terminal")
-                        .font(.system(size: 9))
-                        .foregroundStyle(.purple.opacity(0.7))
+                        .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
+                        .foregroundStyle(Theme.Colors.accentPurple.opacity(0.7))
                     Text(preset.command)
-                        .font(.system(size: 9, design: .monospaced))
-                        .foregroundStyle(.secondary)
+                        .font(Theme.Fonts.number(Theme.Fonts.Size.micro))
+                        .foregroundStyle(Theme.Colors.textSecondary)
                         .lineLimit(1)
                 }
             }
@@ -2130,15 +2408,15 @@ struct PresetManagementCard: View {
                 Spacer()
                 Button { onEdit() } label: {
                     Image(systemName: "pencil.circle.fill")
-                        .font(.system(size: 14))
-                        .foregroundStyle(.blue.opacity(0.6))
+                        .font(Theme.Fonts.icon(Theme.Fonts.Size.callout))
+                        .foregroundStyle(Theme.Colors.accentBlue.opacity(0.6))
                 }
                 .buttonStyle(.plain)
                 
                 Button { onDelete() } label: {
                     Image(systemName: "trash.circle.fill")
-                        .font(.system(size: 14))
-                        .foregroundStyle(.red.opacity(0.5))
+                        .font(Theme.Fonts.icon(Theme.Fonts.Size.callout))
+                        .foregroundStyle(Theme.Colors.accentRed.opacity(0.5))
                 }
                 .buttonStyle(.plain)
             }
@@ -2147,13 +2425,13 @@ struct PresetManagementCard: View {
         .padding(14)
         .frame(height: 110, alignment: .top)
         .background(
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: Theme.Radius.lg)
                 .fill(.ultraThinMaterial)
                 .shadow(color: .black.opacity(isHovered ? 0.08 : 0.03), radius: isHovered ? 8 : 4, y: 2)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(isHovered ? Color.orange.opacity(0.15) : Color.gray.opacity(0.08), lineWidth: 1)
+            RoundedRectangle(cornerRadius: Theme.Radius.lg)
+                .stroke(isHovered ? Theme.Colors.accentOrange.opacity(0.15) : Theme.Colors.textTertiary.opacity(0.08), lineWidth: 1)
         )
         .scaleEffect(isHovered ? 1.01 : 1.0)
         .contextMenu {
@@ -2203,7 +2481,7 @@ struct HostEditorSheet: View {
                                     Text("TCP Port")
                                     Spacer()
                                     Text("\(tcpPort)")
-                                        .foregroundStyle(.secondary)
+                                        .foregroundStyle(Theme.Colors.textSecondary)
                                 }
                             }
                         }
@@ -2212,7 +2490,10 @@ struct HostEditorSheet: View {
                             TextField(languageManager.t("editor.command"), text: $command)
                             Text(languageManager.t("editor.command_hint"))
                                 .font(.caption2)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Theme.Colors.textSecondary)
+                            Text(languageManager.t("editor.command_follows_interval"))
+                                .font(.caption2)
+                                .foregroundStyle(Theme.Colors.accentBlue)
                         }
                     }
                     
@@ -2297,7 +2578,7 @@ struct RuleEditorRow: View {
                         .multilineTextAlignment(.center)
                         .frame(width: 45)
                     Text("ms")
-                        .font(.system(size: 10))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                         .foregroundStyle(Theme.Colors.textSecondary)
                 }
                 
@@ -2305,7 +2586,7 @@ struct RuleEditorRow: View {
                 
                 // Static Label "显示文本"
                 Text(languageManager.t("editor.rule.label"))
-                    .font(.system(size: 11))
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                     .foregroundStyle(Theme.Colors.textSecondary)
                 
                 // Label TextField
@@ -2395,7 +2676,10 @@ struct PresetEditorSheet: View {
                     TextField(languageManager.t("editor.command"), text: $command)
                     Text(languageManager.t("editor.command_hint"))
                         .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.Colors.textSecondary)
+                    Text(languageManager.t("editor.command_follows_interval"))
+                        .font(.caption2)
+                        .foregroundStyle(Theme.Colors.accentBlue)
                 }
             }
             .formStyle(.grouped)
@@ -2494,12 +2778,7 @@ struct LogRow: View {
     @ObservedObject private var languageManager = LanguageManager.shared
     
     var levelColor: Color {
-        switch entry.level {
-        case .debug: return .gray
-        case .info: return .blue
-        case .warning: return .orange
-        case .error: return .red
-        }
+        Theme.Status.logLevel(entry.level)
     }
     
     var body: some View {
@@ -2510,25 +2789,25 @@ struct LogRow: View {
             
             HStack(alignment: .top, spacing: 12) {
                 Text(entry.formattedTimestamp)
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(Theme.Fonts.number(Theme.Fonts.Size.caption))
                     .foregroundStyle(.tertiary)
                     .frame(width: 130, alignment: .leading)
                 
                 Text(languageManager.t("logs.level.\(entry.level.rawValue.lowercased())"))
-                    .font(.system(size: 9, weight: .bold))
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.micro, weight: .bold))
                     .foregroundStyle(levelColor)
                     .frame(width: 50, alignment: .leading)
                 
                 VStack(alignment: .leading, spacing: 3) {
                     if let host = entry.host {
                         Text(host)
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(.secondary)
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.caption, weight: .medium))
+                            .foregroundStyle(Theme.Colors.textSecondary)
                             .lineLimit(1)
                     }
                     Text(entry.message)
-                        .font(.system(size: 12))
-                        .foregroundStyle(.primary)
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
+                        .foregroundStyle(Theme.Colors.textPrimary)
                         .textSelection(.enabled)
                 }
             }
@@ -2618,19 +2897,24 @@ struct SettingsTab: View {
 
                         Toggle(languageManager.t("settings.tailscale"), isOn: $enableTailscale)
                             .help(languageManager.t("settings.tailscale.help"))
-                        
+
                         Divider()
-                        
+
                         HStack {
                             Text(languageManager.t("settings.version"))
                             Spacer()
                             Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "2.0") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"))")
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Theme.Colors.textSecondary)
                                 .frame(width: 220, alignment: .trailing)
                         }
                     }
                 }
-                
+
+                // MARK: - Tailscale 全局监管凭据
+                if enableTailscale {
+                    TailscaleOAuthSettingsCard()
+                }
+
                 // MARK: - Display (Status Bar & Widget)
                 ModernCard {
                     VStack(alignment: .leading, spacing: 16) {
@@ -2655,7 +2939,7 @@ struct SettingsTab: View {
                         
                         Text(statusBarDescription)
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.Colors.textSecondary)
                             .padding(.top, -8)
                         
                         let activeMenuCount = [viewModel.showIconInMenu, viewModel.showLatencyInMenu, viewModel.showLabelsInMenu, viewModel.showSpeedInMenu].filter { $0 }.count
@@ -2722,7 +3006,7 @@ struct SettingsTab: View {
                                             viewModel.statusBarIconWidth -= 2
                                             viewModel.saveSettings()
                                         }
-                                    } label: { Image(systemName: "minus.circle").font(.system(size: 16)) }
+                                    } label: { Image(systemName: "minus.circle").font(Theme.Fonts.icon(Theme.Fonts.Size.headline)) }
                                     .buttonStyle(.borderless)
                                     .disabled(viewModel.statusBarIconWidth <= 10)
                                     
@@ -2735,7 +3019,7 @@ struct SettingsTab: View {
                                             viewModel.statusBarIconWidth += 2
                                             viewModel.saveSettings()
                                         }
-                                    } label: { Image(systemName: "plus.circle").font(.system(size: 16)) }
+                                    } label: { Image(systemName: "plus.circle").font(Theme.Fonts.icon(Theme.Fonts.Size.headline)) }
                                     .buttonStyle(.borderless)
                                     .disabled(viewModel.statusBarIconWidth >= 100)
                                 }
@@ -2754,7 +3038,7 @@ struct SettingsTab: View {
                                             viewModel.statusBarLatencyWidth -= 5
                                             viewModel.saveSettings()
                                         }
-                                    } label: { Image(systemName: "minus.circle").font(.system(size: 16)) }
+                                    } label: { Image(systemName: "minus.circle").font(Theme.Fonts.icon(Theme.Fonts.Size.headline)) }
                                     .buttonStyle(.borderless)
                                     .disabled(viewModel.statusBarLatencyWidth <= 20)
                                     
@@ -2767,7 +3051,7 @@ struct SettingsTab: View {
                                             viewModel.statusBarLatencyWidth += 5
                                             viewModel.saveSettings()
                                         }
-                                    } label: { Image(systemName: "plus.circle").font(.system(size: 16)) }
+                                    } label: { Image(systemName: "plus.circle").font(Theme.Fonts.icon(Theme.Fonts.Size.headline)) }
                                     .buttonStyle(.borderless)
                                     .disabled(viewModel.statusBarLatencyWidth >= 200)
                                 }
@@ -2786,7 +3070,7 @@ struct SettingsTab: View {
                                             viewModel.statusBarLabelWidth -= 5
                                             viewModel.saveSettings()
                                         }
-                                    } label: { Image(systemName: "minus.circle").font(.system(size: 16)) }
+                                    } label: { Image(systemName: "minus.circle").font(Theme.Fonts.icon(Theme.Fonts.Size.headline)) }
                                     .buttonStyle(.borderless)
                                     .disabled(viewModel.statusBarLabelWidth <= 20)
                                     
@@ -2799,7 +3083,7 @@ struct SettingsTab: View {
                                             viewModel.statusBarLabelWidth += 5
                                             viewModel.saveSettings()
                                         }
-                                    } label: { Image(systemName: "plus.circle").font(.system(size: 16)) }
+                                    } label: { Image(systemName: "plus.circle").font(Theme.Fonts.icon(Theme.Fonts.Size.headline)) }
                                     .buttonStyle(.borderless)
                                     .disabled(viewModel.statusBarLabelWidth >= 200)
                                 }
@@ -2818,7 +3102,7 @@ struct SettingsTab: View {
                                             viewModel.statusBarSpeedWidth -= 5
                                             viewModel.saveSettings()
                                         }
-                                    } label: { Image(systemName: "minus.circle").font(.system(size: 16)) }
+                                    } label: { Image(systemName: "minus.circle").font(Theme.Fonts.icon(Theme.Fonts.Size.headline)) }
                                     .buttonStyle(.borderless)
                                     .disabled(viewModel.statusBarSpeedWidth <= 40)
                                     
@@ -2831,7 +3115,7 @@ struct SettingsTab: View {
                                             viewModel.statusBarSpeedWidth += 5
                                             viewModel.saveSettings()
                                         }
-                                    } label: { Image(systemName: "plus.circle").font(.system(size: 16)) }
+                                    } label: { Image(systemName: "plus.circle").font(Theme.Fonts.icon(Theme.Fonts.Size.headline)) }
                                     .buttonStyle(.borderless)
                                     .disabled(viewModel.statusBarSpeedWidth >= 250)
                                 }
@@ -2850,7 +3134,7 @@ struct SettingsTab: View {
                                         viewModel.statusBarFontSize -= 1
                                         viewModel.saveSettings()
                                     }
-                                } label: { Image(systemName: "minus.circle").font(.system(size: 16)) }
+                                } label: { Image(systemName: "minus.circle").font(Theme.Fonts.icon(Theme.Fonts.Size.headline)) }
                                 .buttonStyle(.borderless)
                                 .disabled(viewModel.statusBarFontSize <= 6)
                                 
@@ -2863,7 +3147,7 @@ struct SettingsTab: View {
                                         viewModel.statusBarFontSize += 1
                                         viewModel.saveSettings()
                                     }
-                                } label: { Image(systemName: "plus.circle").font(.system(size: 16)) }
+                                } label: { Image(systemName: "plus.circle").font(Theme.Fonts.icon(Theme.Fonts.Size.headline)) }
                                 .buttonStyle(.borderless)
                                 .disabled(viewModel.statusBarFontSize >= 18)
                             }
@@ -2946,11 +3230,7 @@ struct SettingsTab: View {
                             .frame(width: 220, alignment: .trailing)
                             .onChange(of: viewModel.pingInterval) { _, newValue in
                                 LogManager.shared.info("Ping interval changed to \(Int(newValue))s")
-                                viewModel.saveSettings()
-                                if viewModel.isRunning {
-                                    viewModel.stopAll()
-                                    viewModel.startAll()
-                                }
+                                viewModel.applyPingIntervalChange()
                             }
                         }
                         

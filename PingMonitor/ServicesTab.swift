@@ -105,14 +105,14 @@ struct ServicesTab: View {
                     }) {
                         HStack(spacing: 4) {
                             Image(systemName: "plus")
-                                .font(.system(size: 10, weight: .semibold))
+                                .font(Theme.Fonts.icon(Theme.Fonts.Size.caption, weight: .semibold))
                             Text(languageManager.t("services.add"))
-                                .font(Theme.Fonts.body(11))
+                                .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                         }
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
                         .background(Theme.Colors.accentBlue.opacity(0.15))
-                        .cornerRadius(6)
+                        .cornerRadius(Theme.Radius.sm)
                     }
                     .buttonStyle(.plain)
                     .disabled(viewModel.hosts.isEmpty)
@@ -158,19 +158,19 @@ struct ServicesTab: View {
         Button(action: action) {
             HStack(spacing: 5) {
                 Text("\(count)")
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .bold))
                     .foregroundStyle(isSelected ? color : Theme.Colors.textSecondary)
                 Text(label)
-                    .font(Theme.Fonts.body(11))
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                     .foregroundStyle(isSelected ? Theme.Colors.textPrimary : Theme.Colors.textTertiary)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
             .background(isSelected ? color.opacity(0.12) : Theme.Colors.cardBackground)
-            .cornerRadius(8)
+            .cornerRadius(Theme.Radius.md)
             .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(isSelected ? color.opacity(0.3) : Color.white.opacity(0.06), lineWidth: 1)
+                RoundedRectangle(cornerRadius: Theme.Radius.md)
+                    .stroke(isSelected ? color.opacity(0.3) : Theme.Colors.cardBorder, lineWidth: 1)
             )
         }
         .buttonStyle(.plain)
@@ -182,15 +182,15 @@ struct ServicesTab: View {
         ModernCard {
             VStack(spacing: 16) {
                 Image(systemName: "square.grid.2x2")
-                    .font(.system(size: 40))
+                    .font(Theme.Fonts.icon(Theme.Fonts.Size.giant))
                     .foregroundStyle(Theme.Colors.textTertiary)
                 
                 Text(languageManager.t("services.empty"))
-                    .font(Theme.Fonts.display(16))
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.headline, weight: .semibold))
                     .foregroundStyle(Theme.Colors.textSecondary)
                 
                 Text(languageManager.t("services.empty_hint"))
-                    .font(Theme.Fonts.body(12))
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
                     .foregroundStyle(Theme.Colors.textTertiary)
                 
                 if !viewModel.hosts.isEmpty {
@@ -201,14 +201,14 @@ struct ServicesTab: View {
                     }) {
                         HStack(spacing: 4) {
                             Image(systemName: "plus.circle.fill")
-                                .font(.system(size: 12))
+                                .font(Theme.Fonts.icon(Theme.Fonts.Size.body))
                             Text(languageManager.t("services.add"))
-                                .font(Theme.Fonts.body(12))
+                                .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
                         }
                         .padding(.horizontal, 16)
                         .padding(.vertical, 8)
                         .background(Theme.Colors.accentBlue.opacity(0.15))
-                        .cornerRadius(8)
+                        .cornerRadius(Theme.Radius.md)
                     }
                     .buttonStyle(.plain)
                 }
@@ -229,13 +229,13 @@ struct ServicesTab: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Circle()
-                        .fill(host.isReachable ? Color.green : Color.red.opacity(0.5))
+                        .fill(host.isReachable ? Theme.Colors.accentGreen : Theme.Colors.accentRed.opacity(0.5))
                         .frame(width: 8, height: 8)
                     Text(host.name)
-                        .font(Theme.Fonts.display(14))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .semibold))
                         .foregroundStyle(Theme.Colors.textPrimary)
                     Text(host.address)
-                        .font(.system(size: 11, design: .monospaced))
+                        .font(Theme.Fonts.number(Theme.Fonts.Size.footnote))
                         .foregroundStyle(Theme.Colors.textTertiary)
                     
                     Spacer()
@@ -247,19 +247,19 @@ struct ServicesTab: View {
                         showShortcutEditor = true
                     }) {
                         Image(systemName: "plus.circle")
-                            .font(.system(size: 14))
+                            .font(Theme.Fonts.icon(Theme.Fonts.Size.callout))
                             .foregroundStyle(Theme.Colors.accentBlue)
                     }
                     .buttonStyle(.plain)
                     .help(languageManager.t("services.add"))
                     
                     Text("\(shortcuts.count)")
-                        .font(.system(size: 10, weight: .bold))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.caption, weight: .bold))
                         .foregroundStyle(Theme.Colors.textSecondary)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 2)
                         .background(Theme.Colors.cardBackground)
-                        .cornerRadius(4)
+                        .cornerRadius(Theme.Radius.xs)
                 }
                 
                 LazyVGrid(columns: [
@@ -281,15 +281,15 @@ struct ServicesTab: View {
         }) {
             HStack(spacing: 10) {
                 Image(systemName: shortcut.icon)
-                    .font(.system(size: 16))
+                    .font(Theme.Fonts.icon(Theme.Fonts.Size.headline))
                     .foregroundStyle(serviceColor(for: shortcut.type))
                     .frame(width: 32, height: 32)
                     .background(serviceColor(for: shortcut.type).opacity(0.12))
-                    .cornerRadius(8)
+                    .cornerRadius(Theme.Radius.md)
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(shortcut.name)
-                        .font(Theme.Fonts.body(12))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
                         .foregroundStyle(Theme.Colors.textPrimary)
                         .lineLimit(1)
                     
@@ -303,7 +303,7 @@ struct ServicesTab: View {
                                 .lineLimit(1)
                         }
                     }
-                    .font(.system(size: 9, design: .monospaced))
+                    .font(Theme.Fonts.number(Theme.Fonts.Size.micro))
                     .foregroundStyle(Theme.Colors.textTertiary)
                 }
                 
@@ -311,23 +311,23 @@ struct ServicesTab: View {
                 
                 // Type badge
                 Text(shortcut.type.rawValue.uppercased())
-                    .font(.system(size: 8, weight: .bold))
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.micro, weight: .bold))
                     .foregroundStyle(serviceColor(for: shortcut.type))
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
                     .background(serviceColor(for: shortcut.type).opacity(0.12))
-                    .cornerRadius(4)
+                    .cornerRadius(Theme.Radius.xs)
                 
                 Image(systemName: "arrow.up.right")
-                    .font(.system(size: 9))
+                    .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
                     .foregroundStyle(Theme.Colors.textTertiary)
             }
             .padding(10)
             .background(Theme.Colors.cardBackground)
-            .cornerRadius(10)
+            .cornerRadius(Theme.Radius.md)
             .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                RoundedRectangle(cornerRadius: Theme.Radius.md)
+                    .stroke(Theme.Colors.cardBorder, lineWidth: 1)
             )
         }
         .buttonStyle(.plain)
@@ -445,7 +445,7 @@ struct ShortcutEditorSheet: View {
         VStack(spacing: 20) {
             // Title
             Text(existingShortcut != nil ? languageManager.t("services.edit") : languageManager.t("services.add"))
-                .font(Theme.Fonts.display(16))
+                .font(Theme.Fonts.ui(Theme.Fonts.Size.headline, weight: .semibold))
                 .foregroundStyle(Theme.Colors.textPrimary)
             
             VStack(alignment: .leading, spacing: 14) {
@@ -453,7 +453,7 @@ struct ShortcutEditorSheet: View {
                 if let hosts = hostSelector, existingShortcut == nil {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(languageManager.t("services.select_host"))
-                            .font(Theme.Fonts.body(11))
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                             .foregroundStyle(Theme.Colors.textSecondary)
                         Picker("", selection: Binding(
                             get: { selectedHostId ?? hosts.first?.id },
@@ -470,7 +470,7 @@ struct ShortcutEditorSheet: View {
                 // Type
                 VStack(alignment: .leading, spacing: 4) {
                     Text(languageManager.t("services.type"))
-                        .font(Theme.Fonts.body(11))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                         .foregroundStyle(Theme.Colors.textSecondary)
                     Picker("", selection: $type) {
                         Text(languageManager.t("services.type.web")).tag(ServiceShortcut.ServiceType.web)
@@ -493,7 +493,7 @@ struct ShortcutEditorSheet: View {
                 // Name
                 VStack(alignment: .leading, spacing: 4) {
                     Text(languageManager.t("services.name"))
-                        .font(Theme.Fonts.body(11))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                         .foregroundStyle(Theme.Colors.textSecondary)
                     TextField(type == .ssh ? "My Server SSH" : "Synology DSM", text: $name)
                         .textFieldStyle(.roundedBorder)
@@ -502,7 +502,7 @@ struct ShortcutEditorSheet: View {
                 // URL / Host
                 VStack(alignment: .leading, spacing: 4) {
                     Text(type == .ssh ? languageManager.t("services.ssh.host") : languageManager.t("services.url"))
-                        .font(Theme.Fonts.body(11))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                         .foregroundStyle(Theme.Colors.textSecondary)
                     TextField(type == .ssh ? "100.100.1.30" : "http://100.100.1.30:5000", text: $url)
                         .textFieldStyle(.roundedBorder)
@@ -513,7 +513,7 @@ struct ShortcutEditorSheet: View {
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(languageManager.t("services.ssh.user"))
-                                .font(Theme.Fonts.body(11))
+                                .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                                 .foregroundStyle(Theme.Colors.textSecondary)
                             TextField("root", text: $sshUser)
                                 .textFieldStyle(.roundedBorder)
@@ -521,7 +521,7 @@ struct ShortcutEditorSheet: View {
                         
                         VStack(alignment: .leading, spacing: 4) {
                             Text(languageManager.t("services.ssh.port"))
-                                .font(Theme.Fonts.body(11))
+                                .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                                 .foregroundStyle(Theme.Colors.textSecondary)
                             TextField("22", text: $sshPort)
                                 .textFieldStyle(.roundedBorder)
@@ -532,7 +532,7 @@ struct ShortcutEditorSheet: View {
                     // Auth Mode Toggle
                     VStack(alignment: .leading, spacing: 4) {
                         Text(languageManager.t("services.ssh.auth_mode"))
-                            .font(Theme.Fonts.body(11))
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                             .foregroundStyle(Theme.Colors.textSecondary)
                         Picker("", selection: $sshAuthMode) {
                             Text(languageManager.t("services.ssh.auth_key")).tag(ServiceShortcut.SSHAuthMode.key)
@@ -545,7 +545,7 @@ struct ShortcutEditorSheet: View {
                     if sshAuthMode == .key {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(languageManager.t("services.ssh.key"))
-                                .font(Theme.Fonts.body(11))
+                                .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                                 .foregroundStyle(Theme.Colors.textSecondary)
                             TextField("~/.ssh/id_rsa (\(languageManager.t("services.ssh.key_optional")))", text: $sshKeyPath)
                                 .textFieldStyle(.roundedBorder)
@@ -553,7 +553,7 @@ struct ShortcutEditorSheet: View {
                     } else {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(languageManager.t("services.ssh.password"))
-                                .font(Theme.Fonts.body(11))
+                                .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                                 .foregroundStyle(Theme.Colors.textSecondary)
                             SecureField(languageManager.t("services.ssh.password_hint"), text: $sshPassword)
                                 .textFieldStyle(.roundedBorder)
@@ -562,33 +562,33 @@ struct ShortcutEditorSheet: View {
                     
                     VStack(alignment: .leading, spacing: 4) {
                         Text(languageManager.t("services.ssh.preview"))
-                            .font(Theme.Fonts.body(11))
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                             .foregroundStyle(Theme.Colors.textSecondary)
                         Text(previewSSHCommand)
-                            .font(.system(size: 12, design: .monospaced))
+                            .font(Theme.Fonts.number(Theme.Fonts.Size.body))
                             .foregroundStyle(Theme.Colors.accentGreen)
                             .padding(8)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(Color.black.opacity(0.3))
-                            .cornerRadius(6)
+                            .cornerRadius(Theme.Radius.sm)
                     }
                 }
                 
                 // Icon
                 VStack(alignment: .leading, spacing: 4) {
                     Text(languageManager.t("services.icon"))
-                        .font(Theme.Fonts.body(11))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                         .foregroundStyle(Theme.Colors.textSecondary)
                     LazyVGrid(columns: Array(repeating: GridItem(.fixed(36), spacing: 8), count: 8), spacing: 8) {
                         ForEach(iconOptions, id: \.self) { iconName in
                             Button(action: { icon = iconName }) {
                                 Image(systemName: iconName)
-                                    .font(.system(size: 14))
+                                    .font(Theme.Fonts.icon(Theme.Fonts.Size.callout))
                                     .frame(width: 32, height: 32)
                                     .background(icon == iconName ? Theme.Colors.accentBlue.opacity(0.2) : Theme.Colors.cardBackground)
-                                    .cornerRadius(6)
+                                    .cornerRadius(Theme.Radius.sm)
                                     .overlay(
-                                        RoundedRectangle(cornerRadius: 6)
+                                        RoundedRectangle(cornerRadius: Theme.Radius.sm)
                                             .stroke(icon == iconName ? Theme.Colors.accentBlue : Color.clear, lineWidth: 1.5)
                                     )
                             }

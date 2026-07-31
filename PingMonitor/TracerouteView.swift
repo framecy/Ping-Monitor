@@ -56,9 +56,9 @@ struct TracerouteView: View {
                     }) {
                         HStack(spacing: 4) {
                             Image(systemName: "arrow.uturn.backward")
-                                .font(.system(size: 10))
+                                .font(Theme.Fonts.icon(Theme.Fonts.Size.caption))
                             Text(languageManager.t("common.back"))
-                                .font(.system(size: 12, weight: .medium))
+                                .font(Theme.Fonts.ui(Theme.Fonts.Size.body, weight: .medium))
                         }
                         .padding(.horizontal, 10)
                         .padding(.vertical, 7)
@@ -80,11 +80,11 @@ struct TracerouteView: View {
                     HStack(spacing: 8) {
                         Image(systemName: "point.topleft.down.to.point.bottomright.curvepath")
                             .foregroundStyle(Theme.Colors.accentBlue)
-                            .font(.system(size: 14))
+                            .font(Theme.Fonts.icon(Theme.Fonts.Size.callout))
                         
                         TextField(languageManager.t("traceroute.input_placeholder"), text: $targetHost)
                             .textFieldStyle(.plain)
-                            .font(.system(size: 13, design: .monospaced))
+                            .font(Theme.Fonts.number(Theme.Fonts.Size.callout))
                             .onSubmit {
                                 if !manager.isRunning {
                                     manager.startTrace(host: targetHost)
@@ -94,9 +94,9 @@ struct TracerouteView: View {
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
                     .background(Theme.Colors.cardBackground)
-                    .cornerRadius(8)
+                    .cornerRadius(Theme.Radius.md)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 8)
+                        RoundedRectangle(cornerRadius: Theme.Radius.md)
                             .stroke(Theme.Colors.separator, lineWidth: 1)
                     )
                     .frame(width: 320)
@@ -104,9 +104,9 @@ struct TracerouteView: View {
                     Toggle(isOn: $manager.isMTRMode) {
                         HStack(spacing: 4) {
                             Image(systemName: "repeat")
-                                .font(.system(size: 10))
+                                .font(Theme.Fonts.icon(Theme.Fonts.Size.caption))
                             Text(languageManager.t("traceroute.mtr_mode"))
-                                .font(.system(size: 12, weight: .medium))
+                                .font(Theme.Fonts.ui(Theme.Fonts.Size.body, weight: .medium))
                         }
                     }
                     .toggleStyle(.switch)
@@ -122,17 +122,17 @@ struct TracerouteView: View {
                     }) {
                         HStack(spacing: 6) {
                             Image(systemName: manager.isRunning ? "stop.fill" : "play.fill")
-                                .font(.system(size: 10))
+                                .font(Theme.Fonts.icon(Theme.Fonts.Size.caption))
                             Text(manager.isRunning ? languageManager.t("traceroute.stop") : languageManager.t("traceroute.start"))
-                                .font(.system(size: 12, weight: .medium))
+                                .font(Theme.Fonts.ui(Theme.Fonts.Size.body, weight: .medium))
                         }
                         .padding(.horizontal, 14)
                         .padding(.vertical, 7)
                         .background(
                             Capsule()
-                                .fill(manager.isRunning ? Color.red.opacity(0.15) : Theme.Colors.accentBlue.opacity(0.15))
+                                .fill(manager.isRunning ? Theme.Colors.accentRed.opacity(0.15) : Theme.Colors.accentBlue.opacity(0.15))
                         )
-                        .foregroundStyle(manager.isRunning ? .red : Theme.Colors.accentBlue)
+                        .foregroundStyle(manager.isRunning ? Theme.Colors.accentRed : Theme.Colors.accentBlue)
                     }
                     .buttonStyle(.plain)
                     .disabled(targetHost.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !manager.isRunning)
@@ -147,10 +147,10 @@ struct TracerouteView: View {
                                     .scaleEffect(0.7)
                             } else {
                                 Image(systemName: "magnifyingglass")
-                                    .font(.system(size: 10))
+                                    .font(Theme.Fonts.icon(Theme.Fonts.Size.caption))
                             }
                             Text(languageManager.t("traceroute.nslookup"))
-                                .font(.system(size: 12, weight: .medium))
+                                .font(Theme.Fonts.ui(Theme.Fonts.Size.body, weight: .medium))
                         }
                         .padding(.horizontal, 14)
                         .padding(.vertical, 7)
@@ -173,17 +173,17 @@ struct TracerouteView: View {
                         }) {
                             HStack(spacing: 4) {
                                 Image(systemName: showCopied ? "checkmark" : "doc.on.doc")
-                                    .font(.system(size: 10))
+                                    .font(Theme.Fonts.icon(Theme.Fonts.Size.caption))
                                 Text(showCopied ? languageManager.t("traceroute.copied") : languageManager.t("traceroute.copy"))
-                                    .font(.system(size: 12, weight: .medium))
+                                    .font(Theme.Fonts.ui(Theme.Fonts.Size.body, weight: .medium))
                             }
                             .padding(.horizontal, 10)
                             .padding(.vertical, 7)
                             .background(
                                 Capsule()
-                                    .fill(showCopied ? Color.green.opacity(0.15) : Theme.Colors.cardBackground)
+                                    .fill(showCopied ? Theme.Colors.accentGreen.opacity(0.15) : Theme.Colors.cardBackground)
                             )
-                            .foregroundStyle(showCopied ? .green : Theme.Colors.textSecondary)
+                            .foregroundStyle(showCopied ? Theme.Colors.accentGreen : Theme.Colors.textSecondary)
                         }
                         .buttonStyle(.plain)
                     }
@@ -194,9 +194,9 @@ struct TracerouteView: View {
             if manager.isMTRMode {
                 HStack(spacing: 6) {
                     Image(systemName: "info.circle")
-                        .font(.system(size: 10))
+                        .font(Theme.Fonts.icon(Theme.Fonts.Size.caption))
                     Text(languageManager.t("traceroute.mtr_hint"))
-                        .font(.system(size: 11))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                 }
                 .foregroundStyle(Theme.Colors.textTertiary)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -225,7 +225,7 @@ struct TracerouteView: View {
                         .frame(width: 80, height: 80)
                     
                     Image(systemName: "point.topleft.down.to.point.bottomright.curvepath")
-                        .font(.system(size: 32))
+                        .font(Theme.Fonts.icon(Theme.Fonts.Size.hero))
                         .foregroundStyle(
                             .linearGradient(
                                 colors: [Theme.Colors.accentBlue, Theme.Colors.accentPurple],
@@ -236,11 +236,11 @@ struct TracerouteView: View {
                 }
                 
                 Text(languageManager.t("traceroute.no_result"))
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.headline, weight: .semibold))
                     .foregroundStyle(Theme.Colors.textPrimary)
                 
                 Text(languageManager.t("traceroute.hint"))
-                    .font(.system(size: 13))
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.callout))
                     .foregroundStyle(Theme.Colors.textSecondary)
                     .multilineTextAlignment(.center)
                 
@@ -285,9 +285,9 @@ struct TracerouteView: View {
             HStack(spacing: 8) {
                 Image(systemName: "server.rack")
                     .foregroundStyle(Theme.Colors.accentPurple)
-                    .font(.system(size: 13))
+                    .font(Theme.Fonts.icon(Theme.Fonts.Size.callout))
                 Text(languageManager.t("traceroute.monitored_hosts"))
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .semibold))
                     .foregroundStyle(Theme.Colors.textPrimary)
                 
                 Spacer()
@@ -312,12 +312,12 @@ struct TracerouteView: View {
         }
         .padding(.vertical, 16)
         .background(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: Theme.Radius.lg)
                 .fill(Theme.Colors.cardBackground)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.white.opacity(0.05), lineWidth: 1)
+            RoundedRectangle(cornerRadius: Theme.Radius.lg)
+                .stroke(Theme.Colors.cardBorder, lineWidth: 1)
         )
         .padding(.horizontal, 20)
     }
@@ -333,12 +333,12 @@ struct TracerouteView: View {
                         .scaleEffect(0.8)
                 } else if !manager.hops.isEmpty {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
-                        .font(.system(size: 14))
+                        .foregroundStyle(Theme.Colors.accentGreen)
+                        .font(Theme.Fonts.icon(Theme.Fonts.Size.callout))
                 }
                 
                 Text(manager.progress)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.body, weight: .medium))
                     .foregroundStyle(Theme.Colors.textSecondary)
                 
                 Spacer()
@@ -383,12 +383,12 @@ struct TracerouteView: View {
         }
         .padding(16)
         .background(
-            RoundedRectangle(cornerRadius: 10)
+            RoundedRectangle(cornerRadius: Theme.Radius.md)
                 .fill(Theme.Colors.cardBackground)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(Color.white.opacity(0.05), lineWidth: 1)
+            RoundedRectangle(cornerRadius: Theme.Radius.md)
+                .stroke(Theme.Colors.cardBorder, lineWidth: 1)
         )
     }
     
@@ -417,7 +417,7 @@ struct TracerouteView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.leading, 8)
             }
-            .font(.system(size: 11, weight: .semibold))
+            .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote, weight: .semibold))
             .foregroundStyle(Theme.Colors.textTertiary)
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
@@ -441,7 +441,7 @@ struct TracerouteView: View {
                         .controlSize(.small)
                         .scaleEffect(0.7)
                     Text("...")
-                        .font(.system(size: 12))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
                         .foregroundStyle(Theme.Colors.textTertiary)
                 }
                 .frame(maxWidth: .infinity)
@@ -455,19 +455,17 @@ struct TracerouteView: View {
         )
         .onPreferenceChange(HopTableWidthKey.self) { tableContentWidth = $0 }
         .background(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: Theme.Radius.lg)
                 .fill(Theme.Colors.cardBackground)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.white.opacity(0.05), lineWidth: 1)
+            RoundedRectangle(cornerRadius: Theme.Radius.lg)
+                .stroke(Theme.Colors.cardBorder, lineWidth: 1)
         )
     }
     
     private func latencyColor(_ latency: Double) -> Color {
-        if latency < 50 { return .green }
-        if latency < 100 { return .orange }
-        return .red
+        Theme.Status.latency(latency, .hop)
     }
 
     @ViewBuilder
@@ -508,7 +506,7 @@ struct TracerouteView: View {
                 Image(systemName: "network.badge.shield.half.filled")
                     .foregroundStyle(Theme.Colors.accentBlue)
                 Text(languageManager.t("traceroute.nslookup"))
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .semibold))
                     .foregroundStyle(Theme.Colors.textPrimary)
                 Spacer()
                 if manager.isNSLookupRunning {
@@ -532,11 +530,11 @@ struct TracerouteView: View {
                         ForEach(result.records) { record in
                             HStack(alignment: .top, spacing: 10) {
                                 Text(record.label)
-                                    .font(.system(size: 11, weight: .semibold))
+                                    .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote, weight: .semibold))
                                     .foregroundStyle(Theme.Colors.textSecondary)
                                     .frame(width: 90, alignment: .leading)
                                 Text(record.value)
-                                    .font(.system(size: 12, design: .monospaced))
+                                    .font(Theme.Fonts.number(Theme.Fonts.Size.body))
                                     .foregroundStyle(Theme.Colors.textPrimary)
                                     .textSelection(.enabled)
                                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -546,33 +544,33 @@ struct TracerouteView: View {
                 }
 
                 Text(result.rawOutput)
-                    .font(.system(size: 11, design: .monospaced))
+                    .font(Theme.Fonts.number(Theme.Fonts.Size.footnote))
                     .foregroundStyle(Theme.Colors.textTertiary)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(10)
-                    .background(Color.white.opacity(0.03))
-                    .cornerRadius(8)
+                    .background(Theme.Colors.surfaceOverlay)
+                    .cornerRadius(Theme.Radius.md)
             } else if let error = manager.nsLookupError {
                 Text(error)
-                    .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(.red)
+                    .font(Theme.Fonts.number(Theme.Fonts.Size.footnote))
+                    .foregroundStyle(Theme.Colors.accentRed)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 Text(languageManager.t("traceroute.nslookup_empty"))
-                    .font(.system(size: 12))
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
                     .foregroundStyle(Theme.Colors.textTertiary)
             }
         }
         .padding(16)
         .background(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: Theme.Radius.lg)
                 .fill(Theme.Colors.cardBackground)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.white.opacity(0.05), lineWidth: 1)
+            RoundedRectangle(cornerRadius: Theme.Radius.lg)
+                .stroke(Theme.Colors.cardBorder, lineWidth: 1)
         )
     }
 }
@@ -622,12 +620,12 @@ struct HopRowView: View {
         HStack(spacing: 0) {
             // Hop number with color bar
             HStack(spacing: 6) {
-                RoundedRectangle(cornerRadius: 2)
+                RoundedRectangle(cornerRadius: Theme.Radius.xs)
                     .fill(hop.latencyColor)
                     .frame(width: 3, height: 20)
                 
                 Text("\(hop.hopNumber)")
-                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    .font(Theme.Fonts.number(Theme.Fonts.Size.body, weight: .semibold))
                     .foregroundStyle(Theme.Colors.textPrimary)
             }
             .frame(width: columnWidths.hop, alignment: .center)
@@ -636,16 +634,16 @@ struct HopRowView: View {
             VStack(alignment: .leading, spacing: 2) {
                 if hop.isTimeout {
                     Text("* * *")
-                        .font(.system(size: 12, design: .monospaced))
+                        .font(Theme.Fonts.number(Theme.Fonts.Size.body))
                         .foregroundStyle(Theme.Colors.textTertiary)
                 } else {
                     Text(hop.hostName)
-                        .font(.system(size: 12, weight: .medium))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.body, weight: .medium))
                         .foregroundStyle(Theme.Colors.textPrimary)
                         .lineLimit(1)
                     if hop.hostName != hop.ip {
                         Text(hop.ip)
-                            .font(.system(size: 10, design: .monospaced))
+                            .font(Theme.Fonts.number(Theme.Fonts.Size.caption))
                             .foregroundStyle(Theme.Colors.textTertiary)
                             .lineLimit(1)
                     }
@@ -657,12 +655,12 @@ struct HopRowView: View {
             ForEach(0..<3, id: \.self) { i in
                 if i < hop.latencies.count, let lat = hop.latencies[i] {
                     Text(String(format: "%.1f", lat))
-                        .font(.system(size: 12, design: .monospaced))
+                        .font(Theme.Fonts.number(Theme.Fonts.Size.body))
                         .foregroundStyle(latencyColor(lat))
                         .frame(width: columnWidths.latency, alignment: .trailing)
                 } else {
                     Text(i < hop.latencies.count ? "*" : "-")
-                        .font(.system(size: 12, design: .monospaced))
+                        .font(Theme.Fonts.number(Theme.Fonts.Size.body))
                         .foregroundStyle(Theme.Colors.textTertiary)
                         .frame(width: columnWidths.latency, alignment: .trailing)
                 }
@@ -670,13 +668,13 @@ struct HopRowView: View {
 
             // Average
             Text(hop.formattedAvg)
-                .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                .font(Theme.Fonts.number(Theme.Fonts.Size.body, weight: .semibold))
                 .foregroundStyle(hop.latencyColor)
                 .frame(width: columnWidths.avg, alignment: .trailing)
 
             // Loss
             Text(hop.formattedLoss)
-                .font(.system(size: 12, weight: .medium, design: .monospaced))
+                .font(Theme.Fonts.number(Theme.Fonts.Size.body, weight: .medium))
                 .foregroundStyle(hop.packetLoss > 0 ? Theme.Colors.accentOrange : Theme.Colors.accentGreen)
                 .frame(width: columnWidths.loss, alignment: .trailing)
                 
@@ -684,18 +682,18 @@ struct HopRowView: View {
             VStack(alignment: .leading, spacing: 2) {
                 if let locString = hop.geoLocation?.locationString {
                     Text(locString)
-                        .font(.system(size: 12, weight: .medium))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.body, weight: .medium))
                         .foregroundStyle(Theme.Colors.textPrimary)
                         .lineLimit(1)
                 } else if !hop.isTimeout {
                     Text("-")
-                        .font(.system(size: 12))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
                         .foregroundStyle(Theme.Colors.textTertiary)
                 }
                 
                 if let isp = hop.geoLocation?.isp, !isp.isEmpty {
                     Text(isp)
-                        .font(.system(size: 10))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                         .foregroundStyle(Theme.Colors.textTertiary)
                         .lineLimit(1)
                 }
@@ -705,7 +703,7 @@ struct HopRowView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
-        .background(isHovered ? Color.white.opacity(0.03) : (isEven ? Color.clear : Color.white.opacity(0.01)))
+        .background(isHovered ? Theme.Colors.hoverOverlay : (isEven ? Color.clear : Theme.Colors.surfaceOverlay))
         .onHover { hovering in
             withAnimation(.easeInOut(duration: 0.15)) {
                 isHovered = hovering
@@ -714,9 +712,7 @@ struct HopRowView: View {
     }
     
     private func latencyColor(_ latency: Double) -> Color {
-        if latency < 50 { return .green }
-        if latency < 100 { return .orange }
-        return .red
+        Theme.Status.latency(latency, .hop)
     }
 }
 
@@ -729,16 +725,16 @@ struct QuickTargetButton: View {
         Button(action: action) {
             HStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(.system(size: 11))
+                    .font(Theme.Fonts.icon(Theme.Fonts.Size.footnote))
                 Text(label)
-                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                    .font(Theme.Fonts.number(Theme.Fonts.Size.body, weight: .medium))
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
             .background(Theme.Colors.cardBackground)
-            .cornerRadius(8)
+            .cornerRadius(Theme.Radius.md)
             .overlay(
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: Theme.Radius.md)
                     .stroke(Theme.Colors.separator, lineWidth: 1)
             )
             .foregroundStyle(Theme.Colors.textSecondary)
@@ -756,13 +752,13 @@ struct HopSummaryBadge: View {
     var body: some View {
         HStack(spacing: 4) {
             Image(systemName: icon)
-                .font(.system(size: 9))
+                .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
                 .foregroundStyle(color)
             Text(value)
-                .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                .font(Theme.Fonts.number(Theme.Fonts.Size.footnote, weight: .semibold))
                 .foregroundStyle(Theme.Colors.textPrimary)
             Text(label)
-                .font(.system(size: 10))
+                .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                 .foregroundStyle(Theme.Colors.textTertiary)
         }
     }
@@ -777,20 +773,20 @@ struct RouteContextBadge: View {
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: icon)
-                .font(.system(size: 10))
+                .font(Theme.Fonts.icon(Theme.Fonts.Size.caption))
                 .foregroundStyle(color)
             Text(title)
-                .font(.system(size: 10))
+                .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                 .foregroundStyle(Theme.Colors.textTertiary)
             Text(value)
-                .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                .font(Theme.Fonts.number(Theme.Fonts.Size.footnote, weight: .semibold))
                 .foregroundStyle(Theme.Colors.textPrimary)
                 .lineLimit(1)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(Color.white.opacity(0.03))
-        .cornerRadius(8)
+        .background(Theme.Colors.surfaceOverlay)
+        .cornerRadius(Theme.Radius.md)
     }
 }
 
@@ -805,18 +801,18 @@ struct MonitoredHostCard: View {
             HStack(spacing: 10) {
                 // Status indicator
                 Circle()
-                    .fill(host.isReachable ? latencyColor : .gray.opacity(0.5))
+                    .fill(host.isReachable ? latencyColor : Theme.Colors.textTertiary.opacity(0.5))
                     .frame(width: 8, height: 8)
                     .shadow(color: host.isReachable ? latencyColor.opacity(0.5) : .clear, radius: 3)
                 
                 // Host info
                 VStack(alignment: .leading, spacing: 2) {
                     Text(host.name)
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.body, weight: .semibold))
                         .foregroundStyle(Theme.Colors.textPrimary)
                         .lineLimit(1)
                     Text(host.address)
-                        .font(.system(size: 10, design: .monospaced))
+                        .font(Theme.Fonts.number(Theme.Fonts.Size.caption))
                         .foregroundStyle(Theme.Colors.textTertiary)
                         .lineLimit(1)
                 }
@@ -826,7 +822,7 @@ struct MonitoredHostCard: View {
                 // Latency badge
                 if let latency = host.lastLatency {
                     Text("\(Int(latency))ms")
-                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .font(Theme.Fonts.number(Theme.Fonts.Size.footnote, weight: .semibold))
                         .foregroundStyle(latencyColor)
                 } else if host.isChecking {
                     ProgressView()
@@ -834,22 +830,22 @@ struct MonitoredHostCard: View {
                         .scaleEffect(0.6)
                 } else {
                     Text("--")
-                        .font(.system(size: 11, design: .monospaced))
+                        .font(Theme.Fonts.number(Theme.Fonts.Size.footnote))
                         .foregroundStyle(Theme.Colors.textTertiary)
                 }
                 
                 Image(systemName: "arrow.right.circle")
-                    .font(.system(size: 12))
+                    .font(Theme.Fonts.icon(Theme.Fonts.Size.body))
                     .foregroundStyle(Theme.Colors.accentBlue.opacity(isHovered ? 1 : 0.5))
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
             .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(isHovered ? Color.white.opacity(0.05) : Color.white.opacity(0.02))
+                RoundedRectangle(cornerRadius: Theme.Radius.md)
+                    .fill(isHovered ? Theme.Colors.hoverOverlay : Theme.Colors.surfaceOverlay)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: Theme.Radius.md)
                     .stroke(isHovered ? Theme.Colors.accentBlue.opacity(0.3) : Theme.Colors.separator, lineWidth: 1)
             )
         }
@@ -862,10 +858,7 @@ struct MonitoredHostCard: View {
     }
     
     private var latencyColor: Color {
-        guard let latency = host.lastLatency else { return .gray }
-        if latency < 50 { return .green }
-        if latency < 100 { return .orange }
-        return .red
+        Theme.Status.latency(host.lastLatency, .hop)
     }
 }
 
@@ -899,16 +892,16 @@ struct TracerouteMapView: View {
                             .fill(loc.hop.latencyColor)
                             .frame(width: 12, height: 12)
                             .overlay(
-                                Circle().stroke(Color.white, lineWidth: 2)
+                                Circle().stroke(Theme.Colors.onAccent, lineWidth: 2)
                             )
                             .shadow(radius: 2)
                         
                         Text("\(loc.hop.hopNumber)")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.caption, weight: .bold))
                             .padding(.horizontal, 4)
                             .padding(.vertical, 2)
                             .background(Theme.Colors.cardBackground)
-                            .cornerRadius(4)
+                            .cornerRadius(Theme.Radius.xs)
                             .shadow(radius: 1)
                     }
                 }
