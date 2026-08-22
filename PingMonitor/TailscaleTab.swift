@@ -10,35 +10,57 @@ struct TailscaleTab: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
-                // Status Card
-                statusCard
-                
-                // Exit Node Card
-                exitNodeCard
-                
-                // NAT / Netcheck Card
-                netcheckCard
-                
-                // Health Advice
-                healthAdviceCard
-                
-                // Quick Commands
-                quickCommandsCard
-                
-                // DERP Region Latency
-                if !tailscale.regionLatencies.isEmpty {
-                    derpLatencyCard
+                if !tailscale.isEnabled {
+                    integrationHintCard(text: languageManager.t("tailscale.integration_disabled"))
+                } else if !tailscale.isAvailable {
+                    integrationHintCard(text: languageManager.t("tailscale.cli_not_detected"))
+                } else {
+                    // Status Card
+                    statusCard
+
+                    // Exit Node Card
+                    exitNodeCard
+
+                    // NAT / Netcheck Card
+                    netcheckCard
+
+                    // Health Advice
+                    healthAdviceCard
+
+                    // Quick Commands
+                    quickCommandsCard
+
+                    // DERP Region Latency
+                    if !tailscale.regionLatencies.isEmpty {
+                        derpLatencyCard
+                    }
+
+                    // Nodes List
+                    nodesCard
                 }
-                
-                // Nodes List
-                nodesCard
             }
             .padding(Theme.Layout.cardPadding)
         }
         .background(Theme.Colors.background)
         .onAppear {
+            guard tailscale.isFunctional else { return }
             tailscale.fetchStatus()
             tailscale.fetchNetcheck()
+        }
+    }
+
+    private func integrationHintCard(text: String) -> some View {
+        ModernCard {
+            HStack(spacing: 12) {
+                Image(systemName: "exclamationmark.triangle")
+                    .font(.system(size: 18))
+                    .foregroundStyle(Theme.Colors.accentOrange)
+                Text(text)
+                    .font(Theme.Fonts.body(12))
+                    .foregroundStyle(Theme.Colors.textSecondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 20)
         }
     }
     

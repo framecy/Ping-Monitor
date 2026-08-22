@@ -226,8 +226,58 @@ class TailscaleManager: ObservableObject {
     
     public var cliPath: String?
     
+    // Integration master switch. Persisted and OFF by default, so machines
+    // without Tailscale never spawn any CLI process.
+    @Published private(set) var isEnabled: Bool
+    
+    static let enabledDefaultsKey = "tailscaleIntegrationEnabled"
+    
+    var isFunctional: Bool { isEnabled && isAvailable }
+    
     private init() {
-        detectCLI()
+        isEnabled = UserDefaults.standard.bool(forKey: TailscaleManager.enabledDefaultsKey)
+        if isEnabled {
+            detectCLI()
+        }
+    }
+    
+    func setEnabled(_ on: Bool) {
+        guard on != isEnabled else { return }
+        isEnabled = on
+        UserDefaults.standard.set(on, forKey: TailscaleManager.enabledDefaultsKey)
+        LogManager.shared.info("Tailscale integration \(on ? "enabled" : "disabled")")
+        if on {
+            detectCLI()
+            if isAvailable { fetchStatus() }
+        } else {
+            resetState()
+        }
+    }
+    
+    private func resetState() {
+        isConnected = false
+        isLoading = false
+        lastError = nil
+        selfIP = ""
+        selfHostname = ""
+        magicDNSSuffix = ""
+        nodes = []
+        currentExitNode = nil
+        availableExitNodes = []
+        isTestingExitNodes = false
+        netcheckLoading = false
+        natType = "—"
+        udpEnabled = false
+        ipv4Enabled = false
+        ipv6Enabled = false
+        hairPinning = nil
+        upnp = nil
+        preferredDERP = "—"
+        globalIPv4 = "—"
+        globalIPv6 = "—"
+        regionLatencies = []
+        captivePortal = false
+        healthAdvice = []
     }
     
     // MARK: - CLI Detection
@@ -273,6 +323,7 @@ class TailscaleManager: ObservableObject {
     // MARK: - Fetch Status
     
     func fetchStatus() {
+        guard isEnabled else { return }
         guard let cli = cliPath else {
             lastError = "Tailscale CLI not found"
             return
@@ -471,7 +522,7 @@ class TailscaleManager: ObservableObject {
     
     nonisolated func testAllExitNodesLatency() {
         Task { @MainActor in
-            guard !availableExitNodes.isEmpty else { return }
+            guard isEnabled, !availableExitNodes.isEmpty else { return }
             isTestingExitNodes = true
             let nodesToTest = availableExitNodes
             let results = await withTaskGroup(of: ExitNode.self) { group in
@@ -536,6 +587,7 @@ class TailscaleManager: ObservableObject {
     }
     
     func switchExitNode(to node: TailscaleNode) {
+        guard isEnabled else { return }
         Task {
             await runTailscaleCommand(["set", "--exit-node="], background: true)
             await runTailscaleCommand(["set", "--exit-node=\(node.tailscaleIP)"], background: true)
@@ -544,6 +596,7 @@ class TailscaleManager: ObservableObject {
     }
     
     func disableExitNode() {
+        guard isEnabled else { return }
         Task {
             await runTailscaleCommand(["set", "--exit-node="], background: true)
             fetchStatus()
@@ -565,7 +618,7 @@ class TailscaleManager: ObservableObject {
     ]
     
     func fetchNetcheck() {
-        guard let cli = cliPath else { return }
+        guard isEnabled, let cli = cliPath else { return }
         netcheckLoading = true
         
         Task.detached { [cli, derpRegionNames] in
@@ -637,7 +690,7 @@ class TailscaleManager: ObservableObject {
     // MARK: - Path Diagnosis
     
     func runPathDiagnosis(for node: TailscaleNode) {
-        guard let cli = cliPath else { return }
+        guard isEnabled, let cli = cliPath else { return }
         
         if let index = nodes.firstIndex(where: { $0.tailscaleIP == node.tailscaleIP }) {
             nodes[index].isCheckingPath = true
@@ -694,6 +747,10 @@ class TailscaleManager: ObservableObject {
     }
     
     func runTailscaleCommand(_ args: [String], background: Bool = false) async {
+        guard isEnabled else {
+            LogManager.shared.info("Tailscale integration is disabled; command skipped: tailscale \(args.joined(separator: " "))")
+            return
+        }
         guard let cli = cliPath else {
             LogManager.shared.error("Tailscale CLI not found")
             return

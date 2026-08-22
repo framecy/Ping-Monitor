@@ -570,8 +570,25 @@ class PingMonitorViewModel: ObservableObject {
                 }
             }
             .store(in: &keepAliveCancellables)
+
+        // When the Tailscale integration switch flips, restart standard ICMP probes
+        // so they pick up (or drop) the tailscale CLI without an app restart.
+        TailscaleManager.shared.$isEnabled
+            .dropFirst()
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self = self, self.isRunning else { return }
+                for (i, host) in self.hosts.enumerated() {
+                    guard !host.isPaused, host.probeMode == .icmp,
+                          host.command.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
+                    self.stopPingProcess(for: host.id)
+                    self.startPingProcess(for: host, at: i)
+                }
+            }
+            .store(in: &keepAliveCancellables)
     }
-    
+
     private func handleKeepAliveChange(interface: String, active: Bool) {
         guard isRunning else { return }
         
@@ -1645,7 +1662,7 @@ class PingMonitorViewModel: ObservableObject {
     }
 
     private func tailscaleProbeCLIPath(for host: HostConfig, address: String, customCommand: String) -> String? {
-        guard customCommand.isEmpty, let cli = TailscaleManager.shared.cliPath else { return nil }
+        guard TailscaleManager.shared.isEnabled, customCommand.isEmpty, let cli = TailscaleManager.shared.cliPath else { return nil }
         guard host.isTailscaleNode || isKnownTailscaleNodeAddress(address) else { return nil }
         return cli
     }

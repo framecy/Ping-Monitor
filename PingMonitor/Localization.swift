@@ -463,6 +463,11 @@ public final class LanguageManager: ObservableObject {
             "tailscale.advice.easy_nat": "Easy NAT detected. P2P should work well.",
             "tailscale.advice.udp_blocked": "UDP is blocked. P2P is impossible. Check firewall.",
             "tailscale.advice.captive_portal": "Captive portal detected. This may interfere with connections.",
+            "settings.section.integration": "Integrations",
+            "settings.tailscale_integration": "Tailscale Integration",
+            "tailscale.cli_detected": "Detected",
+            "tailscale.cli_not_detected": "Tailscale CLI not detected. Install Tailscale, then reopen Settings to re-detect.",
+            "tailscale.integration_disabled": "Off — no Tailscale commands will be run. Enable it in Settings.",
             
             // Services
             "services.title": "Service Shortcuts",
@@ -958,6 +963,11 @@ public final class LanguageManager: ObservableObject {
             "tailscale.advice.easy_nat": "检测到全锥型/受限锥型 NAT。P2P 连接应当非常顺畅。",
             "tailscale.advice.udp_blocked": "UDP 协议被拦截。无法建立 P2P 连接，请检查防火墙设置。",
             "tailscale.advice.captive_portal": "检测到网络认证门户（Captive Portal）。这可能会干扰 Tailscale 连接。",
+            "settings.section.integration": "集成",
+            "settings.tailscale_integration": "Tailscale 集成",
+            "tailscale.cli_detected": "已检测到",
+            "tailscale.cli_not_detected": "未检测到 Tailscale CLI。安装 Tailscale 后重新打开设置即可自动识别。",
+            "tailscale.integration_disabled": "已关闭 — 不会调用任何 Tailscale 命令。可在设置中开启。",
             
             // Services
             "services.title": "服务快捷方式",

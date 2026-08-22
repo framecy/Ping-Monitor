@@ -3,6 +3,7 @@ import SwiftUI
 struct SidebarView: View {
     @Binding var selectedItem: SidebarItem
     @ObservedObject private var languageManager = LanguageManager.shared
+    @ObservedObject private var tailscale = TailscaleManager.shared
     
     var body: some View {
         VStack(spacing: 0) {
@@ -35,7 +36,7 @@ struct SidebarView: View {
                     SidebarRow(item: .traceroute, selectedItem: $selectedItem, icon: SidebarItem.traceroute.icon, title: SidebarItem.traceroute.title)
                     SidebarRow(item: .netspeed, selectedItem: $selectedItem, icon: SidebarItem.netspeed.icon, title: SidebarItem.netspeed.title)
                     
-                    if TailscaleManager.shared.isAvailable {
+                    if tailscale.isFunctional {
                         SidebarRow(item: .tailscale, selectedItem: $selectedItem, icon: SidebarItem.tailscale.icon, title: SidebarItem.tailscale.title)
                     }
                     

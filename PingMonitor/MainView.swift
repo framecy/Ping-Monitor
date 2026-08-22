@@ -197,7 +197,8 @@ struct TailscaleQuickActionView: View {
     @ObservedObject var languageManager = LanguageManager.shared
     
     var body: some View {
-        Menu {
+        if tailscale.isFunctional {
+            Menu {
             if tailscale.availableExitNodes.isEmpty {
                 Text(languageManager.t("tailscale.no_exit_nodes"))
             } else {
@@ -248,6 +249,7 @@ struct TailscaleQuickActionView: View {
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
+        }
     }
 }
 
@@ -2495,6 +2497,7 @@ struct LogFileDocument: FileDocument {
 struct SettingsTab: View {
     @ObservedObject var viewModel: PingMonitorViewModel
     @ObservedObject private var languageManager = LanguageManager.shared
+    @ObservedObject private var tailscale = TailscaleManager.shared
 
     var body: some View {
         ScrollView {
@@ -2554,6 +2557,29 @@ struct SettingsTab: View {
                                 .frame(width: 220, alignment: .trailing)
                         }
                     }
+                }
+                
+                // MARK: - Integrations
+                ModernCard {
+                    VStack(alignment: .leading, spacing: 16) {
+                        SectionHeader(title: languageManager.t("settings.section.integration"), icon: "puzzlepiece")
+                        
+                        Toggle(isOn: Binding(
+                            get: { tailscale.isEnabled },
+                            set: { tailscale.setEnabled($0) }
+                        )) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(languageManager.t("settings.tailscale_integration"))
+                                Text(tailscaleIntegrationStatus)
+                                    .font(Theme.Fonts.body(10))
+                                    .foregroundStyle(Theme.Colors.textSecondary)
+                            }
+                        }
+                    }
+                }
+                .onAppear {
+                    // Re-detect in case Tailscale was installed after launch
+                    if tailscale.isEnabled { tailscale.detectCLI() }
                 }
                 
                 // MARK: - Display (Status Bar & Widget)
@@ -2962,6 +2988,16 @@ struct SettingsTab: View {
         case .first:
             return languageManager.t("settings.desc.first")
         }
+    }
+
+    private var tailscaleIntegrationStatus: String {
+        if !tailscale.isEnabled {
+            return languageManager.t("tailscale.integration_disabled")
+        }
+        if tailscale.isAvailable, let path = tailscale.cliPath {
+            return languageManager.t("tailscale.cli_detected") + ": " + path
+        }
+        return languageManager.t("tailscale.cli_not_detected")
     }
 }
 
