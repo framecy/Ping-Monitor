@@ -3184,6 +3184,24 @@ struct SettingsTab: View {
                         Divider()
                         
                         HStack {
+                            Text(languageManager.t("settings.status_bar_color"))
+                            Spacer()
+                            Picker("", selection: $viewModel.statusBarColorMode) {
+                                Text(languageManager.t("settings.status_bar_color.auto")).tag("auto")
+                                Text(languageManager.t("settings.status_bar_color.light")).tag("light")
+                                Text(languageManager.t("settings.status_bar_color.dark")).tag("dark")
+                            }
+                            .pickerStyle(.segmented)
+                            .frame(width: 220, alignment: .trailing)
+                            .onChange(of: viewModel.statusBarColorMode) { _, newValue in
+                                LogManager.shared.info("Status bar color mode changed to \(newValue)")
+                                viewModel.saveSettings()
+                            }
+                        }
+                        
+                        Divider()
+                        
+                        HStack {
                             Text(languageManager.t("settings.widget.mode"))
                             Spacer()
                             Picker("", selection: $viewModel.widgetDisplayMode) {

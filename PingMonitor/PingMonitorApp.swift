@@ -476,6 +476,7 @@ class PingMonitorViewModel: ObservableObject {
     @Published var statusBarFontSize: Int = 9
     @Published var statusBarFontWeight: String = "medium" // "regular", "medium", "bold"
     @Published var showIconInMenu: Bool = true
+    @Published var statusBarColorMode: String = "auto" // "auto", "light", "dark"
     @Published var appAppearance: String = "system" // "system", "light", "dark"
     
     var statusBarController: StatusBarController?
@@ -708,6 +709,7 @@ class PingMonitorViewModel: ObservableObject {
         }
         
         appAppearance = (settings?["appAppearance"] as? String) ?? (defaults.string(forKey: "appAppearance") ?? "system")
+        statusBarColorMode = (settings?["statusBarColorMode"] as? String) ?? (defaults.string(forKey: "statusBarColorMode") ?? "auto")
         
         LogManager.shared.info("Settings loaded: \(hosts.count) hosts, \(presets.count) presets")
     }
@@ -744,6 +746,7 @@ class PingMonitorViewModel: ObservableObject {
             "statusBarFontSize": AnyCodable(statusBarFontSize),
             "statusBarFontWeight": AnyCodable(statusBarFontWeight),
             "showIconInMenu": AnyCodable(showIconInMenu),
+            "statusBarColorMode": AnyCodable(statusBarColorMode),
             "appAppearance": AnyCodable(appAppearance)
         ]
         ConfigManager.shared.save(settings, to: ConfigManager.shared.settingsURL)
@@ -780,6 +783,7 @@ class PingMonitorViewModel: ObservableObject {
         defaults.set(statusBarFontSize, forKey: "statusBarFontSize")
         defaults.set(statusBarFontWeight, forKey: "statusBarFontWeight")
         defaults.set(showIconInMenu, forKey: "showIconInMenu")
+        defaults.set(statusBarColorMode, forKey: "statusBarColorMode")
         defaults.set(appAppearance, forKey: "appAppearance")
     }
 
@@ -2540,6 +2544,13 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
             }
             .store(in: &cancellables)
         
+        viewModel.$showIconInMenu
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.updateStatusBar()
+            }
+            .store(in: &cancellables)
+
         viewModel.$showLatencyInMenu
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
@@ -2612,6 +2623,13 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
             .store(in: &cancellables)
 
         viewModel.$statusBarFontWeight
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.updateStatusBar()
+            }
+            .store(in: &cancellables)
+
+        viewModel.$statusBarColorMode
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 self?.updateStatusBar()
@@ -2844,6 +2862,14 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
         statusItem?.length = totalWidth
     }
 
+    private func statusBarForegroundColor() -> NSColor {
+        switch viewModel.statusBarColorMode {
+        case "light": return NSColor.white
+        case "dark": return NSColor.black
+        default: return NSColor.labelColor
+        }
+    }
+
     private func renderPlaceholderImage(font: NSFont) -> NSImage {
         let width: CGFloat = 16
         let height: CGFloat = 18
@@ -2851,7 +2877,7 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
         image.lockFocus()
         let attributes: [NSAttributedString.Key: Any] = [
             .font: font,
-            .foregroundColor: NSColor.labelColor
+            .foregroundColor: statusBarForegroundColor()
         ]
         let textSize = ("●" as NSString).size(withAttributes: attributes)
         let rect = NSRect(
@@ -2862,7 +2888,7 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
         )
         ("●" as NSString).draw(in: rect, withAttributes: attributes)
         image.unlockFocus()
-        image.isTemplate = true
+        image.isTemplate = viewModel.statusBarColorMode == "auto"
         return image
     }
 
@@ -2875,7 +2901,8 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
         if let iconImage = iconImage {
             iconImage.isTemplate = true
             let iconSize = iconImage.size
-            let scale = min(1.0, min(14.0 / iconSize.width, 14.0 / iconSize.height))
+            // 图标撑满 18px 槽位（修复图标偏小问题）
+            let scale = min(1.0, min(18.0 / iconSize.width, 18.0 / iconSize.height))
             let drawWidth = iconSize.width * scale
             let drawHeight = iconSize.height * scale
             let rect = NSRect(
@@ -2885,9 +2912,14 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
                 height: drawHeight
             )
             iconImage.draw(in: rect, from: NSRect(origin: .zero, size: iconSize), operation: .sourceOver, fraction: 1.0)
+            // 固定颜色模式：用所选颜色重新着色图标
+            if viewModel.statusBarColorMode != "auto" {
+                statusBarForegroundColor().set()
+                rect.fill(using: .sourceAtop)
+            }
         }
         image.unlockFocus()
-        image.isTemplate = true
+        image.isTemplate = viewModel.statusBarColorMode == "auto"
         return image
     }
 
@@ -2916,7 +2948,7 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
         let customFont = NSFont.monospacedDigitSystemFont(ofSize: CGFloat(viewModel.statusBarFontSize), weight: weight)
         let attributes: [NSAttributedString.Key: Any] = [
             .font: customFont,
-            .foregroundColor: NSColor.labelColor
+            .foregroundColor: statusBarForegroundColor()
         ]
 
         let textSize = (latencyStr as NSString).size(withAttributes: attributes)
@@ -2929,7 +2961,7 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
         (latencyStr as NSString).draw(in: rect, withAttributes: attributes)
 
         image.unlockFocus()
-        image.isTemplate = true
+        image.isTemplate = viewModel.statusBarColorMode == "auto"
         return image
     }
 
@@ -2963,7 +2995,7 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
         let customFont = NSFont.monospacedDigitSystemFont(ofSize: CGFloat(viewModel.statusBarFontSize), weight: weight)
         let attributes: [NSAttributedString.Key: Any] = [
             .font: customFont,
-            .foregroundColor: NSColor.labelColor
+            .foregroundColor: statusBarForegroundColor()
         ]
 
         let textSize = (labelStr as NSString).size(withAttributes: attributes)
@@ -2976,7 +3008,7 @@ class StatusBarController: NSObject, ObservableObject, NSWindowDelegate {
         (labelStr as NSString).draw(in: rect, withAttributes: attributes)
 
         image.unlockFocus()
-        image.isTemplate = true
+        image.isTemplate = viewModel.statusBarColorMode == "auto"
         return image
     }
 
