@@ -2844,6 +2844,7 @@ struct SettingsTab: View {
     @ObservedObject private var languageManager = LanguageManager.shared
     // Tailscale 功能总闸：关闭后隐藏所有 Tailscale 入口；CLI 不可用且开关开启时仍不展示。
     @AppStorage("pm.enableTailscale") private var enableTailscale: Bool = false
+    @ObservedObject private var tailscale = TailscaleManager.shared
 
     var body: some View {
         ScrollView {
@@ -2897,6 +2898,14 @@ struct SettingsTab: View {
 
                         Toggle(languageManager.t("settings.tailscale"), isOn: $enableTailscale)
                             .help(languageManager.t("settings.tailscale.help"))
+                            .onChange(of: enableTailscale) { _, newValue in
+                                TailscaleManager.shared.setEnabled(newValue)
+                            }
+
+                        Text(tailscaleIntegrationStatus)
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
+                            .foregroundStyle(Theme.Colors.textSecondary)
+                            .padding(.top, -8)
 
                         Divider()
 
@@ -3304,8 +3313,12 @@ struct SettingsTab: View {
         }
         .background(Theme.Colors.background)
         .padding()
+        .onAppear {
+            // 安装 Tailscale 后无需重启应用：打开设置页即重新检测 CLI。
+            if enableTailscale { TailscaleManager.shared.detectCLI() }
+        }
     }
-    
+
     private var statusBarDescription: String {
         switch viewModel.statusBarDisplayMode {
         case .average:
@@ -3317,6 +3330,19 @@ struct SettingsTab: View {
         case .first:
             return languageManager.t("settings.desc.first")
         }
+    }
+
+    private var tailscaleIntegrationStatus: String {
+        if !enableTailscale {
+            return languageManager.t("settings.tailscale.status.off")
+        }
+        if tailscale.isAvailable, let path = tailscale.cliPath {
+            return languageManager.t("settings.tailscale.status.detected") + ": " + path
+        }
+        if tailscale.hasInventoryCredentials {
+            return languageManager.t("settings.tailscale.status.control_plane")
+        }
+        return languageManager.t("settings.tailscale.status.not_detected")
     }
 }
 

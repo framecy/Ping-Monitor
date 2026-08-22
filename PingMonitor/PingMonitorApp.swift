@@ -570,8 +570,25 @@ class PingMonitorViewModel: ObservableObject {
                 }
             }
             .store(in: &keepAliveCancellables)
+
+        // 集成总闸翻转时，重启标准 ICMP 探测：开启时升级为 tailscale ping，
+        // 关闭时退回普通 ping，无需重启应用。
+        TailscaleManager.shared.$isEnabled
+            .dropFirst()
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self = self, self.isRunning else { return }
+                for (i, host) in self.hosts.enumerated() {
+                    guard !host.isPaused, host.probeMode == .icmp,
+                          host.command.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
+                    self.stopPingProcess(for: host.id)
+                    self.startPingProcess(for: host, at: i)
+                }
+            }
+            .store(in: &keepAliveCancellables)
     }
-    
+
     private func handleKeepAliveChange(interface: String, active: Bool) {
         guard isRunning else { return }
         
@@ -1675,7 +1692,7 @@ class PingMonitorViewModel: ObservableObject {
     }
 
     private func tailscaleProbeCLIPath(for host: HostConfig, address: String, customCommand: String) -> String? {
-        guard customCommand.isEmpty, let cli = TailscaleManager.shared.cliPath else { return nil }
+        guard TailscaleManager.shared.isEnabled, customCommand.isEmpty, let cli = TailscaleManager.shared.cliPath else { return nil }
         guard host.isTailscaleNode || isKnownTailscaleNodeAddress(address) else { return nil }
         return cli
     }

@@ -186,11 +186,60 @@ class TailscaleManager: ObservableObject {
 
     public var cliPath: String?
 
+    // 集成总闸（与设置页的 pm.enableTailscale 同键）。关闭时不做 CLI 探测、
+    // 不发 API 请求、探测进程一律退回普通 ping —— 而不是仅隐藏界面。
+    @Published private(set) var isEnabled: Bool
+
+    static let enableDefaultsKey = "pm.enableTailscale"
+
     private var inventoryTimer: Timer?
 
     private init() {
-        detectCLI()
+        isEnabled = UserDefaults.standard.bool(forKey: TailscaleManager.enableDefaultsKey)
+        if isEnabled {
+            detectCLI()
+        }
         refreshInventoryConfiguration()
+    }
+
+    func setEnabled(_ on: Bool) {
+        guard on != isEnabled else { return }
+        isEnabled = on
+        UserDefaults.standard.set(on, forKey: TailscaleManager.enableDefaultsKey)
+        LogManager.shared.info("Tailscale integration \(on ? "enabled" : "disabled")")
+        if on {
+            detectCLI()
+            if isAvailable { fetchStatus() }
+        } else {
+            resetState()
+        }
+        refreshInventoryConfiguration()
+    }
+
+    private func resetState() {
+        isConnected = false
+        isLoading = false
+        lastError = nil
+        selfIP = ""
+        selfHostname = ""
+        magicDNSSuffix = ""
+        nodes = []
+        netcheckLoading = false
+        natType = "—"
+        udpEnabled = false
+        ipv4Enabled = false
+        ipv6Enabled = false
+        hairPinning = nil
+        upnp = nil
+        preferredDERP = "—"
+        globalIPv4 = "—"
+        globalIPv6 = "—"
+        regionLatencies = []
+        captivePortal = false
+        healthAdvice = []
+        pendingActionDeviceID = nil
+        lastActionError = nil
+        isFetchingInventory = false
     }
 
     // MARK: - CLI Detection
@@ -236,6 +285,7 @@ class TailscaleManager: ObservableObject {
     // MARK: - Fetch Status
     
     func fetchStatus() {
+        guard isEnabled else { return }
         guard let cli = cliPath else {
             lastError = "Tailscale CLI not found"
             return
@@ -443,6 +493,15 @@ class TailscaleManager: ObservableObject {
 
     /// 凭据变更 / 开关切换后调用：重置 token 缓存并重建轮询。
     func refreshInventoryConfiguration() {
+        guard isEnabled else {
+            stopInventoryPolling()
+            Task { await TailscaleAPIClient.shared.invalidateToken() }
+            hasInventoryCredentials = false
+            tailnetDevices = []
+            lastInventorySync = nil
+            inventoryState = .notConfigured
+            return
+        }
         Task { await TailscaleAPIClient.shared.invalidateToken() }
         hasInventoryCredentials = isInventoryConfigured
 
@@ -477,7 +536,7 @@ class TailscaleManager: ObservableObject {
     }
 
     func refreshInventory() {
-        guard isInventoryConfigured else {
+        guard isEnabled, isInventoryConfigured else {
             inventoryState = .notConfigured
             return
         }
@@ -527,6 +586,7 @@ class TailscaleManager: ObservableObject {
     }
 
     func perform(_ action: DeviceAction, on device: TailnetDevice) {
+        guard isEnabled else { return }
         guard pendingActionDeviceID == nil else { return }
         pendingActionDeviceID = device.id
         lastActionError = nil
@@ -618,7 +678,7 @@ class TailscaleManager: ObservableObject {
     ]
     
     func fetchNetcheck() {
-        guard let cli = cliPath else { return }
+        guard isEnabled, let cli = cliPath else { return }
         netcheckLoading = true
         
         Task.detached { [cli, derpRegionNames] in
@@ -690,7 +750,7 @@ class TailscaleManager: ObservableObject {
     // MARK: - Path Diagnosis
     
     func runPathDiagnosis(for node: TailscaleNode) {
-        guard let cli = cliPath else { return }
+        guard isEnabled, let cli = cliPath else { return }
         
         if let index = nodes.firstIndex(where: { $0.tailscaleIP == node.tailscaleIP }) {
             nodes[index].isCheckingPath = true
@@ -747,6 +807,10 @@ class TailscaleManager: ObservableObject {
     }
     
     func runTailscaleCommand(_ args: [String], background: Bool = false) async {
+        guard isEnabled else {
+            LogManager.shared.info("Tailscale integration is disabled; command skipped: tailscale \(args.joined(separator: " "))")
+            return
+        }
         guard let cli = cliPath else {
             LogManager.shared.error("Tailscale CLI not found")
             return

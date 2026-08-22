@@ -54,19 +54,50 @@
         <!-- Timeline -->
         <div class="timeline" id="changelog-timeline">
 
-            <!-- v2.4.1 -->
-            <div class="timeline-item animate-fade-in" data-categories="fixed,updated">
+            <!-- v2.5.0 -->
+            <div class="timeline-item animate-fade-in" data-categories="changed,added,updated">
                 <div class="timeline-dot latest"></div>
                 <div class="timeline-card">
                     <div class="timeline-header" onclick="toggleTimeline(this)">
                         <div class="timeline-header-left">
-                            <span class="timeline-version">v2.4.1</span>
+                            <span class="timeline-version">v2.5.0</span>
                             <span class="timeline-badge">Latest</span>
-                            <span class="timeline-date">2026-07-31</span>
+                            <span class="timeline-date">2026-08-22</span>
                         </div>
                         <div class="timeline-toggle">▼</div>
                     </div>
                     <div class="timeline-body open">
+                        <div class="timeline-content">
+                            <div class="change-category" data-type="changed">
+                                <div class="category-tag tag-changed">Changed</div>
+                                <ul class="change-list">
+                                    <li><strong>Tailscale 集成成为真正的开关</strong>：设置项此前只隐藏界面入口，应用启动仍会探测 CLI、导入过的节点仍用 tailscale 探测、OAuth 凭据存在时仍轮询 API。现在关闭即全面静默：零 CLI 检测、零 API 请求、探测全部退回普通 ping，未安装 Tailscale 的机器不再有任何派生进程与报错。默认关闭，此前已开启的用户保持开启。</li>
+                                    <li><strong>开关切换即时生效</strong>：监控运行中切换集成，标准 ICMP 探测自动重启并相应升级/退回，无需重启应用。</li>
+                                </ul>
+                            </div>
+                            <div class="change-category" data-type="added">
+                                <div class="category-tag tag-added">Added</div>
+                                <ul class="change-list">
+                                    <li><strong>集成状态提示</strong>：设置页开关下方实时显示 CLI 检测结果（含路径）或控制面凭据状态；安装 Tailscale 后重开设置页即自动识别。</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- v2.4.1 -->
+            <div class="timeline-item animate-fade-in" data-categories="fixed,updated">
+                <div class="timeline-dot"></div>
+                <div class="timeline-card">
+                    <div class="timeline-header" onclick="toggleTimeline(this)">
+                        <div class="timeline-header-left">
+                            <span class="timeline-version">v2.4.1</span>
+                            <span class="timeline-date">2026-07-31</span>
+                        </div>
+                        <div class="timeline-toggle">▼</div>
+                    </div>
+                    <div class="timeline-body">
                         <div class="timeline-content">
                             <div class="change-category" data-type="fixed">
                                 <div class="category-tag tag-fixed">Fixed</div>

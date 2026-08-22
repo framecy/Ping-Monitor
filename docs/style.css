@@ -11,6 +11,7 @@
     --tag-added: #3b82f6;
     --tag-updated: #a855f7;
     --tag-fixed: #22c55e;
+    --tag-changed: #f59e0b;
     --font-sans: 'Inter', -apple-system, system-ui, sans-serif;
     --font-serif: 'Georgia', 'Times New Roman', serif;
     --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
@@ -1307,6 +1308,7 @@ footer {
 .tag-added  { background: rgba(59,130,246,0.15);  color: var(--tag-added);   border: 1px solid rgba(59,130,246,0.25); }
 .tag-updated{ background: rgba(168,85,247,0.15);  color: var(--tag-updated); border: 1px solid rgba(168,85,247,0.25); }
 .tag-fixed  { background: rgba(34,197,94,0.15);   color: var(--tag-fixed);   border: 1px solid rgba(34,197,94,0.25); }
+.tag-changed{ background: rgba(245,158,11,0.15); color: var(--tag-changed); border: 1px solid rgba(245,158,11,0.25); }
 
 .change-list { list-style: none; padding: 0; }
 
