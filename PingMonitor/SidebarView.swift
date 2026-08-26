@@ -56,7 +56,7 @@ private struct NavPanel: View {
             .padding(.bottom, Theme.Space.controlGap)
 
             ScrollView {
-                VStack(alignment: .leading, spacing: Theme.Space.xxs) {
+                VStack(alignment: .leading, spacing: Theme.Space.xs) {
                     NavSection(
                         title: languageManager.t("sidebar.overview"),
                         isCollapsed: collapsedSections.contains("overview"),
@@ -71,7 +71,7 @@ private struct NavPanel: View {
                         }
                     }
 
-                    Spacer().frame(height: Theme.Space.lg)
+                    Spacer().frame(height: Theme.Space.xl)
 
                     NavSection(
                         title: languageManager.t("sidebar.management"),
@@ -83,7 +83,7 @@ private struct NavPanel: View {
                         NavRow(item: .logs, selectedItem: $selectedItem)
                     }
 
-                    Spacer().frame(height: Theme.Space.lg)
+                    Spacer().frame(height: Theme.Space.xl)
 
                     NavSection(
                         title: languageManager.t("sidebar.config"),
@@ -96,11 +96,20 @@ private struct NavPanel: View {
                 .padding(.horizontal, Theme.Space.sm)
             }
 
-            // 底部：用户 + 版本
+            // 底部：Tailnet 入口 + 用户/版本 + 语言切换
             VStack(spacing: Theme.Space.sm) {
                 Rectangle()
                     .fill(Theme.Colors.separator)
                     .frame(height: 1)
+
+                // Tailnet 监管状态（只读，点击进入 Tailscale 页）
+                if tailscaleVisible {
+                    HStack {
+                        TailnetStatusPill(selectedItem: $selectedItem)
+                        Spacer()
+                    }
+                    .padding(.horizontal, Theme.Space.md)
+                }
 
                 HStack(spacing: Theme.Space.controlGap) {
                     Circle()
@@ -125,6 +134,20 @@ private struct NavPanel: View {
                         }
                     }
                     Spacer()
+
+                    // 语言切换：chip 显示将要切换到的语言，点击即切换
+                    Button {
+                        languageManager.toggle()
+                    } label: {
+                        Text(languageManager.currentLanguage == .zh ? "EN" : "中")
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote, weight: .bold))
+                            .foregroundStyle(Theme.Colors.textSecondary)
+                            .padding(.horizontal, Theme.Space.sm)
+                            .padding(.vertical, Theme.Space.xxs)
+                            .background(Capsule().fill(Theme.Colors.navSelection))
+                    }
+                    .buttonStyle(.plain)
+                    .help(languageManager.t("settings.language"))
                 }
                 .padding(.horizontal, Theme.Space.md)
                 .padding(.bottom, Theme.Space.md)
@@ -197,7 +220,7 @@ private struct NavRow: View {
 
                 Spacer()
             }
-            .padding(.vertical, Theme.Space.xs)
+            .padding(.vertical, Theme.Space.sm)
             .padding(.horizontal, Theme.Space.sm)
             .background(
                 RoundedRectangle(cornerRadius: Theme.Radius.md)

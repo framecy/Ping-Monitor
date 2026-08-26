@@ -410,6 +410,9 @@ public final class LanguageManager: ObservableObject {
             "traceroute.nslookup_server": "DNS Server",
             "traceroute.nslookup_empty": "Run NSLookup to inspect DNS answers",
             "traceroute.lookup_failed": "NSLookup failed",
+            "traceroute.map.small": "S",
+            "traceroute.map.medium": "M",
+            "traceroute.map.large": "L",
             
             // Host Detail
             "host_detail.checking": "Checking...",
@@ -581,6 +584,7 @@ public final class LanguageManager: ObservableObject {
             "netspeed.family.other": "Other",
             "netspeed.default_route": "Default route",
             "netspeed.no_interfaces": "No interfaces detected",
+            "netspeed.physical_totals_hint": "Physical totals exclude tunnel bytes to avoid double-counting",
             "netspeed.traffic_stats": "Traffic Statistics",
             "netspeed.total_download": "Total Download",
             "netspeed.total_upload": "Total Upload",
@@ -983,6 +987,9 @@ public final class LanguageManager: ObservableObject {
             "traceroute.nslookup_server": "DNS 服务器",
             "traceroute.nslookup_empty": "运行 NSLookup 查看 DNS 解析结果",
             "traceroute.lookup_failed": "NSLookup 执行失败",
+            "traceroute.map.small": "小",
+            "traceroute.map.medium": "中",
+            "traceroute.map.large": "大",
             
             // Host Detail
             "host_detail.checking": "检测中...",
@@ -1154,6 +1161,7 @@ public final class LanguageManager: ObservableObject {
             "netspeed.family.other": "其他",
             "netspeed.default_route": "默认出口",
             "netspeed.no_interfaces": "未检测到接口",
+            "netspeed.physical_totals_hint": "物理接口总量已剔除隧道字节，避免重复计数",
             "netspeed.traffic_stats": "流量统计",
             "netspeed.total_download": "总计下载",
             "netspeed.total_upload": "总计上传",

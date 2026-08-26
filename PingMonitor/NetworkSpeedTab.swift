@@ -14,7 +14,7 @@ struct NetworkSpeedTab: View {
     @StateObject private var speedManager = NetworkSpeedManager.shared
     @ObservedObject private var languageManager = LanguageManager.shared
     @State private var trafficRange: TrafficTimeRange = .oneHour
-    @State private var tabMode: NetSpeedTabMode = .interfaces
+    @AppStorage("pm.netspeed.tabMode") private var tabMode: NetSpeedTabMode = .interfaces
     /// 默认只展开承载真实流量的两族，其余（管理口、回环等）收起。
     @State private var expandedFamilies: Set<InterfaceFamily> = [.wifi, .ethernet]
     
@@ -71,7 +71,7 @@ struct NetworkSpeedTab: View {
             Spacer()
         }
     }
-    
+
     // MARK: - Speed Overview Card
     
     private var speedOverviewCard: some View {
@@ -184,7 +184,7 @@ struct NetworkSpeedTab: View {
 
                         Spacer()
 
-                        Text("Physical totals exclude tunnel bytes to avoid double-counting")
+                        Text(languageManager.t("netspeed.physical_totals_hint"))
                             .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                             .foregroundStyle(Theme.Colors.textTertiary)
                     }
@@ -394,11 +394,14 @@ struct NetworkSpeedTab: View {
                         .frame(maxWidth: .infinity, alignment: .center)
                         .padding(.vertical, Theme.Space.lg)
                 } else {
-                    // 同族接口合并成一组，默认收起；行底色用半透明色块交替区分。
+                    // 同族接口合并成一组，默认收起；组间发丝线分隔，不再做整组斑马底色。
                     let groups = interfaceGroups
                     VStack(spacing: 0) {
                         ForEach(Array(groups.enumerated()), id: \.element.family) { index, group in
-                            interfaceGroupRow(group, striped: !index.isMultiple(of: 2))
+                            if index > 0 {
+                                Divider().opacity(0.5)
+                            }
+                            interfaceGroupRow(group)
                         }
                     }
                     .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.sm))
@@ -444,18 +447,22 @@ struct NetworkSpeedTab: View {
     }
 
     @ViewBuilder
-    private func interfaceGroupRow(_ group: InterfaceGroup, striped: Bool) -> some View {
+    /// 组头行 + 可展开的成员行。展开/收起带动画；组头与成员都不铺整组底色，
+    /// 层级靠缩进表达，分隔靠发丝线（组间由调用方插入）。
+    private func interfaceGroupRow(_ group: InterfaceGroup) -> some View {
         let isExpanded = expandedFamilies.contains(group.family)
 
         VStack(spacing: 0) {
             Button {
-                if isExpanded {
-                    expandedFamilies.remove(group.family)
-                } else {
-                    expandedFamilies.insert(group.family)
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    if isExpanded {
+                        expandedFamilies.remove(group.family)
+                    } else {
+                        expandedFamilies.insert(group.family)
+                    }
                 }
             } label: {
-                HStack(spacing: 10) {
+                HStack(spacing: Theme.Space.sm) {
                     Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
                         .font(Theme.Fonts.icon(Theme.Fonts.Size.micro, weight: .semibold))
                         .foregroundStyle(Theme.Colors.textTertiary)
@@ -473,8 +480,8 @@ struct NetworkSpeedTab: View {
                     Text("\(group.members.count)")
                         .font(Theme.Fonts.number(Theme.Fonts.Size.micro, weight: .bold))
                         .foregroundStyle(Theme.Colors.textSecondary)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 1)
+                        .padding(.horizontal, Theme.Space.xs)
+                        .padding(.vertical, Theme.Space.xxs)
                         .background(Theme.Colors.surfaceOverlay)
                         .cornerRadius(Theme.Radius.xs)
 
@@ -486,25 +493,27 @@ struct NetworkSpeedTab: View {
 
                     speedPair(speedIn: group.speedIn, speedOut: group.speedOut)
                 }
-                .padding(.horizontal, 10)
+                .padding(.horizontal, Theme.Space.md)
                 .padding(.vertical, Theme.Space.sm)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
 
             if isExpanded {
-                ForEach(group.members) { iface in
+                ForEach(Array(group.members.enumerated()), id: \.element.id) { index, iface in
+                    if index > 0 {
+                        Divider().opacity(0.35)
+                    }
                     interfaceRow(iface)
                 }
             }
         }
-        .background(striped ? Theme.Colors.surfaceOverlay : Color.clear)
     }
 
     /// 上/下行速率对，组行与成员行共用。
     private func speedPair(speedIn: Double, speedOut: Double) -> some View {
-        HStack(spacing: 14) {
-            HStack(spacing: 3) {
+        HStack(spacing: Theme.Space.lg) {
+            HStack(spacing: Theme.Space.xs) {
                 Image(systemName: "arrow.up")
                     .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
                     .foregroundStyle(speedOut > 0 ? Theme.Colors.accentPurple : Theme.Colors.textTertiary)
@@ -512,7 +521,7 @@ struct NetworkSpeedTab: View {
                     .font(Theme.Fonts.number(Theme.Fonts.Size.caption, weight: .medium))
                     .foregroundStyle(speedOut > 0 ? Theme.Colors.accentPurple : Theme.Colors.textTertiary)
             }
-            HStack(spacing: 3) {
+            HStack(spacing: Theme.Space.xs) {
                 Image(systemName: "arrow.down")
                     .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
                     .foregroundStyle(speedIn > 0 ? Theme.Colors.accentCyan : Theme.Colors.textTertiary)
@@ -527,7 +536,7 @@ struct NetworkSpeedTab: View {
         HStack(spacing: Theme.Space.md) {
             // Interface icon + name
             VStack(alignment: .leading, spacing: Theme.Space.xxs) {
-                HStack(spacing: 6) {
+                HStack(spacing: Theme.Space.xs) {
                     Circle()
                         .fill(iface.isActive ? Theme.Colors.accentGreen : Theme.Colors.textTertiary.opacity(0.4))
                         .frame(width: 6, height: 6)
@@ -556,54 +565,71 @@ struct NetworkSpeedTab: View {
             // Speed
             HStack(spacing: Theme.Space.lg) {
                 // Upload
-                VStack(alignment: .trailing, spacing: 1) {
-                    HStack(spacing: 3) {
+                VStack(alignment: .trailing, spacing: Theme.Space.xxs) {
+                    HStack(spacing: Theme.Space.xs) {
                         Image(systemName: "arrow.up")
                             .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
                             .foregroundStyle(Theme.Colors.accentPurple)
                         Text(NetworkSpeedManager.formatSpeed(iface.speedOut))
                             .font(Theme.Fonts.number(Theme.Fonts.Size.caption, weight: .medium))
                             .foregroundStyle(iface.speedOut > 0 ? Theme.Colors.accentPurple : Theme.Colors.textTertiary)
+                            .lineLimit(1)
                     }
                     Text(NetworkSpeedManager.formatBytes(iface.bytesOut))
                         .font(Theme.Fonts.number(Theme.Fonts.Size.micro))
                         .foregroundStyle(Theme.Colors.textTertiary)
+                        .lineLimit(1)
                 }
                 
                 // Download
-                VStack(alignment: .trailing, spacing: 1) {
-                    HStack(spacing: 3) {
+                VStack(alignment: .trailing, spacing: Theme.Space.xxs) {
+                    HStack(spacing: Theme.Space.xs) {
                         Image(systemName: "arrow.down")
                             .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
                             .foregroundStyle(Theme.Colors.accentCyan)
                         Text(NetworkSpeedManager.formatSpeed(iface.speedIn))
                             .font(Theme.Fonts.number(Theme.Fonts.Size.caption, weight: .medium))
                             .foregroundStyle(iface.speedIn > 0 ? Theme.Colors.accentCyan : Theme.Colors.textTertiary)
+                            .lineLimit(1)
                     }
                     Text(NetworkSpeedManager.formatBytes(iface.bytesIn))
                         .font(Theme.Fonts.number(Theme.Fonts.Size.micro))
                         .foregroundStyle(Theme.Colors.textTertiary)
+                        .lineLimit(1)
                 }
                 
                 // Packets
-                VStack(alignment: .trailing, spacing: 1) {
+                VStack(alignment: .trailing, spacing: Theme.Space.xxs) {
                     Text("PKT ↑\(formatPackets(iface.packetsOut))")
                         .font(Theme.Fonts.number(Theme.Fonts.Size.micro))
                         .foregroundStyle(Theme.Colors.textTertiary)
+                        .lineLimit(1)
                     Text("PKT ↓\(formatPackets(iface.packetsIn))")
                         .font(Theme.Fonts.number(Theme.Fonts.Size.micro))
                         .foregroundStyle(Theme.Colors.textTertiary)
+                        .lineLimit(1)
                 }
+                .fixedSize() // PKT 列保持完整可读；空间不足时由前面的列先收缩
             }
         }
-        .padding(.leading, Theme.Space.xxxl)
+        .padding(.leading, Theme.Space.huge) // 成员行深缩进到组头图标右侧，层级靠缩进表达
         .padding(.trailing, Theme.Space.sm)
-        .padding(.vertical, Theme.Space.xs)
+        .padding(.vertical, Theme.Space.sm)
         .contentShape(Rectangle())
         .onTapGesture {
             speedManager.selectedInterface = (speedManager.selectedInterface == iface.id) ? "all" : iface.id
         }
-        .background(speedManager.selectedInterface == iface.id ? Theme.Colors.accentBlue.opacity(0.10) : Color.clear)
+        // 选中态：内缩圆角高亮，不再整行平铺到分组底上
+        .background(
+            Group {
+                if speedManager.selectedInterface == iface.id {
+                    RoundedRectangle(cornerRadius: Theme.Radius.sm)
+                        .fill(Theme.Colors.accentBlue.opacity(0.10))
+                        .padding(.horizontal, Theme.Space.xs)
+                        .padding(.vertical, Theme.Space.xxs)
+                }
+            }
+        )
     }
     
     private func formatPackets(_ count: UInt64) -> String {

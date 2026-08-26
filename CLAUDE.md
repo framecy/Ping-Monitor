@@ -137,7 +137,6 @@ The app is `LSUIElement` (a pure menu-bar, no Dock icon). `StatusBarController` 
 ### 已知例外（写代码时可依赖）
 
 - Widget 目标不引用 Theme（历史现状）；新增 Widget 界面先本地定义值并注释
-- 地图全出血是 Traceroute 的设计意图
 - `EditableHostCard` 不用 hoverLift：它的边框/悬停光晕携带主机状态色，是信息不是装饰
 - 存量偏离阶梯的光学微调值（3/5/6/7/10/14/30pt 等，见审计基线 ~144 处）集中在卡片内部小组件：改到哪个组件就顺带归阶，不做专门批量替换
 

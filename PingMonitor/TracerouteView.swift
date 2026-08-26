@@ -1,11 +1,25 @@
 import SwiftUI
 
+/// 地图卡三档固定高度（小 200 / 中 300 / 大 440）。
+enum TracerouteMapSize: String, CaseIterable, Identifiable {
+    case small, medium, large
+    var id: String { rawValue }
+    var height: CGFloat {
+        switch self {
+        case .small: return 200
+        case .medium: return 300
+        case .large: return 440
+        }
+    }
+}
+
 struct TracerouteView: View {
     @ObservedObject var viewModel: PingMonitorViewModel
     @StateObject private var manager = TracerouteManager()
     @State private var targetHost = ""
     @State private var showCopied = false
     @State private var tableContentWidth: CGFloat = 640
+    @AppStorage("pm.traceroute.mapSize") private var mapSize: TracerouteMapSize = .medium
     @ObservedObject private var languageManager = LanguageManager.shared
     
     var body: some View {
@@ -17,32 +31,52 @@ struct TracerouteView: View {
                 // Empty state
                 emptyStateView
             } else {
-                // Results
-                VSplitView {
-                    TracerouteMapView(manager: manager)
-                        .frame(minHeight: 200, idealHeight: 300)
-                        
-                    ScrollView {
-                        VStack(spacing: Theme.Space.cardGap) {
-                            // Status bar
-                            statusBar
+                // Results：地图成卡、固定高度，与状态栏/跳点表同列滚动（不再全出血、不再可拖分栏）
+                ScrollView {
+                    VStack(spacing: Theme.Space.cardGap) {
+                        mapCard
 
-                            if manager.isNSLookupRunning || manager.nsLookupResult != nil || manager.nsLookupError != nil {
-                                nsLookupSection
-                            }
+                        // Status bar
+                        statusBar
 
-                            // Hop table
-                            hopTableView
+                        if manager.isNSLookupRunning || manager.nsLookupResult != nil || manager.nsLookupError != nil {
+                            nsLookupSection
                         }
-                        .padding(Theme.Space.pagePadding)
+
+                        // Hop table
+                        hopTableView
                     }
-                    .frame(minHeight: 200)
+                    .padding(Theme.Space.pagePadding)
                 }
             }
         }
         .background(Theme.Colors.background)
     }
     
+    /// 地图卡：三档固定高度（右上角分段切换），圆角描边与其他内容卡一致。
+    private var mapCard: some View {
+        TracerouteMapView(manager: manager)
+            .frame(height: mapSize.height)
+            .frame(maxWidth: .infinity)
+            .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg))
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.Radius.lg)
+                    .stroke(Theme.Colors.cardBorder, lineWidth: 1)
+            )
+            .overlay(alignment: .topTrailing) {
+                Picker("", selection: $mapSize) {
+                    ForEach(TracerouteMapSize.allCases) { size in
+                        Text(languageManager.t("traceroute.map.\(size.rawValue)")).tag(size)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .controlSize(.small)
+                .fixedSize()
+                .padding(Theme.Space.sm)
+            }
+            .animation(.easeInOut(duration: 0.25), value: mapSize)
+    }
+
     // MARK: - Toolbar
     
     private var toolbarView: some View {
@@ -99,7 +133,6 @@ struct TracerouteView: View {
                             .stroke(Theme.Colors.separator, lineWidth: 1)
                     )
                     .frame(maxWidth: .infinity)
-                    .layoutPriority(1)
                     
                     Toggle(isOn: $manager.isMTRMode) {
                         HStack(spacing: Theme.Space.xs) {
@@ -142,6 +175,7 @@ struct TracerouteView: View {
                         .foregroundStyle(manager.isRunning ? Theme.Colors.accentRed : Theme.Colors.accentBlue)
                     }
                     .buttonStyle(.plain)
+                    .fixedSize() // 工具行按钮永不压缩：输入框吃剩余宽度，按钮保持理想尺寸
                     .disabled(targetHost.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !manager.isRunning)
 
                     Button(action: {
@@ -168,6 +202,7 @@ struct TracerouteView: View {
                         .foregroundStyle(Theme.Colors.textSecondary)
                     }
                     .buttonStyle(.plain)
+                    .fixedSize()
                     .disabled(targetHost.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || manager.isNSLookupRunning)
                     
                     if !manager.hops.isEmpty {
@@ -193,6 +228,7 @@ struct TracerouteView: View {
                             .foregroundStyle(showCopied ? Theme.Colors.accentGreen : Theme.Colors.textSecondary)
                         }
                         .buttonStyle(.plain)
+                        .fixedSize()
                     }
                 }
             
@@ -208,9 +244,7 @@ struct TracerouteView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .padding(.horizontal, Theme.Space.pagePadding)
-        .padding(.top, Theme.Space.pageTopGap)
-        .padding(.bottom, Theme.Space.controlGap)
+        .padding(Theme.Space.pagePadding) // 卡内四边统一 16，与内容卡（cardPadding）一致
         .background(Theme.Colors.cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg))
         .overlay(
@@ -226,56 +260,68 @@ struct TracerouteView: View {
     
     private var emptyStateView: some View {
         ScrollView {
-            VStack(spacing: Theme.Space.xl) {
-                Spacer(minLength: Theme.Space.xxl)
-                
-                ZStack {
-                    Circle()
-                        .fill(
-                            .linearGradient(
-                                colors: [Theme.Colors.accentBlue.opacity(0.15), Theme.Colors.accentPurple.opacity(0.08)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
+            VStack(spacing: Theme.Space.cardGap) {
+                // 空态主卡：图标 + 标题 + 提示 + 快捷目标，内容落卡片，不裸放在画布上
+                VStack(spacing: Theme.Space.xl) {
+                    ZStack {
+                        Circle()
+                            .fill(
+                                .linearGradient(
+                                    colors: [Theme.Colors.accentBlue.opacity(0.15), Theme.Colors.accentPurple.opacity(0.08)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
                             )
-                        )
-                        .frame(width: 80, height: 80)
-                    
-                    Image(systemName: "point.topleft.down.to.point.bottomright.curvepath")
-                        .font(Theme.Fonts.icon(Theme.Fonts.Size.hero))
-                        .foregroundStyle(
-                            .linearGradient(
-                                colors: [Theme.Colors.accentBlue, Theme.Colors.accentPurple],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
+                            .frame(width: 80, height: 80)
+
+                        Image(systemName: "point.topleft.down.to.point.bottomright.curvepath")
+                            .font(Theme.Fonts.icon(Theme.Fonts.Size.hero))
+                            .foregroundStyle(
+                                .linearGradient(
+                                    colors: [Theme.Colors.accentBlue, Theme.Colors.accentPurple],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
                             )
-                        )
+                    }
+
+                    Text(languageManager.t("traceroute.no_result"))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.headline, weight: .semibold))
+                        .foregroundStyle(Theme.Colors.textPrimary)
+
+                    Text(languageManager.t("traceroute.hint"))
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.callout))
+                        .foregroundStyle(Theme.Colors.textSecondary)
+                        .multilineTextAlignment(.center)
+
+                    // Quick targets
+                    HStack(spacing: Theme.Space.sm) {
+                        QuickTargetButton(label: "8.8.8.8", icon: "globe") {
+                            targetHost = "8.8.8.8"
+                            manager.startTrace(host: targetHost)
+                        }
+                        QuickTargetButton(label: "1.1.1.1", icon: "shield") {
+                            targetHost = "1.1.1.1"
+                            manager.startTrace(host: targetHost)
+                        }
+                        QuickTargetButton(label: "baidu.com", icon: "network") {
+                            targetHost = "www.baidu.com"
+                            manager.startTrace(host: targetHost)
+                        }
+                    }
+                    .padding(.top, Theme.Space.xs)
                 }
-                
-                Text(languageManager.t("traceroute.no_result"))
-                    .font(Theme.Fonts.ui(Theme.Fonts.Size.headline, weight: .semibold))
-                    .foregroundStyle(Theme.Colors.textPrimary)
-                
-                Text(languageManager.t("traceroute.hint"))
-                    .font(Theme.Fonts.ui(Theme.Fonts.Size.callout))
-                    .foregroundStyle(Theme.Colors.textSecondary)
-                    .multilineTextAlignment(.center)
-                
-                // Quick targets
-                HStack(spacing: Theme.Space.sm) {
-                    QuickTargetButton(label: "8.8.8.8", icon: "globe") {
-                        targetHost = "8.8.8.8"
-                        manager.startTrace(host: targetHost)
-                    }
-                    QuickTargetButton(label: "1.1.1.1", icon: "shield") {
-                        targetHost = "1.1.1.1"
-                        manager.startTrace(host: targetHost)
-                    }
-                    QuickTargetButton(label: "baidu.com", icon: "network") {
-                        targetHost = "www.baidu.com"
-                        manager.startTrace(host: targetHost)
-                    }
-                }
-                .padding(.top, Theme.Space.xs)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, Theme.Space.pagePadding)
+                .padding(.vertical, Theme.Space.huge) // 空态类大留白走稀疏档
+                .background(
+                    RoundedRectangle(cornerRadius: Theme.Radius.lg)
+                        .fill(Theme.Colors.cardBackground)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.Radius.lg)
+                        .stroke(Theme.Colors.cardBorder, lineWidth: 1)
+                )
 
                 // Monitored hosts section
                 if viewModel.isRunning && !viewModel.hosts.isEmpty {
@@ -284,12 +330,11 @@ struct TracerouteView: View {
 
                 if manager.isNSLookupRunning || manager.nsLookupResult != nil || manager.nsLookupError != nil {
                     nsLookupSection
-                        .padding(.horizontal, Theme.Space.lg)
                 }
-
-                Spacer(minLength: Theme.Space.xxl)
             }
-            .frame(maxWidth: .infinity)
+            .padding(.horizontal, Theme.Space.pagePadding)
+            .padding(.top, Theme.Space.controlGap) // 与工具栏卡的下外距合成 cardGap 节奏
+            .padding(.bottom, Theme.Space.pagePadding)
         }
     }
     
@@ -335,7 +380,7 @@ struct TracerouteView: View {
             RoundedRectangle(cornerRadius: Theme.Radius.lg)
                 .stroke(Theme.Colors.cardBorder, lineWidth: 1)
         )
-        .padding(.horizontal, Theme.Space.xl)
+        // 水平边距由空态容器统一提供，卡片自身不再自带外距
     }
     
     // MARK: - Status Bar

@@ -96,15 +96,10 @@ struct MainView: View {
                 .background(Theme.Colors.sidebarBackground)
                 .layoutPriority(1)
 
-            VStack(spacing: 0) {
-                headerView
-                    .padding(.horizontal, Theme.Space.lg)
-                    .padding(.top, 10)
-                    .padding(.bottom, Theme.Space.xs)
-
-                detailContent
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
+            // 顶部栏已整体移除：全局控制（监控开关 / 语言）迁入侧边栏底部，
+            // 页面内容直达 detail 区顶部，顶部留白由各页自己负责。
+            detailContent
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             // minWidth: 0 让 detail 成为唯一可压缩列；clipped 防止超宽内容盖到侧边栏上。
             .frame(minWidth: 0, maxWidth: .infinity)
             .background(Theme.Colors.background)
@@ -169,84 +164,6 @@ struct MainView: View {
         }
     }
 
-    // MARK: - Header
-    // LM Studio 式工具栏卡片：白色圆角卡承载页面标题 + 全局状态开关，
-    // 浮在内容区背景之上，不再用材质渐变条。
-    private var headerView: some View {
-        HStack(spacing: 14) {
-            // 状态指示点（运行中呼吸脉冲）
-            ZStack {
-                if viewModel.isRunning {
-                    Circle()
-                        .fill(Theme.Colors.accentGreen.opacity(0.25))
-                        .frame(width: 22, height: 22)
-                        .scaleEffect(viewModel.isRunning ? 1.5 : 1.0)
-                        .opacity(viewModel.isRunning ? 0 : 0.6)
-                        .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: false), value: viewModel.isRunning)
-                }
-                Circle()
-                    .fill(viewModel.isRunning ? Theme.Colors.accentGreen : Theme.Colors.textTertiary.opacity(0.5))
-                    .frame(width: 9, height: 9)
-            }
-
-            VStack(alignment: .leading, spacing: Theme.Space.xxs) {
-                Text(selectedItem.title)
-                    .font(Theme.Fonts.ui(Theme.Fonts.Size.headline, weight: .semibold))
-                Text(viewModel.isRunning ? String(format: languageManager.t("header.monitoring"), viewModel.hosts.count) : languageManager.t("header.stopped"))
-                    .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
-                    .foregroundStyle(Theme.Colors.textSecondary)
-            }
-
-            Spacer()
-
-            // Language Toggle
-            Button(action: { languageManager.toggle() }) {
-                Text(languageManager.currentLanguage == .zh ? "EN" : "中")
-                    .font(Theme.Fonts.ui(Theme.Fonts.Size.body, weight: .bold))
-                    .foregroundStyle(Theme.Colors.textSecondary)
-                    .padding(6)
-                    .background(Theme.Colors.background)
-                    .clipShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .help("Switch Language")
-
-            // Tailnet 监管状态（只读，点击进入 Tailscale 页）
-            if tailscaleVisible {
-                TailnetStatusPill(selectedItem: $selectedItem)
-            }
-
-            Rectangle()
-                .fill(Theme.Colors.separator)
-                .frame(width: 1, height: 22)
-
-            // 状态开关：LM Studio 的 "Status: Running" 同款
-            HStack(spacing: Theme.Space.sm) {
-                Text(viewModel.isRunning ? languageManager.t("header.stop") : languageManager.t("header.start"))
-                    .font(Theme.Fonts.ui(Theme.Fonts.Size.body, weight: .medium))
-                    .foregroundStyle(Theme.Colors.textSecondary)
-
-                Toggle("", isOn: Binding(
-                    get: { viewModel.isRunning },
-                    set: { _ in viewModel.toggle() }
-                ))
-                .labelsHidden()
-                .toggleStyle(.switch)
-                .tint(Theme.Colors.accentBlue)
-                .controlSize(.small)
-            }
-        }
-        .padding(.horizontal, Theme.Space.lg)
-        .padding(.vertical, 10)
-        .background(
-            RoundedRectangle(cornerRadius: Theme.Radius.lg)
-                .fill(Theme.Colors.cardBackground)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.Radius.lg)
-                .stroke(Theme.Colors.cardBorder, lineWidth: 1)
-        )
-    }
 }
 
 // MARK: - Sidebar Resizer
@@ -638,17 +555,30 @@ struct MonitorTab: View {
     var body: some View {
         ZStack {
             VStack(spacing: 0) {
-                // 工具栏
+                // 工具栏：页面标题 + 灰色数量；右侧添加按钮 + 全局监控开关（原顶栏迁入）
                 ToolbarRow(
-                    title: "\(languageManager.t("monitor.title")) (\(viewModel.hosts.count))"
+                    title: languageManager.t("monitor.title"),
+                    count: viewModel.hosts.count
                 ) {
-                    Button {
-                        showingAddHost = true
-                    } label: {
-                        Label(languageManager.t("monitor.add"), systemImage: "plus")
+                    HStack(spacing: Theme.Space.sm) {
+                        Button {
+                            showingAddHost = true
+                        } label: {
+                            Label(languageManager.t("monitor.add"), systemImage: "plus")
+                                .frame(minHeight: 22) // 与右侧开关同高（按钮允许略高一线）
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+
+                        Toggle("", isOn: Binding(
+                            get: { viewModel.isRunning },
+                            set: { _ in viewModel.toggle() }
+                        ))
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                        .tint(Theme.Colors.accentBlue)
+                        .controlSize(.small)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
                 }
                 .padding(.horizontal, Theme.Space.pagePadding)
                 .padding(.top, Theme.Space.pageTopGap)
@@ -1577,7 +1507,7 @@ struct HostEditorSheet: View {
                                 .foregroundStyle(Theme.Colors.textSecondary)
                             Text(languageManager.t("editor.command_follows_interval"))
                                 .font(Theme.Fonts.ui(Theme.Fonts.Size.micro))
-                                .foregroundStyle(Theme.Colors.accentBlue)
+                                .foregroundStyle(Theme.Colors.textSecondary)
                         }
                     }
                     
@@ -1631,7 +1561,7 @@ struct RuleEditorRow: View {
     @ObservedObject private var languageManager = LanguageManager.shared
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: Theme.Space.sm) {
             // Row 1: Enable toggle + Delete
             HStack {
                 Toggle(languageManager.t("editor.rule.enable"), isOn: $rule.enabled)
@@ -1644,10 +1574,9 @@ struct RuleEditorRow: View {
                 }
                 .buttonStyle(.borderless)
             }
-            
-            // Row 2: Condition + Threshold + Label (properly spaced)
+
+            // Row 2: Condition + Threshold
             HStack(spacing: Theme.Space.sm) {
-                // Condition picker
                 Picker("", selection: $rule.condition) {
                     Text(languageManager.t("editor.rule.less")).tag("less")
                     Text(languageManager.t("editor.rule.greater")).tag("greater")
@@ -1655,8 +1584,7 @@ struct RuleEditorRow: View {
                 .pickerStyle(.segmented)
                 .controlSize(.small)
                 .frame(width: 90)
-                
-                // Threshold
+
                 HStack(spacing: Theme.Space.xs) {
                     TextField("", value: $rule.threshold, format: .number)
                         .textFieldStyle(.roundedBorder)
@@ -1666,20 +1594,21 @@ struct RuleEditorRow: View {
                         .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                         .foregroundStyle(Theme.Colors.textSecondary)
                 }
-                
-                Spacer(minLength: 4)
-                
-                // Static Label "显示文本"
+
+                Spacer(minLength: 0)
+            }
+
+            // Row 3: Label 独占整行。macOS 26 的 Form 会把占位符浮到字段上方，
+            // 定宽小字段没有落脚空间，会把「如: P2P」顶出行外与上行相撞。
+            HStack(spacing: Theme.Space.sm) {
                 Text(languageManager.t("editor.rule.label"))
                     .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                     .foregroundStyle(Theme.Colors.textSecondary)
-                
-                // Label TextField
+                    .fixedSize()
+
                 TextField(languageManager.t("editor.rule.label_placeholder"), text: $rule.label)
                     .textFieldStyle(.roundedBorder)
-                    .frame(width: 70)
             }
-            .frame(height: 28) // Force consistent height to fix vertical alignment
         }
         .padding(.vertical, Theme.Space.sm)
     }
@@ -1764,7 +1693,7 @@ struct PresetEditorSheet: View {
                         .foregroundStyle(Theme.Colors.textSecondary)
                     Text(languageManager.t("editor.command_follows_interval"))
                         .font(Theme.Fonts.ui(Theme.Fonts.Size.micro))
-                        .foregroundStyle(Theme.Colors.accentBlue)
+                        .foregroundStyle(Theme.Colors.textSecondary)
                 }
             }
             .formStyle(.grouped)

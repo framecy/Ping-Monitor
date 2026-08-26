@@ -7,13 +7,20 @@ import SwiftUI
 /// 标准滚动页骨架：可选工具行（上）+ 滚动内容（下）。
 /// 工具行是任意视图插槽——外观（裸行 / 卡片 / 切换器）由调用方决定，本组件只管定位与留白。
 struct ScrollPage<Toolbar: View, Content: View>: View {
+    private var hasToolbar = false
     var toolbar: () -> Toolbar
     var content: () -> Content
 
     init(@ViewBuilder toolbar: @escaping () -> Toolbar,
          @ViewBuilder content: @escaping () -> Content) {
+        hasToolbar = true
         self.toolbar = toolbar
         self.content = content
+    }
+
+    /// 无工具行时，顶部留白由内容自己补（有工具行时由工具行的上留白负责，避免双重留白）。
+    private var contentTopInset: CGFloat {
+        hasToolbar ? 0 : Theme.Space.pageTopGap
     }
 
     var body: some View {
@@ -28,6 +35,7 @@ struct ScrollPage<Toolbar: View, Content: View>: View {
                     content()
                 }
                 .padding(.horizontal, Theme.Space.pagePadding)
+                .padding(.top, contentTopInset)
                 .padding(.bottom, Theme.Space.pagePadding)
             }
         }
@@ -39,29 +47,42 @@ extension ScrollPage where Toolbar == EmptyView {
     /// 无工具行的页面：内容从 pageTopGap 开始。
     init(@ViewBuilder content: @escaping () -> Content) {
         self.init(toolbar: { EmptyView() }, content: content)
+        hasToolbar = false
     }
 }
 
 /// 页面工具行：标题（左）+ 操作区（右）的统一字号与行高节奏。
 /// 行的左右留白归 ScrollPage 管，这里只负责行内布局。
+/// count 可选：以灰色小字附在标题右侧（如主机数量），比标题略小一档。
 struct ToolbarRow<Trailing: View>: View {
     let title: String
+    var count: Int? = nil
     @ViewBuilder var trailing: Trailing
 
-    init(title: String, @ViewBuilder trailing: () -> Trailing) {
+    init(title: String,
+         count: Int? = nil,
+         @ViewBuilder trailing: () -> Trailing) {
         self.title = title
+        self.count = count
         self.trailing = trailing()
     }
 
     var body: some View {
         HStack(spacing: Theme.Space.controlGap) {
-            Text(title)
-                .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .semibold))
-                .foregroundStyle(Theme.Colors.textPrimary)
+            HStack(spacing: Theme.Space.xs) {
+                Text(title)
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.headline, weight: .semibold))
+                    .foregroundStyle(Theme.Colors.textPrimary)
+                if let count {
+                    Text("\(count)")
+                        .font(Theme.Fonts.number(Theme.Fonts.Size.footnote, weight: .medium))
+                        .foregroundStyle(Theme.Colors.textSecondary)
+                }
+            }
             Spacer()
             trailing
         }
-        .frame(minHeight: 28)
+        .frame(minHeight: 32)
     }
 }
 
@@ -78,6 +99,8 @@ struct SegmentedSwitcher<Option: Hashable>: View {
     var count: ((Option) -> Int)? = nil
     /// nil = 平铺撑满可用宽度；给定值 = 固定轨道宽（如网速页 200）
     var trackWidth: CGFloat? = nil
+    /// 轨道底色：默认卡片白；放进白色卡片（如壳层顶栏）时传页面灰保持对比
+    var trackColor: Color = Theme.Colors.cardBackground
 
     @Namespace private var slider
 
@@ -112,7 +135,7 @@ struct SegmentedSwitcher<Option: Hashable>: View {
             }
         }
         .padding(Theme.Space.xs)
-        .background(Theme.Colors.cardBackground)
+        .background(trackColor)
         .cornerRadius(Theme.Radius.md)
         .frame(width: trackWidth)
     }
