@@ -5,34 +5,57 @@ struct Theme {
         static var background: Color {
             Color(nsColor: NSColor(name: nil) { appearance in
                 if appearance.name == .darkAqua || appearance.name == .vibrantDark {
-                    return NSColor(hex: "141414")
+                    return NSColor(hex: "1B1B1E")
                 } else {
-                    return NSColor(hex: "F5F5F7")
+                    return NSColor(hex: "F3F3F7")
                 }
             })
         }
-        
+
         static var cardBackground: Color {
             Color(nsColor: NSColor(name: nil) { appearance in
                 if appearance.name == .darkAqua || appearance.name == .vibrantDark {
-                    return NSColor(hex: "1F1F1F")
+                    return NSColor(hex: "242428")
                 } else {
                     return NSColor.white
                 }
             })
         }
-        
-        static var sidebarBackground: Color {
+
+        /// 兼容旧调用点：等同二级导航面板底色。
+        static var sidebarBackground: Color { navBackground }
+
+        /// 二级导航面板（图标栏右侧）底色。
+        static var navBackground: Color {
             Color(nsColor: NSColor(name: nil) { appearance in
                 if appearance.name == .darkAqua || appearance.name == .vibrantDark {
-                    return NSColor(hex: "1A1A1A")
+                    return NSColor(hex: "202024")
                 } else {
-                    return NSColor(hex: "EBEBEB")
+                    return NSColor(hex: "FAFAFC")
                 }
             })
         }
-        
-        static let accentBlue = Color(hex: "4b5cc4")
+
+        /// 导航行选中态的填充（LM Studio 式浅灰胶囊，不用强调色平铺）。
+        static var navSelection: Color {
+            Color(nsColor: NSColor(name: nil) { appearance in
+                if appearance.name == .darkAqua || appearance.name == .vibrantDark {
+                    return NSColor.white.withAlphaComponent(0.10)
+                } else {
+                    return NSColor(hex: "EBEBF0")
+                }
+            })
+        }
+
+        static var accentBlue: Color {
+            Color(nsColor: NSColor(name: nil) { appearance in
+                if appearance.name == .darkAqua || appearance.name == .vibrantDark {
+                    return NSColor(hex: "7B7BF6")
+                } else {
+                    return NSColor(hex: "4A4AF0")
+                }
+            })
+        }
         static let accentGreen = Color(hex: "34C759")
         static let accentPurple = Color(hex: "AF52DE")
         static let accentOrange = Color(hex: "FF9500")
@@ -159,17 +182,42 @@ struct Theme {
         static let pill: CGFloat = 999  // 胶囊
     }
 
+    /// 全局间距标度（4pt 阶梯）。所有 padding / stack spacing 必须从这里取值，禁止再写字面量。
+    /// 页面级留白优先用语义别名，改一处全局生效。
+    struct Space {
+        // 阶梯
+        static let xxs: CGFloat = 2      // 徽标纵向、密集列表微缝
+        static let xs: CGFloat = 4       // 图标-文字、chip 纵向
+        static let sm: CGFloat = 8       // 控件间距、卡片内小组间
+        static let md: CGFloat = 12      // 区块内部分区间距、瓦片网格间距
+        static let lg: CGFloat = 16      // 页面留白、卡片间距
+        static let xl: CGFloat = 20      // 空态内边距等少数场景
+        static let xxl: CGFloat = 24     // 大区块间隔
+        // 稀疏档：仅限共享空态 / 占位组件内部使用
+        static let xxxl: CGFloat = 32
+        static let huge: CGFloat = 40
+
+        // 语义别名（页面解剖学，唯一出处）
+        static let pagePadding: CGFloat = lg   // 页面左右/底部留白
+        static let pageTopGap: CGFloat = lg    // 全局头卡 → 首个内容的间隙（叠加壳层 b4 后视觉约 20）
+        static let cardGap: CGFloat = lg       // 页面级卡片之间的间距
+        static let tileGap: CGFloat = md       // 卡片内部网格瓦片间距
+        static let controlGap: CGFloat = sm    // 工具行 → 内容、行内控件组间距
+        static let sectionGap: CGFloat = md    // 卡片内 section 间距
+    }
+
     struct Layout {
         static let cardCornerRadius: CGFloat = Radius.lg
-        static let cardPadding: CGFloat = 16
-        static let gridSpacing: CGFloat = 16
+        // 兼容旧调用点的别名：数值唯一出处已上移到 Theme.Space。
+        static let cardPadding: CGFloat = Space.lg
+        static let gridSpacing: CGFloat = Space.cardGap
         // 自适应布局断点：detail 区宽度低于阈值时并排两列降为单列堆叠。
         static let twoColumnMinWidth: CGFloat = 280
         static let hostGridMinWidth: CGFloat = 260
         static let narrowTableBreakpoint: CGFloat = 540
         // 侧边栏：默认宽度 + 拖拽区间 + 分隔条宽度，窗口最小宽度由它们推导。
-        static let sidebarDefaultWidth: CGFloat = 220
-        static let sidebarMinWidth: CGFloat = 180
+        static let sidebarDefaultWidth: CGFloat = 200
+        static let sidebarMinWidth: CGFloat = 184
         static let sidebarMaxWidth: CGFloat = 360
         static let sidebarResizerWidth: CGFloat = 8
         // detail 区可用的最小宽度，低于此值内容开始出现挤压。

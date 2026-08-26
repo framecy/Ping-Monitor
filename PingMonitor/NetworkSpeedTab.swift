@@ -19,38 +19,26 @@ struct NetworkSpeedTab: View {
     @State private var expandedFamilies: Set<InterfaceFamily> = [.wifi, .ethernet]
     
     var body: some View {
-        VStack(spacing: 0) {
-            // Tab Switcher
-            HStack {
-                HStack(spacing: 2) {
-                    customTabButton(title: languageManager.t("netspeed.tab.interfaces"), mode: .interfaces)
-                    customTabButton(title: languageManager.t("netspeed.tab.processes"), mode: .processes)
-                }
-                .padding(3)
-                .background(Theme.Colors.cardBackground)
-                .cornerRadius(Theme.Radius.md)
-                .frame(width: 200)
-                Spacer()
-            }
-            .padding(.horizontal, Theme.Layout.cardPadding)
-            .padding(.top, 12)
-            .padding(.bottom, 4)
-            
-            // Content
+        Group {
             if tabMode == .interfaces {
-                ScrollView {
-                    VStack(spacing: 20) {
-                        speedOverviewCard
-                        speedChartCard
-                        topProcessesCard
-                        trafficStatsCard
-                        trafficTrendCard
-                        interfaceDetailsCard
-                    }
-                    .padding(Theme.Layout.cardPadding)
+                ScrollPage(toolbar: { modeSwitcher }) {
+                    speedOverviewCard
+                    speedChartCard
+                    topProcessesCard
+                    trafficStatsCard
+                    trafficTrendCard
+                    interfaceDetailsCard
                 }
             } else {
-                ProcessListView(speedManager: speedManager)
+                // 进程列表自管滚动（含搜索栏/悬浮提示），属非标准结构：工具行留白直接引用同一批常量。
+                VStack(spacing: 0) {
+                    modeSwitcher
+                        .padding(.horizontal, Theme.Space.pagePadding)
+                        .padding(.top, Theme.Space.pageTopGap)
+                        .padding(.bottom, Theme.Space.controlGap)
+
+                    ProcessListView(speedManager: speedManager)
+                }
             }
         }
         .background(Theme.Colors.background)
@@ -65,26 +53,23 @@ struct NetworkSpeedTab: View {
             speedManager.stopProcessMonitoring()
         }
     }
-    
-    private func customTabButton(title: String, mode: NetSpeedTabMode) -> some View {
-        Button(action: {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                tabMode = mode
-            }
-        }) {
-            Text(title)
-                .font(Theme.Fonts.ui(Theme.Fonts.Size.callout))
-                .fontWeight(tabMode == mode ? .semibold : .regular)
-                .foregroundStyle(tabMode == mode ? Theme.Colors.onAccent : Theme.Colors.textSecondary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 5)
-                .background(
-                    RoundedRectangle(cornerRadius: Theme.Radius.sm)
-                        .fill(tabMode == mode ? Theme.Colors.accentBlue : Color.clear)
-                )
-                .contentShape(Rectangle())
+
+    /// 接口/进程 页级切换器（统一走 SegmentedSwitcher，禁止再手写分段按钮）。
+    private var modeSwitcher: some View {
+        HStack(spacing: 0) {
+            SegmentedSwitcher(
+                options: NetSpeedTabMode.allCases,
+                selection: $tabMode,
+                title: { mode in
+                    switch mode {
+                    case .interfaces: return languageManager.t("netspeed.tab.interfaces")
+                    case .processes: return languageManager.t("netspeed.tab.processes")
+                    }
+                },
+                trackWidth: 200
+            )
+            Spacer()
         }
-        .buttonStyle(.plain)
     }
     
     // MARK: - Speed Overview Card
@@ -108,6 +93,7 @@ struct NetworkSpeedTab: View {
                         Text("10s").tag(10.0 as TimeInterval)
                     }
                     .pickerStyle(.segmented)
+                    .controlSize(.small)
                     .frame(width: 200)
                     
                     // Interface selector
@@ -138,7 +124,7 @@ struct NetworkSpeedTab: View {
                             .font(Theme.Fonts.ui(Theme.Fonts.Size.hero, weight: .bold))
                             .foregroundStyle(Theme.Colors.accentPurple)
                         
-                        HStack(spacing: 4) {
+                        HStack(spacing: Theme.Space.xs) {
                             Image(systemName: "arrow.up.circle")
                                 .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
                                 .foregroundStyle(Theme.Colors.textTertiary)
@@ -166,7 +152,7 @@ struct NetworkSpeedTab: View {
                             .font(Theme.Fonts.ui(Theme.Fonts.Size.hero, weight: .bold))
                             .foregroundStyle(Theme.Colors.accentCyan)
                         
-                        HStack(spacing: 4) {
+                        HStack(spacing: Theme.Space.xs) {
                             Text(NetworkSpeedManager.formatBytes(speedManager.totalBytesIn))
                                 .font(Theme.Fonts.number(Theme.Fonts.Size.caption))
                                 .foregroundStyle(Theme.Colors.textTertiary)
@@ -181,12 +167,12 @@ struct NetworkSpeedTab: View {
                 if speedManager.selectedInterface == "all" {
                     Divider().opacity(0.15)
 
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: Theme.Space.md) {
+                        VStack(alignment: .leading, spacing: Theme.Space.xs) {
                             Text("Tunnel/VPN")
                                 .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                                 .foregroundStyle(Theme.Colors.textSecondary)
-                            HStack(spacing: 8) {
+                            HStack(spacing: Theme.Space.sm) {
                                 Text("↓ \(NetworkSpeedManager.formatSpeed(speedManager.tunnelSpeedIn))")
                                     .font(Theme.Fonts.number(Theme.Fonts.Size.footnote, weight: .semibold))
                                     .foregroundStyle(Theme.Colors.accentCyan)
@@ -211,7 +197,7 @@ struct NetworkSpeedTab: View {
     
     private var speedChartCard: some View {
         ModernCard {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: Theme.Space.md) {
                 SectionHeader(title: languageManager.t("netspeed.realtime_chart"), icon: "waveform.path.ecg")
                 
                 if speedManager.speedHistory.count < 2 {
@@ -294,14 +280,14 @@ struct NetworkSpeedTab: View {
                     .frame(height: 120)
                     
                     // Legend
-                    HStack(spacing: 16) {
-                        HStack(spacing: 4) {
+                    HStack(spacing: Theme.Space.lg) {
+                        HStack(spacing: Theme.Space.xs) {
                             Circle().fill(Theme.Colors.accentPurple).frame(width: 6, height: 6)
                             Text(languageManager.t("netspeed.upload"))
                                 .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                                 .foregroundStyle(Theme.Colors.textSecondary)
                         }
-                        HStack(spacing: 4) {
+                        HStack(spacing: Theme.Space.xs) {
                             Circle().fill(Theme.Colors.accentCyan).frame(width: 6, height: 6)
                             Text(languageManager.t("netspeed.download"))
                                 .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
@@ -321,7 +307,7 @@ struct NetworkSpeedTab: View {
     
     private var topProcessesCard: some View {
         ModernCard {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: Theme.Space.md) {
                 HStack {
                     SectionHeader(title: languageManager.t("netspeed.top_processes"), icon: "apps.ipad.hack")
                     Spacer()
@@ -344,7 +330,7 @@ struct NetworkSpeedTab: View {
                         .frame(maxWidth: .infinity, alignment: .center)
                         .padding(.vertical, 10)
                 } else {
-                    VStack(spacing: 8) {
+                    VStack(spacing: Theme.Space.sm) {
                         ForEach(topProcs) { proc in
                             HStack {
                                 VStack(alignment: .leading, spacing: 1) {
@@ -359,9 +345,9 @@ struct NetworkSpeedTab: View {
                                 
                                 Spacer()
                                 
-                                HStack(spacing: 8) {
+                                HStack(spacing: Theme.Space.sm) {
                                     if proc.speedOut > 1024 {
-                                        HStack(spacing: 2) {
+                                        HStack(spacing: Theme.Space.xxs) {
                                             Image(systemName: "arrow.up")
                                                 .font(Theme.Fonts.icon(Theme.Fonts.Size.micro, weight: .bold))
                                                 .foregroundStyle(Theme.Colors.accentPurple)
@@ -372,7 +358,7 @@ struct NetworkSpeedTab: View {
                                     }
                                     
                                     if proc.speedIn > 1024 {
-                                        HStack(spacing: 2) {
+                                        HStack(spacing: Theme.Space.xxs) {
                                             Image(systemName: "arrow.down")
                                                 .font(Theme.Fonts.icon(Theme.Fonts.Size.micro, weight: .bold))
                                                 .foregroundStyle(Theme.Colors.accentCyan)
@@ -398,7 +384,7 @@ struct NetworkSpeedTab: View {
     
     private var interfaceDetailsCard: some View {
         ModernCard {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: Theme.Space.md) {
                 SectionHeader(title: languageManager.t("netspeed.interfaces"), icon: "network")
                 
                 if speedManager.interfaces.isEmpty {
@@ -406,7 +392,7 @@ struct NetworkSpeedTab: View {
                         .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
                         .foregroundStyle(Theme.Colors.textTertiary)
                         .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.vertical, 16)
+                        .padding(.vertical, Theme.Space.lg)
                 } else {
                     // 同族接口合并成一组，默认收起；行底色用半透明色块交替区分。
                     let groups = interfaceGroups
@@ -501,7 +487,7 @@ struct NetworkSpeedTab: View {
                     speedPair(speedIn: group.speedIn, speedOut: group.speedOut)
                 }
                 .padding(.horizontal, 10)
-                .padding(.vertical, 8)
+                .padding(.vertical, Theme.Space.sm)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -538,9 +524,9 @@ struct NetworkSpeedTab: View {
     }
 
     private func interfaceRow(_ iface: NetworkInterfaceStats) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Theme.Space.md) {
             // Interface icon + name
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: Theme.Space.xxs) {
                 HStack(spacing: 6) {
                     Circle()
                         .fill(iface.isActive ? Theme.Colors.accentGreen : Theme.Colors.textTertiary.opacity(0.4))
@@ -568,7 +554,7 @@ struct NetworkSpeedTab: View {
             Spacer()
             
             // Speed
-            HStack(spacing: 16) {
+            HStack(spacing: Theme.Space.lg) {
                 // Upload
                 VStack(alignment: .trailing, spacing: 1) {
                     HStack(spacing: 3) {
@@ -610,9 +596,9 @@ struct NetworkSpeedTab: View {
                 }
             }
         }
-        .padding(.leading, 34)
-        .padding(.trailing, 10)
-        .padding(.vertical, 5)
+        .padding(.leading, Theme.Space.xxxl)
+        .padding(.trailing, Theme.Space.sm)
+        .padding(.vertical, Theme.Space.xs)
         .contentShape(Rectangle())
         .onTapGesture {
             speedManager.selectedInterface = (speedManager.selectedInterface == iface.id) ? "all" : iface.id
@@ -633,7 +619,7 @@ struct NetworkSpeedTab: View {
         let totalBytes = totals.bytesIn + totals.bytesOut
         
         return ModernCard {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: Theme.Space.md) {
                 HStack {
                     SectionHeader(title: languageManager.t("netspeed.traffic_stats"), icon: "chart.bar.fill")
                     Spacer()
@@ -643,55 +629,39 @@ struct NetworkSpeedTab: View {
                         }
                     }
                     .pickerStyle(.segmented)
+                    .controlSize(.small)
                     .frame(width: 220)
                 }
                 
                 Divider().opacity(0.15)
                 
-                HStack(spacing: 12) {
-                    trafficStatItem(
-                        icon: "arrow.down.circle.fill",
+                HStack(spacing: Theme.Space.tileGap) {
+                    StatTile(
+                        title: languageManager.t("netspeed.total_download"),
+                        value: NetworkSpeedManager.formatBytes(totals.bytesIn),
                         color: Theme.Colors.accentCyan,
-                        label: languageManager.t("netspeed.total_download"),
-                        value: NetworkSpeedManager.formatBytes(totals.bytesIn)
+                        icon: "arrow.down.circle.fill",
+                        style: .tinted
                     )
-                    
-                    trafficStatItem(
-                        icon: "arrow.up.circle.fill",
+
+                    StatTile(
+                        title: languageManager.t("netspeed.total_upload"),
+                        value: NetworkSpeedManager.formatBytes(totals.bytesOut),
                         color: Theme.Colors.accentPurple,
-                        label: languageManager.t("netspeed.total_upload"),
-                        value: NetworkSpeedManager.formatBytes(totals.bytesOut)
+                        icon: "arrow.up.circle.fill",
+                        style: .tinted
                     )
-                    
-                    trafficStatItem(
-                        icon: "arrow.up.arrow.down.circle.fill",
+
+                    StatTile(
+                        title: languageManager.t("netspeed.total_traffic"),
+                        value: NetworkSpeedManager.formatBytes(totalBytes),
                         color: Theme.Colors.accentOrange,
-                        label: languageManager.t("netspeed.total_traffic"),
-                        value: NetworkSpeedManager.formatBytes(totalBytes)
+                        icon: "arrow.up.arrow.down.circle.fill",
+                        style: .tinted
                     )
                 }
             }
         }
-    }
-    
-    private func trafficStatItem(icon: String, color: Color, label: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Image(systemName: icon)
-                .font(Theme.Fonts.icon(Theme.Fonts.Size.display))
-                .foregroundStyle(color)
-            Text(label)
-                .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
-                .foregroundStyle(Theme.Colors.textSecondary)
-            Text(value)
-                .font(Theme.Fonts.ui(Theme.Fonts.Size.title, weight: .bold))
-                .foregroundStyle(Theme.Colors.textPrimary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(10)
-        .background(
-            RoundedRectangle(cornerRadius: Theme.Radius.md)
-                .fill(color.opacity(0.06))
-        )
     }
     
     // MARK: - Traffic Trend Card
@@ -701,7 +671,7 @@ struct NetworkSpeedTab: View {
         let totals = speedManager.trafficTotals(for: trafficRange)
         
         return ModernCard {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: Theme.Space.md) {
                 HStack {
                     SectionHeader(title: languageManager.t("netspeed.traffic_trend"), icon: "waveform.path.ecg.rectangle")
                     Spacer()
@@ -720,7 +690,7 @@ struct NetworkSpeedTab: View {
                     .help(languageManager.t("stats.reset_current"))
                 }
                 
-                HStack(spacing: 16) {
+                HStack(spacing: Theme.Space.lg) {
                     HStack(spacing: 6) {
                         Image(systemName: "clock")
                             .font(Theme.Fonts.icon(Theme.Fonts.Size.caption))
@@ -743,7 +713,7 @@ struct NetworkSpeedTab: View {
                     
                     Spacer()
                     
-                    HStack(spacing: 4) {
+                    HStack(spacing: Theme.Space.xs) {
                         Text(languageManager.t("netspeed.total_traffic") + ":")
                             .foregroundStyle(Theme.Colors.textSecondary)
                         Text(NetworkSpeedManager.formatBytes(totals.bytesIn + totals.bytesOut))
@@ -752,7 +722,7 @@ struct NetworkSpeedTab: View {
                     }
                     .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                 }
-                .padding(.bottom, 4)
+                .padding(.bottom, Theme.Space.xs)
                 
                 if snapshots.count < 2 {
                     Text(languageManager.t("netspeed.collecting"))
@@ -887,10 +857,10 @@ struct ProcessListView: View {
     
     var body: some View {
         ScrollView {
-            VStack(spacing: 16) {
+            VStack(spacing: Theme.Space.lg) {
                 // Search & Refresh bar
-                HStack(spacing: 10) {
-                    HStack(spacing: 6) {
+                HStack(spacing: Theme.Space.controlGap) {
+                    HStack(spacing: Theme.Space.xs) {
                         Image(systemName: "magnifyingglass")
                             .font(Theme.Fonts.icon(Theme.Fonts.Size.footnote))
                             .foregroundStyle(Theme.Colors.textTertiary)
@@ -898,8 +868,8 @@ struct ProcessListView: View {
                             .textFieldStyle(.plain)
                             .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
                     }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
+                    .padding(.horizontal, Theme.Space.sm)
+                    .padding(.vertical, Theme.Space.xs)
                     .background(
                         RoundedRectangle(cornerRadius: Theme.Radius.md)
                             .fill(Theme.Colors.cardBackground)
@@ -910,7 +880,7 @@ struct ProcessListView: View {
                     )
                     
                     Button(action: { speedManager.refreshProcessList() }) {
-                        HStack(spacing: 4) {
+                        HStack(spacing: Theme.Space.xs) {
                             Image(systemName: "arrow.clockwise")
                                 .font(Theme.Fonts.icon(Theme.Fonts.Size.caption, weight: .semibold))
                             Text(languageManager.t("netspeed.process.refresh"))
@@ -933,7 +903,7 @@ struct ProcessListView: View {
                 }
                 
                 if filteredProcesses.isEmpty {
-                    VStack(spacing: 10) {
+                    VStack(spacing: Theme.Space.sm) {
                         Image(systemName: "network.slash")
                             .font(Theme.Fonts.icon(Theme.Fonts.Size.hero))
                             .foregroundStyle(Theme.Colors.textTertiary)
@@ -942,9 +912,9 @@ struct ProcessListView: View {
                             .foregroundStyle(Theme.Colors.textSecondary)
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 60)
+                    .padding(.vertical, Theme.Space.huge)
                 } else {
-                    LazyVStack(spacing: 8) {
+                    LazyVStack(spacing: Theme.Space.sm) {
                         ForEach(filteredProcesses) { proc in
                             processCard(proc)
                         }
@@ -979,12 +949,12 @@ struct ProcessListView: View {
                 Text(msg)
                     .font(Theme.Fonts.ui(Theme.Fonts.Size.body, weight: .medium))
                     .foregroundStyle(Theme.Colors.onAccent)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
+                    .padding(.horizontal, Theme.Space.lg)
+                    .padding(.vertical, Theme.Space.sm)
                     .background(Capsule().fill(msg.contains(languageManager.t("netspeed.process.kill_success")) ? Theme.Colors.accentGreen : Theme.Colors.accentRed))
                     .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .padding(.bottom, 16)
+                    .padding(.bottom, Theme.Space.lg)
             }
         }
         .animation(.easeInOut(duration: 0.25), value: killResultMessage)
@@ -1034,9 +1004,9 @@ struct ProcessListView: View {
                     
                     // Real-time Speed
                     if proc.totalSpeed > 100 { // Only show if more than 100B/s
-                        HStack(spacing: 8) {
+                        HStack(spacing: Theme.Space.sm) {
                             if proc.speedOut > 10 {
-                                HStack(spacing: 2) {
+                                HStack(spacing: Theme.Space.xxs) {
                                     Image(systemName: "arrow.up")
                                         .font(Theme.Fonts.icon(Theme.Fonts.Size.micro, weight: .bold))
                                         .foregroundStyle(Theme.Colors.accentPurple)
@@ -1046,7 +1016,7 @@ struct ProcessListView: View {
                                 }
                             }
                             if proc.speedIn > 10 {
-                                HStack(spacing: 2) {
+                                HStack(spacing: Theme.Space.xxs) {
                                     Image(systemName: "arrow.down")
                                         .font(Theme.Fonts.icon(Theme.Fonts.Size.micro, weight: .bold))
                                         .foregroundStyle(Theme.Colors.accentCyan)
@@ -1056,7 +1026,7 @@ struct ProcessListView: View {
                                 }
                             }
                         }
-                        .padding(.leading, 4)
+                        .padding(.leading, Theme.Space.xs)
                         .transition(.opacity)
                     }
                     
@@ -1088,7 +1058,7 @@ struct ProcessListView: View {
                     .buttonStyle(.plain)
                     .help(languageManager.t("netspeed.process.kill"))
                 }
-                .padding(.vertical, 4)
+                .padding(.vertical, Theme.Space.xs)
                 .contentShape(Rectangle())
                 .onTapGesture {
                     withAnimation(.easeInOut(duration: 0.2)) {
@@ -1117,8 +1087,8 @@ struct ProcessListView: View {
                     }
                     .font(Theme.Fonts.ui(Theme.Fonts.Size.micro, weight: .semibold))
                     .foregroundStyle(Theme.Colors.textTertiary)
-                    .padding(.horizontal, 4)
-                    .padding(.bottom, 4)
+                    .padding(.horizontal, Theme.Space.xs)
+                    .padding(.bottom, Theme.Space.xs)
                     
                     ForEach(proc.connections) { conn in
                         connectionRow(conn)
@@ -1157,7 +1127,7 @@ struct ProcessListView: View {
                 Image(systemName: "arrow.right")
                     .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
                     .foregroundStyle(Theme.Colors.textTertiary)
-                    .padding(.horizontal, 4)
+                    .padding(.horizontal, Theme.Space.xs)
             }
             
             // Remote address:port
@@ -1179,12 +1149,12 @@ struct ProcessListView: View {
                 .font(Theme.Fonts.number(Theme.Fonts.Size.micro, weight: .medium))
                 .foregroundStyle(stateColor(conn.state))
                 .padding(.horizontal, 6)
-                .padding(.vertical, 2)
+                .padding(.vertical, Theme.Space.xxs)
                 .background(stateColor(conn.state).opacity(0.1))
                 .cornerRadius(Theme.Radius.xs)
                 .frame(width: 100, alignment: .trailing)
         }
-        .padding(.horizontal, 4)
+        .padding(.horizontal, Theme.Space.xs)
         .padding(.vertical, 3)
         .background(
             RoundedRectangle(cornerRadius: Theme.Radius.xs)

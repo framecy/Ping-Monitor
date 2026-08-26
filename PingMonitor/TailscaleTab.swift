@@ -22,34 +22,30 @@ struct TailscaleTab: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                // Status Card
-                statusCard
-                
-                // 全局监管清单（控制面）
-                tailnetInventoryCard
+        ScrollPage {
+            // Status Card
+            statusCard
 
-                // NAT / Netcheck Card
-                netcheckCard
-                
-                // Health Advice
-                healthAdviceCard
-                
-                // Quick Commands
-                quickCommandsCard
-                
-                // DERP Region Latency
-                if !tailscale.regionLatencies.isEmpty {
-                    derpLatencyCard
-                }
-                
-                // Nodes List
-                nodesCard
+            // 全局监管清单（控制面）
+            tailnetInventoryCard
+
+            // NAT / Netcheck Card
+            netcheckCard
+
+            // Health Advice
+            healthAdviceCard
+
+            // Quick Commands
+            quickCommandsCard
+
+            // DERP Region Latency
+            if !tailscale.regionLatencies.isEmpty {
+                derpLatencyCard
             }
-            .padding(Theme.Layout.cardPadding)
+
+            // Nodes List
+            nodesCard
         }
-        .background(Theme.Colors.background)
         .onAppear {
             tailscale.fetchStatus()
             tailscale.fetchNetcheck()
@@ -120,7 +116,7 @@ struct TailscaleTab: View {
                 .keyboardShortcut(.defaultAction)
             }
         }
-        .padding(20)
+        .padding(Theme.Space.xl)
     }
     
     // MARK: - Tailnet Inventory Card（控制面全局监管）
@@ -140,8 +136,8 @@ struct TailscaleTab: View {
                         Button(action: { tailscale.importAllOnlineDevices(into: viewModel) }) {
                             Text(languageManager.t("tailscale.inventory.import_all_online"))
                                 .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
+                                .padding(.horizontal, Theme.Space.sm)
+                                .padding(.vertical, Theme.Space.xs)
                                 .background(Theme.Colors.accentBlue.opacity(0.15))
                                 .foregroundStyle(Theme.Colors.accentBlue)
                                 .cornerRadius(Theme.Radius.sm)
@@ -150,7 +146,7 @@ struct TailscaleTab: View {
                         .disabled(tailscale.tailnetDevices.isEmpty)
 
                         Button(action: { tailscale.refreshInventory() }) {
-                            HStack(spacing: 4) {
+                            HStack(spacing: Theme.Space.xs) {
                                 if tailscale.isFetchingInventory {
                                     ProgressView().controlSize(.small).scaleEffect(0.7)
                                 } else {
@@ -159,8 +155,8 @@ struct TailscaleTab: View {
                                 Text(languageManager.t("tailscale.refresh"))
                                     .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                             }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
+                            .padding(.horizontal, Theme.Space.sm)
+                            .padding(.vertical, Theme.Space.xs)
                             .background(Theme.Colors.cardBackground)
                             .cornerRadius(Theme.Radius.sm)
                             .overlay(
@@ -198,7 +194,7 @@ struct TailscaleTab: View {
                         .buttonStyle(.plain)
                     }
                     .foregroundStyle(Theme.Colors.accentRed)
-                    .padding(8)
+                    .padding(Theme.Space.sm)
                     .background(Theme.Colors.accentRed.opacity(0.1))
                     .cornerRadius(Theme.Radius.sm)
                 }
@@ -241,7 +237,7 @@ struct TailscaleTab: View {
     }
 
     private func inventoryPlaceholder(icon: String, text: String, color: Color) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Theme.Space.sm) {
             Image(systemName: icon)
                 .font(Theme.Fonts.icon(Theme.Fonts.Size.body))
                 .foregroundStyle(color)
@@ -259,7 +255,7 @@ struct TailscaleTab: View {
 
     private var inventorySummaryRow: some View {
         let summary = tailscale.inventorySummary(monitoredAddresses: monitoredAddresses)
-        return HStack(spacing: 8) {
+        return HStack(spacing: Theme.Space.sm) {
             inventoryStat(languageManager.t("tailscale.inventory.total"), summary.total, Theme.Colors.accentBlue)
             inventoryStat(languageManager.t("tailscale.online"), summary.online, Theme.Colors.accentGreen)
             inventoryStat(languageManager.t("tailscale.inventory.monitored"), summary.monitored, Theme.Colors.accentPurple)
@@ -277,7 +273,7 @@ struct TailscaleTab: View {
     }
 
     private func inventoryStat(_ label: String, _ value: Int, _ color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: Theme.Space.xxs) {
             Text("\(value)")
                 .font(Theme.Fonts.ui(Theme.Fonts.Size.headline, weight: .semibold))
                 .foregroundStyle(color)
@@ -300,7 +296,7 @@ struct TailscaleTab: View {
                 .fill(device.isOnline ? Theme.Colors.accentGreen : Theme.Colors.textTertiary)
                 .frame(width: 8, height: 8)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: Theme.Space.xxs) {
                 HStack(spacing: 6) {
                     Text(device.hostname)
                         .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
@@ -323,7 +319,7 @@ struct TailscaleTab: View {
                     }
                 }
 
-                HStack(spacing: 8) {
+                HStack(spacing: Theme.Space.sm) {
                     Text(device.tailscaleIP)
                         .font(Theme.Fonts.number(Theme.Fonts.Size.caption))
                         .foregroundStyle(Theme.Colors.textTertiary)
@@ -353,7 +349,7 @@ struct TailscaleTab: View {
                 Button(action: { tailscale.importDevice(device, into: viewModel) }) {
                     Text(languageManager.t("tailscale.import"))
                         .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
-                        .padding(.horizontal, 8)
+                        .padding(.horizontal, Theme.Space.sm)
                         .padding(.vertical, 3)
                         .background(Theme.Colors.accentBlue.opacity(0.15))
                         .foregroundStyle(Theme.Colors.accentBlue)
@@ -438,7 +434,7 @@ struct TailscaleTab: View {
 
     private var statusCard: some View {
         ModernCard {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: Theme.Space.lg) {
                 HStack {
                     SectionHeader(title: languageManager.t("tailscale.title"), icon: "network")
                     Spacer()
@@ -446,7 +442,7 @@ struct TailscaleTab: View {
                         tailscale.fetchStatus()
                         tailscale.fetchNetcheck()
                     }) {
-                        HStack(spacing: 4) {
+                        HStack(spacing: Theme.Space.xs) {
                             if tailscale.isLoading {
                                 ProgressView()
                                     .controlSize(.small)
@@ -459,7 +455,7 @@ struct TailscaleTab: View {
                                 .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                         }
                         .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
+                        .padding(.vertical, Theme.Space.xs)
                         .background(Theme.Colors.cardBackground)
                         .cornerRadius(Theme.Radius.sm)
                         .overlay(
@@ -471,8 +467,8 @@ struct TailscaleTab: View {
                     .disabled(tailscale.isLoading)
                 }
                 
-                HStack(spacing: 24) {
-                    VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: Theme.Space.xxl) {
+                    VStack(alignment: .leading, spacing: Theme.Space.xs) {
                         Text(languageManager.t("tailscale.status"))
                             .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                             .foregroundStyle(Theme.Colors.textSecondary)
@@ -490,7 +486,7 @@ struct TailscaleTab: View {
                     
                     Divider().frame(height: 30).opacity(0.3)
                     
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: Theme.Space.xs) {
                         Text(languageManager.t("tailscale.my_ip"))
                             .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                             .foregroundStyle(Theme.Colors.textSecondary)
@@ -503,7 +499,7 @@ struct TailscaleTab: View {
                     
                     Divider().frame(height: 30).opacity(0.3)
                     
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: Theme.Space.xs) {
                         Text(languageManager.t("tailscale.nodes"))
                             .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                             .foregroundStyle(Theme.Colors.textSecondary)
@@ -519,7 +515,7 @@ struct TailscaleTab: View {
                     Text(error)
                         .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                         .foregroundStyle(Theme.Colors.accentRed)
-                        .padding(8)
+                        .padding(Theme.Space.sm)
                         .background(Theme.Colors.accentRed.opacity(0.1))
                         .cornerRadius(Theme.Radius.sm)
                 }
@@ -531,10 +527,10 @@ struct TailscaleTab: View {
     
     private var quickCommandsCard: some View {
         ModernCard {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: Theme.Space.md) {
                 SectionHeader(title: "Quick Commands", icon: "command")
                 
-                HStack(spacing: 12) {
+                HStack(spacing: Theme.Space.md) {
                     CommandButton(title: "Status", icon: "terminal", action: { tailscale.fetchStatus() })
                     CommandButton(title: "Netcheck", icon: "shield.checkered", action: { tailscale.fetchNetcheck() })
                     CommandButton(title: "Ping All", icon: "waveform", action: { executeTailscale("ping --all") })
@@ -564,7 +560,7 @@ struct TailscaleTab: View {
                         .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
+                .padding(.vertical, Theme.Space.sm)
                 .background(Theme.Colors.cardBackground)
                 .cornerRadius(Theme.Radius.md)
                 .overlay(
@@ -592,7 +588,7 @@ struct TailscaleTab: View {
                 }
                 
                 // NAT Type (prominent)
-                HStack(spacing: 12) {
+                HStack(spacing: Theme.Space.md) {
                     Image(systemName: natIcon)
                         .font(Theme.Fonts.icon(Theme.Fonts.Size.display))
                         .foregroundStyle(natColor)
@@ -600,7 +596,7 @@ struct TailscaleTab: View {
                         .background(natColor.opacity(0.12))
                         .cornerRadius(Theme.Radius.md)
                     
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: Theme.Space.xxs) {
                         Text(languageManager.t("tailscale.nat_type"))
                             .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                             .foregroundStyle(Theme.Colors.textSecondary)
@@ -611,7 +607,7 @@ struct TailscaleTab: View {
                     
                     Spacer()
                     
-                    VStack(alignment: .trailing, spacing: 2) {
+                    VStack(alignment: .trailing, spacing: Theme.Space.xxs) {
                         Text(languageManager.t("tailscale.preferred_derp"))
                             .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                             .foregroundStyle(Theme.Colors.textSecondary)
@@ -636,8 +632,8 @@ struct TailscaleTab: View {
                 // Global IPs
                 if tailscale.globalIPv4 != "—" || tailscale.globalIPv6 != "—" {
                     Divider().opacity(0.2)
-                    HStack(spacing: 20) {
-                        VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: Theme.Space.xl) {
+                        VStack(alignment: .leading, spacing: Theme.Space.xxs) {
                             Text("Global IPv4")
                                 .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                                 .foregroundStyle(Theme.Colors.textSecondary)
@@ -645,7 +641,7 @@ struct TailscaleTab: View {
                                 .font(Theme.Fonts.number(Theme.Fonts.Size.body))
                                 .foregroundStyle(Theme.Colors.textPrimary)
                         }
-                        VStack(alignment: .leading, spacing: 2) {
+                        VStack(alignment: .leading, spacing: Theme.Space.xxs) {
                             Text("Global IPv6")
                                 .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                                 .foregroundStyle(Theme.Colors.textSecondary)
@@ -666,7 +662,7 @@ struct TailscaleTab: View {
     
     private var derpLatencyCard: some View {
         ModernCard {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: Theme.Space.md) {
                 SectionHeader(title: languageManager.t("tailscale.derp_latency"), icon: "globe.americas.fill")
                 
                 ForEach(tailscale.regionLatencies.prefix(10)) { region in
@@ -745,11 +741,11 @@ struct TailscaleTab: View {
                         SectionHeader(title: languageManager.t("tailscale.health_report"), icon: "heart.text.square.fill")
                         
                         ForEach(tailscale.healthAdvice, id: \.self) { advice in
-                            HStack(alignment: .top, spacing: 8) {
+                            HStack(alignment: .top, spacing: Theme.Space.sm) {
                                 Image(systemName: "lightbulb.fill")
                                     .font(Theme.Fonts.icon(Theme.Fonts.Size.body))
                                     .foregroundStyle(Theme.Colors.accentOrange)
-                                    .padding(.top, 2)
+                                    .padding(.top, Theme.Space.xxs)
                                 Text(advice)
                                     .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                                     .foregroundStyle(Theme.Colors.textPrimary)
@@ -770,7 +766,6 @@ struct TailscaleTab: View {
         }
     }
     
-    @ViewBuilder
     private func connectionTypeBadge(_ type: TailscaleConnectionType) -> some View {
         let (color, icon): (Color, String) = {
             switch type {
@@ -780,25 +775,15 @@ struct TailscaleTab: View {
             case .unknown: return (Theme.Colors.textTertiary, "questionmark.circle")
             }
         }()
-        
-        HStack(spacing: 3) {
-            Image(systemName: icon)
-                .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
-            Text(type.rawValue)
-                .font(Theme.Fonts.ui(Theme.Fonts.Size.micro, weight: .medium))
-        }
-        .foregroundStyle(color)
-        .padding(.horizontal, 6)
-        .padding(.vertical, 2)
-        .background(color.opacity(0.12))
-        .cornerRadius(Theme.Radius.xs)
+
+        return Badge(text: type.rawValue, color: color, icon: icon, style: .pill)
     }
     
     // MARK: - Nodes Card
     
     private var nodesCard: some View {
         ModernCard {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: Theme.Space.md) {
                 HStack {
                     SectionHeader(title: languageManager.t("tailscale.nodes"), icon: "desktopcomputer")
                     Spacer()
@@ -806,14 +791,14 @@ struct TailscaleTab: View {
                     Button(action: {
                         tailscale.importAllOnlineNodes(into: viewModel)
                     }) {
-                        HStack(spacing: 4) {
+                        HStack(spacing: Theme.Space.xs) {
                             Image(systemName: "square.and.arrow.down.on.square")
                                 .font(Theme.Fonts.icon(Theme.Fonts.Size.caption, weight: .semibold))
                             Text(languageManager.t("tailscale.import_all"))
                                 .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                         }
                         .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
+                        .padding(.vertical, Theme.Space.xs)
                         .background(Theme.Colors.accentBlue.opacity(0.15))
                         .cornerRadius(Theme.Radius.sm)
                     }
@@ -838,7 +823,7 @@ struct TailscaleTab: View {
                         ForEach(tailscale.nodes) { node in
                             nodeRow(node)
                             if node.id != tailscale.nodes.last?.id {
-                                Divider().padding(.vertical, 2)
+                                Divider().padding(.vertical, Theme.Space.xxs)
                             }
                         }
                     }
@@ -852,14 +837,14 @@ struct TailscaleTab: View {
     private func nodeRow(_ node: TailscaleNode) -> some View {
         let isMonitored = viewModel.hosts.contains(where: { $0.address == node.tailscaleIP })
         
-        return VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 12) {
+        return VStack(alignment: .leading, spacing: Theme.Space.xs) {
+            HStack(spacing: Theme.Space.md) {
                 Image(systemName: node.osIcon)
                     .font(Theme.Fonts.icon(Theme.Fonts.Size.headline))
                     .foregroundStyle(node.online ? Theme.Colors.accentBlue : Theme.Colors.textTertiary)
                     .frame(width: 28)
                 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: Theme.Space.xxs) {
                     HStack(spacing: 6) {
                         Text(node.hostname)
                             .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .semibold))
@@ -872,7 +857,7 @@ struct TailscaleTab: View {
                                 .font(Theme.Fonts.ui(Theme.Fonts.Size.micro, weight: .bold))
                                 .foregroundStyle(Theme.Colors.onAccent)
                                 .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
+                                .padding(.vertical, Theme.Space.xxs)
                                 .background(Theme.Colors.accentBlue)
                                 .cornerRadius(Theme.Radius.xs)
                                 .layoutPriority(1)
@@ -887,7 +872,7 @@ struct TailscaleTab: View {
                 Spacer()
                 
                 HStack(spacing: 6) {
-                    HStack(spacing: 4) {
+                    HStack(spacing: Theme.Space.xs) {
                         Circle()
                             .fill(node.online ? Theme.Colors.accentGreen : Theme.Colors.accentRed.opacity(0.5))
                             .frame(width: 6, height: 6)
@@ -936,8 +921,8 @@ struct TailscaleTab: View {
                             Text(languageManager.t("tailscale.already_monitored"))
                                 .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                                 .foregroundStyle(Theme.Colors.textSecondary)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
+                                .padding(.horizontal, Theme.Space.sm)
+                                .padding(.vertical, Theme.Space.xs)
                                 .background(Theme.Colors.cardBackground)
                                 .cornerRadius(Theme.Radius.xs)
                                 .layoutPriority(1)
@@ -945,15 +930,15 @@ struct TailscaleTab: View {
                             Button(action: {
                                 tailscale.importNode(node, into: viewModel)
                             }) {
-                                HStack(spacing: 4) {
+                                HStack(spacing: Theme.Space.xs) {
                                     Image(systemName: "plus.circle.fill")
                                         .font(Theme.Fonts.icon(Theme.Fonts.Size.caption))
                                     Text(languageManager.t("tailscale.import"))
                                         .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                                         .lineLimit(1)
                                 }
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
+                                .padding(.horizontal, Theme.Space.sm)
+                                .padding(.vertical, Theme.Space.xs)
                                 .background(Theme.Colors.accentBlue.opacity(0.15))
                                 .cornerRadius(Theme.Radius.xs)
                             }
@@ -971,7 +956,7 @@ struct TailscaleTab: View {
                         .font(Theme.Fonts.number(Theme.Fonts.Size.micro))
                         .foregroundStyle(result.contains("P2P") ? Theme.Colors.accentGreen : (result.contains("Error") ? Theme.Colors.accentRed : Theme.Colors.accentOrange))
                         .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
+                        .padding(.vertical, Theme.Space.xxs)
                         .background(Color.black.opacity(0.1))
                         .cornerRadius(Theme.Radius.xs)
                     Spacer()
@@ -979,7 +964,7 @@ struct TailscaleTab: View {
                 .padding(.top, -2)
             }
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, Theme.Space.sm)
         .opacity(node.online ? 1.0 : 0.5)
     }
 }

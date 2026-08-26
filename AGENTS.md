@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
 ## Project
 
@@ -145,7 +145,7 @@ The app is `LSUIElement` (a pure menu-bar, no Dock icon). `StatusBarController` 
 
 `scripts/design-audit.sh` 报告四类违规计数（默认 report-only 恒退出 0；`--strict` 有违规才退 1）。UI 改动提交前跑一次：**新增违规必须清零，存量计数只许降不许升。**
 
-## Files Claude should leave alone
+## Files Codex should leave alone
 
 - `PingMonitor.xcodeproj/` — regenerated; edit `project.yml` instead.
 - `DerivedData/`, `build/`, `PingMonitor_Debug.app/` — local build artifacts.

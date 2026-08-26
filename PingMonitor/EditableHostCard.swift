@@ -164,7 +164,7 @@ struct EditableHostCard: View {
 
     @ViewBuilder
     private func compactMetric(title: String, value: String, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: Theme.Space.xxs) {
             Text(title)
                 .font(Theme.Fonts.ui(Theme.Fonts.Size.micro))
                 .foregroundStyle(Theme.Colors.textSecondary)
@@ -178,7 +178,7 @@ struct EditableHostCard: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(height: 28)
-        .padding(.horizontal, 8)
+        .padding(.horizontal, Theme.Space.sm)
         .padding(.vertical, 6)
         .background(Theme.Colors.cardBackground.opacity(0.65))
         .cornerRadius(Theme.Radius.md)
@@ -190,7 +190,7 @@ struct EditableHostCard: View {
         let labelText = hasEnoughQualityData ? gradeLabel : languageManager.t("card.measuring")
         let badgeColor = hasEnoughQualityData ? qualityColor : Theme.Colors.textTertiary
 
-        HStack(spacing: 4) {
+        HStack(spacing: Theme.Space.xs) {
             Text(scoreText)
                 .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote, weight: .bold))
                 .foregroundStyle(badgeColor)
@@ -200,7 +200,7 @@ struct EditableHostCard: View {
                 .lineLimit(1)
         }
         .padding(.horizontal, 7)
-        .padding(.vertical, 2)
+        .padding(.vertical, Theme.Space.xxs)
         .background(badgeColor.opacity(0.14))
         .overlay(
             Capsule()
@@ -226,7 +226,7 @@ struct EditableHostCard: View {
                     .lineLimit(1)
             }
         }
-        .padding(.horizontal, 8)
+        .padding(.horizontal, Theme.Space.sm)
         .padding(.vertical, 6)
         .background(Theme.Colors.background.opacity(0.45))
         .cornerRadius(Theme.Radius.md)
@@ -234,7 +234,7 @@ struct EditableHostCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
+            HStack(spacing: Theme.Space.sm) {
                 ZStack {
                     Circle()
                         .fill(statusColor.opacity(0.15))
@@ -244,8 +244,8 @@ struct EditableHostCard: View {
                         .foregroundStyle(statusColor)
                 }
                 
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 4) {
+                VStack(alignment: .leading, spacing: Theme.Space.xxs) {
+                    HStack(spacing: Theme.Space.xs) {
                         Text(host.name)
                             .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .semibold))
                             .foregroundStyle(host.isPaused ? Theme.Colors.textSecondary : Theme.Colors.textPrimary)
@@ -266,7 +266,7 @@ struct EditableHostCard: View {
                 
                 Spacer()
 
-                VStack(alignment: .trailing, spacing: 4) {
+                VStack(alignment: .trailing, spacing: Theme.Space.xs) {
                     if let latency = host.lastLatency, viewModel.isRunning {
                         Text("\(Int(latency)) ms")
                             .font(Theme.Fonts.number(Theme.Fonts.Size.headline, weight: .bold))
@@ -285,7 +285,7 @@ struct EditableHostCard: View {
                 }
             }
 
-            HStack(spacing: 8) {
+            HStack(spacing: Theme.Space.sm) {
                 compactMetric(
                     title: languageManager.t("stats.availability"),
                     value: availabilityText,
@@ -308,7 +308,7 @@ struct EditableHostCard: View {
                 )
             }
 
-            HStack(spacing: 8) {
+            HStack(spacing: Theme.Space.sm) {
                 infoPill(icon: "point.topleft.down.to.point.bottomright.curvepath", title: languageManager.t("card.path"), value: pathLabel, color: diagnosticColor)
                 infoPill(icon: "checkmark.shield", title: languageManager.t("stats.success_rate"), value: successRateText, color: Theme.Colors.accentGreen)
                 infoPill(icon: "bolt.horizontal.circle", title: languageManager.t("card.services"), value: serviceCountText, color: Theme.Colors.accentPurple)
@@ -346,7 +346,7 @@ struct EditableHostCard: View {
                 .frame(height: 32) // Slightly increased for visibility
                 .background(Theme.Colors.surfaceOverlay)
                 .cornerRadius(Theme.Radius.xs)
-                .padding(.horizontal, 2)
+                .padding(.horizontal, Theme.Space.xxs)
             } else {
                 Color.clear.frame(height: 32)
             }
@@ -378,7 +378,7 @@ struct EditableHostCard: View {
                 Spacer()
 
                 if !host.displayRules.isEmpty {
-                    HStack(spacing: 4) {
+                    HStack(spacing: Theme.Space.xs) {
                         Image(systemName: "checklist")
                             .font(Theme.Fonts.icon(Theme.Fonts.Size.caption))
                             .foregroundStyle(Theme.Colors.textTertiary)
@@ -395,7 +395,7 @@ struct EditableHostCard: View {
                         } label: {
                             Image(systemName: host.isPaused ? "play.fill" : "pause.fill")
                                 .foregroundStyle(Theme.Colors.textSecondary)
-                                .padding(4)
+                                .padding(Theme.Space.xs)
                                 .contentShape(Rectangle())
                         }
                         .help(host.isPaused ? languageManager.t("header.start") : languageManager.t("header.stop"))
@@ -403,7 +403,7 @@ struct EditableHostCard: View {
                         Button { onEdit() } label: {
                             Image(systemName: "pencil")
                                 .foregroundStyle(Theme.Colors.textSecondary)
-                                .padding(4)
+                                .padding(Theme.Space.xs)
                                 .contentShape(Rectangle())
                         }
                         .help(languageManager.t("menu.edit"))
@@ -411,7 +411,7 @@ struct EditableHostCard: View {
                         Button { onDelete() } label: {
                             Image(systemName: "trash")
                                 .foregroundStyle(Theme.Colors.accentRed)
-                                .padding(4)
+                                .padding(Theme.Space.xs)
                                 .contentShape(Rectangle())
                         }
                         .help(languageManager.t("menu.delete"))
@@ -423,6 +423,7 @@ struct EditableHostCard: View {
             .frame(height: 24)
         }
         .padding(Theme.Layout.cardPadding)
+        // 豁免 hoverLift：边框与悬停光晕携带主机状态色（正常/降级/故障），是信息不是装饰。
         .background(Theme.Colors.cardBackground)
         .cornerRadius(Theme.Layout.cardCornerRadius)
         .overlay(

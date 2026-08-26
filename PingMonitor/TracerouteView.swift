@@ -23,18 +23,18 @@ struct TracerouteView: View {
                         .frame(minHeight: 200, idealHeight: 300)
                         
                     ScrollView {
-                        VStack(spacing: 16) {
+                        VStack(spacing: Theme.Space.cardGap) {
                             // Status bar
                             statusBar
 
                             if manager.isNSLookupRunning || manager.nsLookupResult != nil || manager.nsLookupError != nil {
                                 nsLookupSection
                             }
-                            
+
                             // Hop table
                             hopTableView
                         }
-                        .padding()
+                        .padding(Theme.Space.pagePadding)
                     }
                     .frame(minHeight: 200)
                 }
@@ -46,7 +46,7 @@ struct TracerouteView: View {
     // MARK: - Toolbar
     
     private var toolbarView: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: Theme.Space.lg) {
             if !manager.hops.isEmpty || manager.isRunning {
                 HStack {
                     Button(action: {
@@ -54,14 +54,14 @@ struct TracerouteView: View {
                         manager.clear()
                         targetHost = ""
                     }) {
-                        HStack(spacing: 4) {
+                        HStack(spacing: Theme.Space.xs) {
                             Image(systemName: "arrow.uturn.backward")
                                 .font(Theme.Fonts.icon(Theme.Fonts.Size.caption))
                             Text(languageManager.t("common.back"))
                                 .font(Theme.Fonts.ui(Theme.Fonts.Size.body, weight: .medium))
                         }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 7)
+                        .padding(.horizontal, Theme.Space.md)
+                        .padding(.vertical, Theme.Space.sm)
                         .background(
                             Capsule()
                                 .fill(Theme.Colors.cardBackground)
@@ -74,10 +74,9 @@ struct TracerouteView: View {
                 }
             }
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
+            HStack(spacing: Theme.Space.md) {
                     // Host input
-                    HStack(spacing: 8) {
+                    HStack(spacing: Theme.Space.sm) {
                         Image(systemName: "point.topleft.down.to.point.bottomright.curvepath")
                             .foregroundStyle(Theme.Colors.accentBlue)
                             .font(Theme.Fonts.icon(Theme.Fonts.Size.callout))
@@ -91,18 +90,19 @@ struct TracerouteView: View {
                                 }
                             }
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
+                    .padding(.horizontal, Theme.Space.md)
+                    .padding(.vertical, Theme.Space.sm)
                     .background(Theme.Colors.cardBackground)
                     .cornerRadius(Theme.Radius.md)
                     .overlay(
                         RoundedRectangle(cornerRadius: Theme.Radius.md)
                             .stroke(Theme.Colors.separator, lineWidth: 1)
                     )
-                    .frame(width: 320)
+                    .frame(maxWidth: .infinity)
+                    .layoutPriority(1)
                     
                     Toggle(isOn: $manager.isMTRMode) {
-                        HStack(spacing: 4) {
+                        HStack(spacing: Theme.Space.xs) {
                             Image(systemName: "repeat")
                                 .font(Theme.Fonts.icon(Theme.Fonts.Size.caption))
                             Text(languageManager.t("traceroute.mtr_mode"))
@@ -112,7 +112,14 @@ struct TracerouteView: View {
                     .toggleStyle(.switch)
                     .controlSize(.small)
                     .disabled(manager.isRunning)
-                    
+                    .fixedSize()
+
+                    // 分组分隔：MTR 开关与右侧主操作按钮之间画一道细分隔线。
+                    Rectangle()
+                        .fill(Theme.Colors.separator)
+                        .frame(width: 1, height: 22)
+                        .padding(.horizontal, Theme.Space.xxs)
+
                     Button(action: {
                         if manager.isRunning {
                             manager.stop()
@@ -126,8 +133,8 @@ struct TracerouteView: View {
                             Text(manager.isRunning ? languageManager.t("traceroute.stop") : languageManager.t("traceroute.start"))
                                 .font(Theme.Fonts.ui(Theme.Fonts.Size.body, weight: .medium))
                         }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 7)
+                        .padding(.horizontal, Theme.Space.md)
+                        .padding(.vertical, Theme.Space.sm)
                         .background(
                             Capsule()
                                 .fill(manager.isRunning ? Theme.Colors.accentRed.opacity(0.15) : Theme.Colors.accentBlue.opacity(0.15))
@@ -152,8 +159,8 @@ struct TracerouteView: View {
                             Text(languageManager.t("traceroute.nslookup"))
                                 .font(Theme.Fonts.ui(Theme.Fonts.Size.body, weight: .medium))
                         }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 7)
+                        .padding(.horizontal, Theme.Space.md)
+                        .padding(.vertical, Theme.Space.sm)
                         .background(
                             Capsule()
                                 .fill(Theme.Colors.cardBackground)
@@ -171,14 +178,14 @@ struct TracerouteView: View {
                                 showCopied = false
                             }
                         }) {
-                            HStack(spacing: 4) {
+                            HStack(spacing: Theme.Space.xs) {
                                 Image(systemName: showCopied ? "checkmark" : "doc.on.doc")
                                     .font(Theme.Fonts.icon(Theme.Fonts.Size.caption))
                                 Text(showCopied ? languageManager.t("traceroute.copied") : languageManager.t("traceroute.copy"))
                                     .font(Theme.Fonts.ui(Theme.Fonts.Size.body, weight: .medium))
                             }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 7)
+                            .padding(.horizontal, Theme.Space.md)
+                            .padding(.vertical, Theme.Space.sm)
                             .background(
                                 Capsule()
                                     .fill(showCopied ? Theme.Colors.accentGreen.opacity(0.15) : Theme.Colors.cardBackground)
@@ -188,7 +195,6 @@ struct TracerouteView: View {
                         .buttonStyle(.plain)
                     }
                 }
-            }
             
             // MTR hint
             if manager.isMTRMode {
@@ -202,16 +208,26 @@ struct TracerouteView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .padding()
-        .background(.ultraThinMaterial)
+        .padding(.horizontal, Theme.Space.pagePadding)
+        .padding(.top, Theme.Space.pageTopGap)
+        .padding(.bottom, Theme.Space.controlGap)
+        .background(Theme.Colors.cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.Radius.lg)
+                .stroke(Theme.Colors.cardBorder, lineWidth: 1)
+        )
+        .padding(.horizontal, Theme.Space.pagePadding)
+        .padding(.top, Theme.Space.pageTopGap) // 修复：工具栏卡原先缺顶部留白、贴住窗口头
+        .padding(.bottom, Theme.Space.controlGap)
     }
-    
+
     // MARK: - Empty State
     
     private var emptyStateView: some View {
         ScrollView {
-            VStack(spacing: 20) {
-                Spacer(minLength: 30)
+            VStack(spacing: Theme.Space.xl) {
+                Spacer(minLength: Theme.Space.xxl)
                 
                 ZStack {
                     Circle()
@@ -245,7 +261,7 @@ struct TracerouteView: View {
                     .multilineTextAlignment(.center)
                 
                 // Quick targets
-                HStack(spacing: 8) {
+                HStack(spacing: Theme.Space.sm) {
                     QuickTargetButton(label: "8.8.8.8", icon: "globe") {
                         targetHost = "8.8.8.8"
                         manager.startTrace(host: targetHost)
@@ -259,8 +275,8 @@ struct TracerouteView: View {
                         manager.startTrace(host: targetHost)
                     }
                 }
-                .padding(.top, 4)
-                
+                .padding(.top, Theme.Space.xs)
+
                 // Monitored hosts section
                 if viewModel.isRunning && !viewModel.hosts.isEmpty {
                     monitoredHostsSection
@@ -268,10 +284,10 @@ struct TracerouteView: View {
 
                 if manager.isNSLookupRunning || manager.nsLookupResult != nil || manager.nsLookupError != nil {
                     nsLookupSection
-                        .padding(.horizontal, 20)
+                        .padding(.horizontal, Theme.Space.lg)
                 }
-                
-                Spacer(minLength: 30)
+
+                Spacer(minLength: Theme.Space.xxl)
             }
             .frame(maxWidth: .infinity)
         }
@@ -280,9 +296,9 @@ struct TracerouteView: View {
     // MARK: - Monitored Hosts Section
     
     private var monitoredHostsSection: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: Theme.Space.sectionGap) {
             // Section header
-            HStack(spacing: 8) {
+            HStack(spacing: Theme.Space.controlGap) {
                 Image(systemName: "server.rack")
                     .foregroundStyle(Theme.Colors.accentPurple)
                     .font(Theme.Fonts.icon(Theme.Fonts.Size.callout))
@@ -297,10 +313,10 @@ struct TracerouteView: View {
                     color: Theme.Colors.accentBlue
                 )
             }
-            .padding(.horizontal, 16)
-            
+            .padding(.horizontal, Theme.Space.lg)
+
             // Host cards grid
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 200), spacing: 10)], spacing: 10) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 200), spacing: Theme.Space.tileGap)], spacing: Theme.Space.tileGap) {
                 ForEach(viewModel.hosts) { host in
                     MonitoredHostCard(host: host) {
                         targetHost = host.address
@@ -308,9 +324,9 @@ struct TracerouteView: View {
                     }
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, Theme.Space.lg)
         }
-        .padding(.vertical, 16)
+        .padding(.vertical, Theme.Space.lg)
         .background(
             RoundedRectangle(cornerRadius: Theme.Radius.lg)
                 .fill(Theme.Colors.cardBackground)
@@ -319,14 +335,14 @@ struct TracerouteView: View {
             RoundedRectangle(cornerRadius: Theme.Radius.lg)
                 .stroke(Theme.Colors.cardBorder, lineWidth: 1)
         )
-        .padding(.horizontal, 20)
+        .padding(.horizontal, Theme.Space.xl)
     }
     
     // MARK: - Status Bar
     
     private var statusBar: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
+        VStack(alignment: .leading, spacing: Theme.Space.md) {
+            HStack(spacing: Theme.Space.md) {
                 if manager.isRunning {
                     ProgressView()
                         .controlSize(.small)
@@ -347,7 +363,7 @@ struct TracerouteView: View {
                     let validHops = manager.hops.filter { !$0.isTimeout }
                     let timeoutHops = manager.hops.filter { $0.isTimeout }
                     
-                    HStack(spacing: 12) {
+                    HStack(spacing: Theme.Space.md) {
                         HopSummaryBadge(
                             icon: "arrow.triangle.branch",
                             value: "\(manager.hops.count)",
@@ -381,13 +397,14 @@ struct TracerouteView: View {
                 routeContextView(routeContext)
             }
         }
-        .padding(16)
+        .padding(Theme.Space.pagePadding)
+        // 状态条是页面级卡片，圆角与其他卡片对齐（lg）。
         .background(
-            RoundedRectangle(cornerRadius: Theme.Radius.md)
+            RoundedRectangle(cornerRadius: Theme.Radius.lg)
                 .fill(Theme.Colors.cardBackground)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: Theme.Radius.md)
+            RoundedRectangle(cornerRadius: Theme.Radius.lg)
                 .stroke(Theme.Colors.cardBorder, lineWidth: 1)
         )
     }
@@ -415,11 +432,11 @@ struct TracerouteView: View {
                     .frame(width: w.loss, alignment: .trailing)
                 Text("Location") // Note: should localize if possible, but hardcoded here if missing translation
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.leading, 8)
+                    .padding(.leading, Theme.Space.sm)
             }
             .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote, weight: .semibold))
             .foregroundStyle(Theme.Colors.textTertiary)
-            .padding(.horizontal, 16)
+            .padding(.horizontal, Theme.Space.lg)
             .padding(.vertical, 10)
             .background(Theme.Colors.cardBackground.opacity(0.5))
 
@@ -430,13 +447,13 @@ struct TracerouteView: View {
                 HopRowView(hop: hop, isEven: index % 2 == 0, columnWidths: w)
 
                 if index < manager.hops.count - 1 {
-                    Divider().opacity(0.15).padding(.horizontal, 16)
+                    Divider().opacity(0.15).padding(.horizontal, Theme.Space.lg)
                 }
             }
 
             // Loading indicator for running trace
             if manager.isRunning {
-                HStack(spacing: 8) {
+                HStack(spacing: Theme.Space.sm) {
                     ProgressView()
                         .controlSize(.small)
                         .scaleEffect(0.7)
@@ -445,7 +462,7 @@ struct TracerouteView: View {
                         .foregroundStyle(Theme.Colors.textTertiary)
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
+                .padding(.vertical, Theme.Space.md)
             }
         }
         .background(
@@ -501,8 +518,8 @@ struct TracerouteView: View {
     }
 
     private var nsLookupSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: Theme.Space.md) {
+            HStack(spacing: Theme.Space.sm) {
                 Image(systemName: "network.badge.shield.half.filled")
                     .foregroundStyle(Theme.Colors.accentBlue)
                 Text(languageManager.t("traceroute.nslookup"))
@@ -526,7 +543,7 @@ struct TracerouteView: View {
                 }
 
                 if !result.records.isEmpty {
-                    VStack(spacing: 8) {
+                    VStack(spacing: Theme.Space.sm) {
                         ForEach(result.records) { record in
                             HStack(alignment: .top, spacing: 10) {
                                 Text(record.label)
@@ -548,7 +565,7 @@ struct TracerouteView: View {
                     .foregroundStyle(Theme.Colors.textTertiary)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(10)
+                    .padding(Theme.Space.md)
                     .background(Theme.Colors.surfaceOverlay)
                     .cornerRadius(Theme.Radius.md)
             } else if let error = manager.nsLookupError {
@@ -563,7 +580,7 @@ struct TracerouteView: View {
                     .foregroundStyle(Theme.Colors.textTertiary)
             }
         }
-        .padding(16)
+        .padding(Theme.Space.lg)
         .background(
             RoundedRectangle(cornerRadius: Theme.Radius.lg)
                 .fill(Theme.Colors.cardBackground)
@@ -631,7 +648,7 @@ struct HopRowView: View {
             .frame(width: columnWidths.hop, alignment: .center)
 
             // Host / IP
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: Theme.Space.xxs) {
                 if hop.isTimeout {
                     Text("* * *")
                         .font(Theme.Fonts.number(Theme.Fonts.Size.body))
@@ -679,7 +696,7 @@ struct HopRowView: View {
                 .frame(width: columnWidths.loss, alignment: .trailing)
                 
             // Location
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: Theme.Space.xxs) {
                 if let locString = hop.geoLocation?.locationString {
                     Text(locString)
                         .font(Theme.Fonts.ui(Theme.Fonts.Size.body, weight: .medium))
@@ -699,10 +716,10 @@ struct HopRowView: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.leading, 8)
+            .padding(.leading, Theme.Space.sm)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
+        .padding(.horizontal, Theme.Space.lg)
+        .padding(.vertical, Theme.Space.sm)
         .background(isHovered ? Theme.Colors.hoverOverlay : (isEven ? Color.clear : Theme.Colors.surfaceOverlay))
         .onHover { hovering in
             withAnimation(.easeInOut(duration: 0.15)) {
@@ -729,8 +746,8 @@ struct QuickTargetButton: View {
                 Text(label)
                     .font(Theme.Fonts.number(Theme.Fonts.Size.body, weight: .medium))
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
+            .padding(.horizontal, Theme.Space.md)
+            .padding(.vertical, Theme.Space.sm)
             .background(Theme.Colors.cardBackground)
             .cornerRadius(Theme.Radius.md)
             .overlay(
@@ -750,7 +767,7 @@ struct HopSummaryBadge: View {
     let color: Color
     
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: Theme.Space.xs) {
             Image(systemName: icon)
                 .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
                 .foregroundStyle(color)
@@ -783,7 +800,7 @@ struct RouteContextBadge: View {
                 .foregroundStyle(Theme.Colors.textPrimary)
                 .lineLimit(1)
         }
-        .padding(.horizontal, 10)
+        .padding(.horizontal, Theme.Space.md)
         .padding(.vertical, 6)
         .background(Theme.Colors.surfaceOverlay)
         .cornerRadius(Theme.Radius.md)
@@ -806,7 +823,7 @@ struct MonitoredHostCard: View {
                     .shadow(color: host.isReachable ? latencyColor.opacity(0.5) : .clear, radius: 3)
                 
                 // Host info
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: Theme.Space.xxs) {
                     Text(host.name)
                         .font(Theme.Fonts.ui(Theme.Fonts.Size.body, weight: .semibold))
                         .foregroundStyle(Theme.Colors.textPrimary)
@@ -838,7 +855,7 @@ struct MonitoredHostCard: View {
                     .font(Theme.Fonts.icon(Theme.Fonts.Size.body))
                     .foregroundStyle(Theme.Colors.accentBlue.opacity(isHovered ? 1 : 0.5))
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, Theme.Space.md)
             .padding(.vertical, 10)
             .background(
                 RoundedRectangle(cornerRadius: Theme.Radius.md)
@@ -887,7 +904,7 @@ struct TracerouteMapView: View {
             // Draw markers for each hop
             ForEach(validLocations, id: \.hop.id) { loc in
                 Annotation(loc.hop.hostName, coordinate: loc.coord) {
-                    VStack(spacing: 4) {
+                    VStack(spacing: Theme.Space.xs) {
                         Circle()
                             .fill(loc.hop.latencyColor)
                             .frame(width: 12, height: 12)
@@ -898,8 +915,8 @@ struct TracerouteMapView: View {
                         
                         Text("\(loc.hop.hopNumber)")
                             .font(Theme.Fonts.ui(Theme.Fonts.Size.caption, weight: .bold))
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 2)
+                            .padding(.horizontal, Theme.Space.xs)
+                            .padding(.vertical, Theme.Space.xxs)
                             .background(Theme.Colors.cardBackground)
                             .cornerRadius(Theme.Radius.xs)
                             .shadow(radius: 1)

@@ -98,6 +98,9 @@ struct MainView: View {
 
             VStack(spacing: 0) {
                 headerView
+                    .padding(.horizontal, Theme.Space.lg)
+                    .padding(.top, 10)
+                    .padding(.bottom, Theme.Space.xs)
 
                 detailContent
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -167,27 +170,28 @@ struct MainView: View {
     }
 
     // MARK: - Header
+    // LM Studio 式工具栏卡片：白色圆角卡承载页面标题 + 全局状态开关，
+    // 浮在内容区背景之上，不再用材质渐变条。
     private var headerView: some View {
         HStack(spacing: 14) {
-            // Animated status indicator
+            // 状态指示点（运行中呼吸脉冲）
             ZStack {
                 if viewModel.isRunning {
                     Circle()
                         .fill(Theme.Colors.accentGreen.opacity(0.25))
-                        .frame(width: 24, height: 24)
-                        .scaleEffect(viewModel.isRunning ? 1.6 : 1.0)
+                        .frame(width: 22, height: 22)
+                        .scaleEffect(viewModel.isRunning ? 1.5 : 1.0)
                         .opacity(viewModel.isRunning ? 0 : 0.6)
                         .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: false), value: viewModel.isRunning)
                 }
                 Circle()
                     .fill(viewModel.isRunning ? Theme.Colors.accentGreen : Theme.Colors.textTertiary.opacity(0.5))
-                    .frame(width: 10, height: 10)
-                    .shadow(color: viewModel.isRunning ? Theme.Colors.accentGreen.opacity(0.5) : .clear, radius: 4)
+                    .frame(width: 9, height: 9)
             }
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: Theme.Space.xxs) {
                 Text(selectedItem.title)
-                    .font(Theme.Fonts.ui(Theme.Fonts.Size.headline, weight: .bold))
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.headline, weight: .semibold))
                 Text(viewModel.isRunning ? String(format: languageManager.t("header.monitoring"), viewModel.hosts.count) : languageManager.t("header.stopped"))
                     .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                     .foregroundStyle(Theme.Colors.textSecondary)
@@ -201,7 +205,7 @@ struct MainView: View {
                     .font(Theme.Fonts.ui(Theme.Fonts.Size.body, weight: .bold))
                     .foregroundStyle(Theme.Colors.textSecondary)
                     .padding(6)
-                    .background(Theme.Colors.cardBackground)
+                    .background(Theme.Colors.background)
                     .clipShape(Circle())
             }
             .buttonStyle(.plain)
@@ -212,36 +216,36 @@ struct MainView: View {
                 TailnetStatusPill(selectedItem: $selectedItem)
             }
 
-            Button(action: { viewModel.toggle() }) {
-                HStack(spacing: 6) {
-                    Image(systemName: viewModel.isRunning ? "stop.fill" : "play.fill")
-                        .font(Theme.Fonts.icon(Theme.Fonts.Size.caption))
-                    Text(viewModel.isRunning ? languageManager.t("header.stop") : languageManager.t("header.start"))
-                        .font(Theme.Fonts.ui(Theme.Fonts.Size.body, weight: .medium))
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 7)
-                .background(
-                    Capsule()
-                        .fill(viewModel.isRunning ? Theme.Colors.accentRed.opacity(0.15) : Theme.Colors.accentGreen.opacity(0.15))
-                )
-                .foregroundStyle(viewModel.isRunning ? Theme.Colors.accentRed : Theme.Colors.accentGreen)
+            Rectangle()
+                .fill(Theme.Colors.separator)
+                .frame(width: 1, height: 22)
+
+            // 状态开关：LM Studio 的 "Status: Running" 同款
+            HStack(spacing: Theme.Space.sm) {
+                Text(viewModel.isRunning ? languageManager.t("header.stop") : languageManager.t("header.start"))
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.body, weight: .medium))
+                    .foregroundStyle(Theme.Colors.textSecondary)
+
+                Toggle("", isOn: Binding(
+                    get: { viewModel.isRunning },
+                    set: { _ in viewModel.toggle() }
+                ))
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .tint(Theme.Colors.accentBlue)
+                .controlSize(.small)
             }
-            .buttonStyle(.plain)
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 12)
+        .padding(.horizontal, Theme.Space.lg)
+        .padding(.vertical, 10)
         .background(
-            LinearGradient(
-                colors: [
-                    viewModel.isRunning ? Theme.Colors.accentGreen.opacity(0.04) : Theme.Colors.textTertiary.opacity(0.03),
-                    .clear
-                ],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
+            RoundedRectangle(cornerRadius: Theme.Radius.lg)
+                .fill(Theme.Colors.cardBackground)
         )
-        .background(.ultraThinMaterial)
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.Radius.lg)
+                .stroke(Theme.Colors.cardBorder, lineWidth: 1)
+        )
     }
 }
 
@@ -380,6 +384,7 @@ struct TailscaleOAuthSettingsCard: View {
                         Text("15m").tag(900.0)
                     }
                     .pickerStyle(.segmented)
+                    .controlSize(.small)
                     .frame(width: 260, alignment: .trailing)
                     .onChange(of: inventoryInterval) { _, _ in
                         tailscale.refreshInventoryConfiguration()
@@ -451,7 +456,7 @@ struct TailscaleOAuthSettingsCard: View {
             .buttonStyle(.plain)
 
             if isGuideExpanded {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: Theme.Space.sm) {
                     guideStep(1, "settings.tailscale.howto.step1")
                     guideStep(2, "settings.tailscale.howto.step2")
                     guideStep(3, "settings.tailscale.howto.step3")
@@ -459,7 +464,7 @@ struct TailscaleOAuthSettingsCard: View {
                     guideStep(5, "settings.tailscale.howto.step5")
                     guideStep(6, "settings.tailscale.howto.step6")
 
-                    HStack(spacing: 8) {
+                    HStack(spacing: Theme.Space.sm) {
                         Button(action: { NSWorkspace.shared.open(Self.consoleURL) }) {
                             HStack(spacing: 5) {
                                 Image(systemName: "arrow.up.forward.square")
@@ -493,7 +498,7 @@ struct TailscaleOAuthSettingsCard: View {
                         }
                         .buttonStyle(.plain)
                     }
-                    .padding(.top, 2)
+                    .padding(.top, Theme.Space.xxs)
 
                     HStack(alignment: .top, spacing: 6) {
                         Image(systemName: "exclamationmark.triangle.fill")
@@ -504,9 +509,9 @@ struct TailscaleOAuthSettingsCard: View {
                             .foregroundStyle(Theme.Colors.textSecondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                    .padding(.top, 2)
+                    .padding(.top, Theme.Space.xxs)
                 }
-                .padding(12)
+                .padding(Theme.Space.md)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Theme.Colors.surfaceOverlay)
                 .cornerRadius(Theme.Radius.md)
@@ -515,7 +520,7 @@ struct TailscaleOAuthSettingsCard: View {
     }
 
     private func guideStep(_ index: Int, _ key: String) -> some View {
-        HStack(alignment: .top, spacing: 8) {
+        HStack(alignment: .top, spacing: Theme.Space.sm) {
             Text("\(index)")
                 .font(Theme.Fonts.number(Theme.Fonts.Size.micro, weight: .bold))
                 .foregroundStyle(Theme.Colors.onAccent)
@@ -599,901 +604,20 @@ struct TailnetStatusPill: View {
 
     var body: some View {
         Button(action: { selectedItem = .tailscale }) {
-            HStack(spacing: 4) {
+            HStack(spacing: Theme.Space.xs) {
                 Image(systemName: "network")
                     .font(Theme.Fonts.icon(Theme.Fonts.Size.body))
                 Text(summary.text)
                     .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote, weight: .medium))
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
+            .padding(.horizontal, Theme.Space.md)
+            .padding(.vertical, Theme.Space.xs)
             .background(Capsule().fill(summary.color.opacity(0.15)))
             .foregroundStyle(summary.color)
         }
         .buttonStyle(.plain)
         .help(languageManager.t("tailscale.inventory.title"))
         .fixedSize()
-    }
-}
-
-// MARK: - 统计 Tab
-struct StatisticsTab: View {
-    @ObservedObject var viewModel: PingMonitorViewModel
-    @State private var selectedHost: HostConfig?
-    @State private var selectedWindow: NetworkQualityWindow = .fiveMinutes
-    @ObservedObject private var languageManager = LanguageManager.shared
-    
-    var body: some View {
-        VStack(spacing: 0) {
-            VStack(spacing: 12) {
-                if viewModel.hosts.count > 1 {
-                    Picker(languageManager.t("stats.select_host"), selection: $selectedHost) {
-                        Text(languageManager.t("stats.all_hosts")).tag(nil as HostConfig?)
-                        ForEach(viewModel.hosts) { host in
-                            Text(host.name).tag(host as HostConfig?)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                }
-
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(languageManager.t("stats.quality_assessment"))
-                            .font(Theme.Fonts.ui(Theme.Fonts.Size.display, weight: .bold))
-                            .foregroundStyle(Theme.Colors.textPrimary)
-                        Text(languageManager.t("stats.dimension_readability"))
-                            .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
-                            .foregroundStyle(Theme.Colors.textSecondary)
-                    }
-
-                    Spacer()
-
-                    Picker("", selection: $selectedWindow) {
-                        Text(languageManager.t("dashboard.window_1m")).tag(NetworkQualityWindow.oneMinute)
-                        Text(languageManager.t("dashboard.window_5m")).tag(NetworkQualityWindow.fiveMinutes)
-                        Text(languageManager.t("dashboard.window_1h")).tag(NetworkQualityWindow.oneHour)
-                    }
-                    .pickerStyle(.segmented)
-                    .frame(width: 220)
-                }
-            }
-            .padding()
-            .background(.ultraThinMaterial)
-            
-            if viewModel.hosts.isEmpty {
-                ContentUnavailableView(languageManager.t("monitor.no_hosts"), systemImage: "network", description: Text(languageManager.t("monitor.add_host_hint")))
-            } else {
-                StatisticsContentView(host: selectedHost, window: selectedWindow, viewModel: viewModel)
-            }
-        }
-    }
-}
-
-struct StatisticsContentView: View {
-    let host: HostConfig?
-    let window: NetworkQualityWindow
-    @ObservedObject var viewModel: PingMonitorViewModel
-    @ObservedObject private var languageManager = LanguageManager.shared
-
-    private var aggregatedStats: AggregatedStats {
-        if let singleHost = host {
-            let stats = viewModel.hostStats[singleHost.id]
-            return AggregatedStats(
-                totalPings: stats?.totalPings ?? 0,
-                successfulPings: stats?.successfulPings ?? 0,
-                failedPings: stats?.failedPings ?? 0,
-                totalBytesSent: stats?.totalBytesSent ?? 0,
-                totalBytesReceived: stats?.totalBytesReceived ?? 0,
-                minLatency: stats?.minLatency,
-                maxLatency: stats?.maxLatency,
-                avgLatency: stats?.avgLatency ?? 0,
-                latencyHistory: stats?.latencyHistory ?? [],
-                startTime: stats?.startTime ?? Date(),
-                isAggregated: false,
-                hostCount: 1
-            )
-        }
-
-        var totalPings = 0
-        var successfulPings = 0
-        var failedPings = 0
-        var totalBytesSent: Int64 = 0
-        var totalBytesReceived: Int64 = 0
-        var minLatency: Double?
-        var maxLatency: Double?
-        var totalAvgLatency: Double = 0
-        var allLatencyHistory: [LatencyPoint] = []
-        var earliestStartTime = Date()
-        var hostCount = 0
-
-        for (_, stats) in viewModel.hostStats {
-            totalPings += stats.totalPings
-            successfulPings += stats.successfulPings
-            failedPings += stats.failedPings
-            totalBytesSent += stats.totalBytesSent
-            totalBytesReceived += stats.totalBytesReceived
-
-            if let hostMinLatency = stats.minLatency {
-                minLatency = minLatency == nil ? hostMinLatency : Swift.min(minLatency!, hostMinLatency)
-            }
-            if let hostMaxLatency = stats.maxLatency {
-                maxLatency = maxLatency == nil ? hostMaxLatency : Swift.max(maxLatency!, hostMaxLatency)
-            }
-
-            totalAvgLatency += stats.avgLatency
-            allLatencyHistory.append(contentsOf: stats.latencyHistory)
-
-            if stats.startTime < earliestStartTime {
-                earliestStartTime = stats.startTime
-            }
-
-            hostCount += 1
-        }
-
-        allLatencyHistory.sort { $0.timestamp < $1.timestamp }
-        if allLatencyHistory.count > 100 {
-            allLatencyHistory = Array(allLatencyHistory.suffix(100))
-        }
-
-        return AggregatedStats(
-            totalPings: totalPings,
-            successfulPings: successfulPings,
-            failedPings: failedPings,
-            totalBytesSent: totalBytesSent,
-            totalBytesReceived: totalBytesReceived,
-            minLatency: minLatency,
-            maxLatency: maxLatency,
-            avgLatency: hostCount > 0 ? totalAvgLatency / Double(hostCount) : 0,
-            latencyHistory: allLatencyHistory,
-            startTime: earliestStartTime,
-            isAggregated: true,
-            hostCount: hostCount
-        )
-    }
-
-    private var hostSnapshot: HostQualitySnapshot? {
-        host.map { viewModel.qualitySnapshot(for: $0, window: window) }
-    }
-
-    private var globalSnapshot: GlobalQualitySnapshot {
-        viewModel.globalQualitySnapshot(window: window)
-    }
-
-    private var score: Int {
-        hostSnapshot?.score ?? globalSnapshot.score
-    }
-
-    private var dimensions: QualityDimensionScores {
-        hostSnapshot?.dimensions ?? globalSnapshot.dimensions
-    }
-
-    private var p95Latency: Double? {
-        hostSnapshot?.p95Latency ?? globalSnapshot.averageP95Latency
-    }
-
-    private var p99Latency: Double? {
-        hostSnapshot?.p99Latency
-    }
-
-    private var packetLoss: Double {
-        hostSnapshot?.packetLoss ?? globalSnapshot.averagePacketLoss
-    }
-
-    private var jitter: Double {
-        hostSnapshot?.jitter ?? globalSnapshot.averageJitter
-    }
-
-    private var currentPath: ProbePathKind {
-        hostSnapshot?.pathKind ?? .unknown
-    }
-
-    private var pathFlaps: Int {
-        hostSnapshot?.pathFlapCount ?? globalSnapshot.worstHosts.reduce(0) { $0 + $1.pathFlapCount }
-    }
-
-    private var consecutiveFailures: Int {
-        hostSnapshot?.consecutiveFailures ?? globalSnapshot.worstHosts.map(\.consecutiveFailures).max() ?? 0
-    }
-
-    private var trendPoints: [QualityTrendPoint] {
-        if let host {
-            return viewModel.qualityTrend(for: host, window: window)
-        }
-        return viewModel.qualityTrend(window: window)
-    }
-
-    private var recentEvents: [NetworkQualityEvent] {
-        viewModel.recentQualityEvents(for: host?.id, limit: 10)
-    }
-
-    private var targetName: String {
-        host?.name ?? languageManager.t("stats.all_hosts")
-    }
-
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 18) {
-                LazyVGrid(
-                    columns: [GridItem(.adaptive(minimum: Theme.Layout.twoColumnMinWidth), spacing: 18)],
-                    spacing: 18
-                ) {
-                    StatsQualityHeroCard(
-                        targetName: targetName,
-                        window: window,
-                        score: score,
-                        p95Latency: p95Latency,
-                        packetLoss: packetLoss,
-                        jitter: jitter,
-                        hostCount: host == nil ? globalSnapshot.hostCount : 1,
-                        path: currentPath
-                    )
-
-                    StatsDimensionBreakdownCard(dimensions: dimensions)
-                }
-
-                LazyVGrid(
-                    columns: [GridItem(.adaptive(minimum: Theme.Layout.twoColumnMinWidth), spacing: 18)],
-                    spacing: 18
-                ) {
-                    StatsQualityTrendCard(
-                        trendPoints: trendPoints,
-                        score: score,
-                        packetLoss: packetLoss,
-                        jitter: jitter
-                    )
-                    StatsEventTimelineCard(events: recentEvents)
-                }
-
-                StatsDimensionStandardsCard()
-
-                LazyVGrid(
-                    columns: [GridItem(.adaptive(minimum: Theme.Layout.twoColumnMinWidth), spacing: 18)],
-                    spacing: 18
-                ) {
-                    StatsRawMetricsCard(
-                        stats: aggregatedStats,
-                        score: score,
-                        p95Latency: p95Latency,
-                        p99Latency: p99Latency,
-                        jitter: jitter,
-                        packetLoss: packetLoss,
-                        consecutiveFailures: consecutiveFailures,
-                        pathFlaps: pathFlaps,
-                        currentPath: currentPath
-                    )
-
-                    StatsWorstHostsCard(
-                        snapshots: host == nil ? globalSnapshot.worstHosts : hostSnapshot.map { [$0] } ?? []
-                    )
-                }
-
-                HStack {
-                    if let singleHost = host {
-                        Button(languageManager.t("stats.export_current")) {
-                            viewModel.exportStats(for: singleHost.id)
-                        }
-                        .buttonStyle(.bordered)
-
-                        Button(languageManager.t("stats.reset_current")) {
-                            viewModel.resetStats(for: singleHost.id)
-                        }
-                        .buttonStyle(.bordered)
-                    }
-
-                    Button(languageManager.t("stats.export_all")) {
-                        viewModel.exportAllStats()
-                    }
-                    .buttonStyle(.bordered)
-
-                    Button(languageManager.t("stats.reset_all")) {
-                        viewModel.resetAllStats()
-                    }
-                    .buttonStyle(.bordered)
-                    .foregroundStyle(Theme.Colors.accentRed)
-                }
-                .padding(.top, 4)
-            }
-            .padding()
-        }
-    }
-}
-
-struct AggregatedStats {
-    var totalPings: Int
-    var successfulPings: Int
-    var failedPings: Int
-    var totalBytesSent: Int64
-    var totalBytesReceived: Int64
-    var minLatency: Double?
-    var maxLatency: Double?
-    var avgLatency: Double
-    var latencyHistory: [LatencyPoint]
-    var startTime: Date
-    var isAggregated: Bool
-    var hostCount: Int
-    
-    var packetLossRate: Double {
-        guard totalPings > 0 else { return 0 }
-        return Double(failedPings) / Double(totalPings) * 100
-    }
-    
-    var successRate: Double {
-        guard totalPings > 0 else { return 0 }
-        return Double(successfulPings) / Double(totalPings) * 100
-    }
-    
-    var totalTraffic: String {
-        let total = totalBytesSent + totalBytesReceived
-        return formatBytes(total)
-    }
-    
-    private func formatBytes(_ bytes: Int64) -> String {
-        let formatter = ByteCountFormatter()
-        formatter.allowedUnits = [.useBytes, .useKB, .useMB, .useGB]
-        formatter.countStyle = .file
-        return formatter.string(fromByteCount: bytes)
-    }
-}
-
-private struct StatsQualityHeroCard: View {
-    let targetName: String
-    let window: NetworkQualityWindow
-    let score: Int
-    let p95Latency: Double?
-    let packetLoss: Double
-    let jitter: Double
-    let hostCount: Int
-    let path: ProbePathKind
-    @ObservedObject private var languageManager = LanguageManager.shared
-
-    var body: some View {
-        statsPanel {
-            VStack(alignment: .leading, spacing: 16) {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(languageManager.t("stats.quality_assessment"))
-                            .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .semibold))
-                            .foregroundStyle(Theme.Colors.textPrimary)
-                        Text(targetName)
-                            .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
-                            .foregroundStyle(Theme.Colors.textSecondary)
-                    }
-                    Spacer()
-                    Text(windowLabel(window))
-                        .font(Theme.Fonts.number(Theme.Fonts.Size.footnote, weight: .semibold))
-                        .foregroundStyle(Theme.Colors.accentBlue)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(Theme.Colors.accentBlue.opacity(0.12))
-                        .cornerRadius(Theme.Radius.pill)
-                }
-
-                HStack(alignment: .firstTextBaseline, spacing: 12) {
-                    Text("\(score)")
-                        .font(Theme.Fonts.ui(Theme.Fonts.Size.giant, weight: .bold))
-                        .foregroundStyle(scoreColor(score))
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(gradeText(score))
-                            .font(Theme.Fonts.ui(Theme.Fonts.Size.headline, weight: .semibold))
-                            .foregroundStyle(scoreColor(score))
-                        Text(languageManager.t("stats.current_score_hint"))
-                            .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
-                            .foregroundStyle(Theme.Colors.textSecondary)
-                    }
-                }
-
-                HStack(spacing: 12) {
-                    compactStat(title: languageManager.t("dashboard.p95_latency"), value: p95Latency.map { String(format: "%.0f ms", $0) } ?? "—", color: Theme.Colors.accentBlue)
-                    compactStat(title: languageManager.t("stats.loss_rate"), value: String(format: "%.1f%%", packetLoss), color: packetLoss > 3 ? Theme.Colors.accentRed : Theme.Colors.textPrimary)
-                    compactStat(title: languageManager.t("host_detail.jitter"), value: String(format: "%.1f ms", jitter), color: Theme.Colors.accentOrange)
-                }
-
-                HStack(spacing: 12) {
-                    compactStat(title: languageManager.t("stats.current_path"), value: pathLabel(path), color: pathColor(path))
-                    compactStat(title: languageManager.t("dashboard.hosts_count"), value: "\(hostCount)", color: Theme.Colors.accentPurple)
-                    compactStat(title: languageManager.t("stats.window"), value: windowLabel(window), color: Theme.Colors.textPrimary)
-                }
-            }
-        }
-    }
-
-    private func compactStat(title: String, value: String, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(title)
-                .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
-                .foregroundStyle(Theme.Colors.textSecondary)
-            Text(value)
-                .font(Theme.Fonts.number(Theme.Fonts.Size.callout, weight: .semibold))
-                .foregroundStyle(color)
-                .lineLimit(1)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(10)
-        .background(Theme.Colors.cardBackground.opacity(0.55))
-        .cornerRadius(Theme.Radius.md)
-    }
-
-    private func gradeText(_ score: Int) -> String {
-        switch score {
-        case 90...: return languageManager.t("stats.grade.excellent")
-        case 75..<90: return languageManager.t("stats.grade.good")
-        case 60..<75: return languageManager.t("stats.grade.fair")
-        case 40..<60: return languageManager.t("stats.grade.poor")
-        default: return languageManager.t("stats.grade.critical")
-        }
-    }
-}
-
-private struct StatsDimensionBreakdownCard: View {
-    let dimensions: QualityDimensionScores
-    @ObservedObject private var languageManager = LanguageManager.shared
-
-    var body: some View {
-        statsPanel {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text(languageManager.t("stats.dimension_scores"))
-                        .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .semibold))
-                        .foregroundStyle(Theme.Colors.textPrimary)
-                    Spacer()
-                    Text("\(dimensions.average)")
-                        .font(Theme.Fonts.number(Theme.Fonts.Size.callout, weight: .bold))
-                        .foregroundStyle(scoreColor(dimensions.average))
-                }
-
-                dimensionRow(title: languageManager.t("stats.dimension.latency"), value: dimensions.latency, color: Theme.Colors.accentBlue, weight: "30%")
-                dimensionRow(title: languageManager.t("stats.dimension.stability"), value: dimensions.stability, color: Theme.Colors.accentGreen, weight: "30%")
-                dimensionRow(title: languageManager.t("stats.dimension.path"), value: dimensions.path, color: Theme.Colors.accentOrange, weight: "15%")
-                dimensionRow(title: languageManager.t("stats.dimension.bandwidth"), value: dimensions.bandwidth, color: Theme.Colors.accentPurple, weight: "10%")
-                dimensionRow(title: languageManager.t("stats.dimension.resolution"), value: dimensions.resolution, color: Theme.Colors.accentCyan, weight: "5%")
-                dimensionRow(title: languageManager.t("stats.dimension.overlay"), value: dimensions.overlay, color: Theme.Colors.accentRed, weight: "10%")
-            }
-        }
-    }
-
-    private func dimensionRow(title: String, value: Int, color: Color, weight: String) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack {
-                Text(title)
-                    .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote, weight: .medium))
-                    .foregroundStyle(Theme.Colors.textPrimary)
-                Spacer()
-                Text(weight)
-                    .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
-                    .foregroundStyle(Theme.Colors.textTertiary)
-                Text("\(value)")
-                    .font(Theme.Fonts.number(Theme.Fonts.Size.footnote, weight: .bold))
-                    .foregroundStyle(color)
-            }
-
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: Theme.Radius.xs)
-                        .fill(Theme.Colors.cardBackground)
-                    RoundedRectangle(cornerRadius: Theme.Radius.xs)
-                        .fill(color)
-                        .frame(width: max(6, geo.size.width * CGFloat(value) / 100))
-                }
-            }
-            .frame(height: 8)
-        }
-    }
-}
-
-private struct StatsQualityTrendCard: View {
-    let trendPoints: [QualityTrendPoint]
-    let score: Int
-    let packetLoss: Double
-    let jitter: Double
-    @ObservedObject private var languageManager = LanguageManager.shared
-
-    var body: some View {
-        statsPanel {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text(languageManager.t("stats.quality_trend"))
-                        .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .semibold))
-                        .foregroundStyle(Theme.Colors.textPrimary)
-                    Spacer()
-                    Text("\(trendPoints.count)")
-                        .font(Theme.Fonts.number(Theme.Fonts.Size.footnote, weight: .semibold))
-                        .foregroundStyle(Theme.Colors.textTertiary)
-                }
-
-                if trendPoints.isEmpty {
-                    Text(languageManager.t("dashboard.no_data"))
-                        .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
-                        .foregroundStyle(Theme.Colors.textSecondary)
-                        .frame(maxWidth: .infinity, minHeight: 190)
-                } else {
-                    Chart {
-                        ForEach(trendPoints) { point in
-                            LineMark(
-                                x: .value("Time", point.timestamp),
-                                y: .value("Score", point.score)
-                            )
-                            .interpolationMethod(.monotone)
-                            .foregroundStyle(Theme.Colors.accentBlue)
-                            .lineStyle(StrokeStyle(lineWidth: 2))
-
-                            AreaMark(
-                                x: .value("Time", point.timestamp),
-                                y: .value("Score", point.score)
-                            )
-                            .interpolationMethod(.monotone)
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [Theme.Colors.accentBlue.opacity(0.24), Theme.Colors.accentBlue.opacity(0.02)],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
-                        }
-                    }
-                    .chartYScale(domain: 0...100)
-                    .chartXAxis {
-                        AxisMarks(values: .automatic(desiredCount: 4)) { value in
-                            AxisValueLabel {
-                                if let date = value.as(Date.self) {
-                                    Text(date.formatted(.dateTime.hour().minute()))
-                                        .font(Theme.Fonts.ui(Theme.Fonts.Size.micro))
-                                        .foregroundStyle(Theme.Colors.textTertiary)
-                                }
-                            }
-                        }
-                    }
-                    .chartYAxis {
-                        AxisMarks(position: .leading) { value in
-                            AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [4, 4]))
-                                .foregroundStyle(Theme.Colors.chartGrid)
-                            AxisValueLabel {
-                                if let score = value.as(Double.self) {
-                                    Text("\(Int(score))")
-                                        .font(Theme.Fonts.number(Theme.Fonts.Size.micro))
-                                        .foregroundStyle(Theme.Colors.textTertiary)
-                                }
-                            }
-                        }
-                    }
-                    .frame(height: 190)
-                }
-
-                HStack(spacing: 12) {
-                    trendBadge(title: languageManager.t("dashboard.quality_score"), value: "\(score)", color: scoreColor(score))
-                    trendBadge(title: languageManager.t("stats.loss_rate"), value: String(format: "%.1f%%", packetLoss), color: packetLoss > 3 ? Theme.Colors.accentRed : Theme.Colors.textPrimary)
-                    trendBadge(title: languageManager.t("host_detail.jitter"), value: String(format: "%.1f ms", jitter), color: jitter > 25 ? Theme.Colors.accentOrange : Theme.Colors.textPrimary)
-                }
-            }
-        }
-    }
-
-    private func trendBadge(title: String, value: String, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title)
-                .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
-                .foregroundStyle(Theme.Colors.textSecondary)
-            Text(value)
-                .font(Theme.Fonts.number(Theme.Fonts.Size.body, weight: .semibold))
-                .foregroundStyle(color)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
-private struct StatsEventTimelineCard: View {
-    let events: [NetworkQualityEvent]
-    @ObservedObject private var languageManager = LanguageManager.shared
-
-    var body: some View {
-        statsPanel {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(languageManager.t("stats.recent_anomalies"))
-                    .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .semibold))
-                    .foregroundStyle(Theme.Colors.textPrimary)
-
-                if events.isEmpty {
-                    Text(languageManager.t("stats.no_events"))
-                        .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
-                        .foregroundStyle(Theme.Colors.textSecondary)
-                        .frame(maxWidth: .infinity, minHeight: 190)
-                } else {
-                    VStack(spacing: 10) {
-                        ForEach(events) { event in
-                            HStack(alignment: .top, spacing: 10) {
-                                Circle()
-                                    .fill(eventColor(event.severity))
-                                    .frame(width: 8, height: 8)
-                                    .padding(.top, 5)
-
-                                VStack(alignment: .leading, spacing: 3) {
-                                    HStack {
-                                        Text(event.title)
-                                            .font(Theme.Fonts.ui(Theme.Fonts.Size.body, weight: .semibold))
-                                            .foregroundStyle(Theme.Colors.textPrimary)
-                                        Spacer()
-                                        Text(event.timestamp.formatted(date: .omitted, time: .shortened))
-                                            .font(Theme.Fonts.number(Theme.Fonts.Size.caption))
-                                            .foregroundStyle(Theme.Colors.textTertiary)
-                                    }
-
-                                    if let hostName = event.hostName {
-                                        Text(hostName)
-                                            .font(Theme.Fonts.ui(Theme.Fonts.Size.caption, weight: .medium))
-                                            .foregroundStyle(eventColor(event.severity))
-                                    }
-
-                                    Text(event.detail)
-                                        .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
-                                        .foregroundStyle(Theme.Colors.textSecondary)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
-                            }
-                            .padding(10)
-                            .background(Theme.Colors.cardBackground.opacity(0.65))
-                            .cornerRadius(Theme.Radius.md)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private func eventColor(_ severity: QualityEventSeverity) -> Color {
-        Theme.Status.severity(severity)
-    }
-}
-
-private struct StatsDimensionStandardsCard: View {
-    @ObservedObject private var languageManager = LanguageManager.shared
-
-    var body: some View {
-        statsPanel {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text(languageManager.t("stats.scoring_standard"))
-                        .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .semibold))
-                        .foregroundStyle(Theme.Colors.textPrimary)
-                    Spacer()
-                    Text(languageManager.t("stats.scoring_hint"))
-                        .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
-                        .foregroundStyle(Theme.Colors.textTertiary)
-                }
-
-                VStack(spacing: 10) {
-                    standardRow(
-                        dimension: languageManager.t("stats.dimension.latency"),
-                        weight: "30%",
-                        signal: languageManager.t("stats.standard.latency.signal"),
-                        standard: languageManager.t("stats.standard.latency.rule"),
-                        accent: Theme.Colors.accentBlue
-                    )
-                    standardRow(
-                        dimension: languageManager.t("stats.dimension.stability"),
-                        weight: "30%",
-                        signal: languageManager.t("stats.standard.stability.signal"),
-                        standard: languageManager.t("stats.standard.stability.rule"),
-                        accent: Theme.Colors.accentGreen
-                    )
-                    standardRow(
-                        dimension: languageManager.t("stats.dimension.path"),
-                        weight: "15%",
-                        signal: languageManager.t("stats.standard.path.signal"),
-                        standard: languageManager.t("stats.standard.path.rule"),
-                        accent: Theme.Colors.accentOrange
-                    )
-                    standardRow(
-                        dimension: languageManager.t("stats.dimension.bandwidth"),
-                        weight: "10%",
-                        signal: languageManager.t("stats.standard.bandwidth.signal"),
-                        standard: languageManager.t("stats.standard.bandwidth.rule"),
-                        accent: Theme.Colors.accentPurple
-                    )
-                    standardRow(
-                        dimension: languageManager.t("stats.dimension.resolution"),
-                        weight: "5%",
-                        signal: languageManager.t("stats.standard.resolution.signal"),
-                        standard: languageManager.t("stats.standard.resolution.rule"),
-                        accent: Theme.Colors.accentCyan
-                    )
-                    standardRow(
-                        dimension: languageManager.t("stats.dimension.overlay"),
-                        weight: "10%",
-                        signal: languageManager.t("stats.standard.overlay.signal"),
-                        standard: languageManager.t("stats.standard.overlay.rule"),
-                        accent: Theme.Colors.accentRed
-                    )
-                }
-            }
-        }
-    }
-
-    private func standardRow(dimension: String, weight: String, signal: String, standard: String, accent: Color) -> some View {
-        HStack(alignment: .top, spacing: 14) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(dimension)
-                    .font(Theme.Fonts.ui(Theme.Fonts.Size.body, weight: .semibold))
-                    .foregroundStyle(Theme.Colors.textPrimary)
-                Text(weight)
-                    .font(Theme.Fonts.number(Theme.Fonts.Size.footnote, weight: .bold))
-                    .foregroundStyle(accent)
-            }
-            .frame(width: 86, alignment: .leading)
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(signal)
-                    .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
-                    .foregroundStyle(Theme.Colors.textSecondary)
-                Text(standard)
-                    .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
-                    .foregroundStyle(Theme.Colors.textPrimary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(12)
-        .background(Theme.Colors.cardBackground.opacity(0.55))
-        .cornerRadius(Theme.Radius.md)
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.Radius.md)
-                .stroke(accent.opacity(0.14), lineWidth: 1)
-        )
-    }
-}
-
-private struct StatsRawMetricsCard: View {
-    let stats: AggregatedStats
-    let score: Int
-    let p95Latency: Double?
-    let p99Latency: Double?
-    let jitter: Double
-    let packetLoss: Double
-    let consecutiveFailures: Int
-    let pathFlaps: Int
-    let currentPath: ProbePathKind
-    @ObservedObject private var languageManager = LanguageManager.shared
-
-    var body: some View {
-        statsPanel {
-            VStack(alignment: .leading, spacing: 14) {
-                Text(languageManager.t("stats.raw_metrics"))
-                    .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .semibold))
-                    .foregroundStyle(Theme.Colors.textPrimary)
-
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: 10)], spacing: 10) {
-                    metricCard(label: languageManager.t("dashboard.quality_score"), value: "\(score)", color: scoreColor(score))
-                    metricCard(label: languageManager.t("dashboard.p95_latency"), value: p95Latency.map { String(format: "%.0fms", $0) } ?? "—", color: Theme.Colors.accentBlue)
-                    metricCard(label: "P99", value: p99Latency.map { String(format: "%.0fms", $0) } ?? "—", color: Theme.Colors.accentPurple)
-                    metricCard(label: languageManager.t("host_detail.jitter"), value: String(format: "%.1fms", jitter), color: Theme.Colors.accentOrange)
-                    metricCard(label: languageManager.t("stats.success_rate"), value: String(format: "%.1f%%", stats.successRate), color: Theme.Colors.accentGreen)
-                    metricCard(label: languageManager.t("stats.loss_rate"), value: String(format: "%.1f%%", packetLoss), color: packetLoss > 3 ? Theme.Colors.accentRed : Theme.Colors.textPrimary)
-                    metricCard(label: languageManager.t("stats.availability"), value: String(format: "%.1f%%", max(0, 100 - packetLoss)), color: Theme.Colors.accentGreen)
-                    metricCard(label: languageManager.t("stats.current_path"), value: pathLabel(currentPath), color: pathColor(currentPath))
-                    metricCard(label: languageManager.t("stats.path_flaps"), value: "\(pathFlaps)", color: pathFlaps > 1 ? Theme.Colors.accentOrange : Theme.Colors.textPrimary)
-                    metricCard(label: languageManager.t("stats.consecutive_failures"), value: "\(consecutiveFailures)", color: consecutiveFailures >= 3 ? Theme.Colors.accentRed : Theme.Colors.textPrimary)
-                    metricCard(label: languageManager.t("stats.requests"), value: "\(stats.totalPings)", color: Theme.Colors.textPrimary)
-                    metricCard(label: languageManager.t("stats.avg_latency"), value: String(format: "%.1fms", stats.avgLatency), color: Theme.Colors.accentPurple)
-                    metricCard(label: languageManager.t("stats.traffic"), value: stats.totalTraffic, color: Theme.Colors.accentCyan)
-                }
-            }
-        }
-    }
-
-    private func metricCard(label: String, value: String, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(label)
-                .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
-                .foregroundStyle(Theme.Colors.textSecondary)
-                .lineLimit(1)
-            Text(value)
-                .font(Theme.Fonts.number(Theme.Fonts.Size.body, weight: .semibold))
-                .foregroundStyle(color)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(10)
-        .background(Theme.Colors.cardBackground.opacity(0.55))
-        .cornerRadius(Theme.Radius.md)
-    }
-}
-
-private struct StatsWorstHostsCard: View {
-    let snapshots: [HostQualitySnapshot]
-    @ObservedObject private var languageManager = LanguageManager.shared
-
-    var body: some View {
-        statsPanel {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(languageManager.t("stats.worst_hosts"))
-                    .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .semibold))
-                    .foregroundStyle(Theme.Colors.textPrimary)
-
-                if snapshots.isEmpty {
-                    Text(languageManager.t("dashboard.no_data"))
-                        .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
-                        .foregroundStyle(Theme.Colors.textSecondary)
-                        .frame(maxWidth: .infinity, minHeight: 180)
-                } else {
-                    VStack(spacing: 10) {
-                        ForEach(snapshots) { snapshot in
-                            HStack(spacing: 10) {
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(snapshot.hostName)
-                                        .font(Theme.Fonts.ui(Theme.Fonts.Size.body, weight: .semibold))
-                                        .foregroundStyle(Theme.Colors.textPrimary)
-                                    Text(pathLabel(snapshot.pathKind))
-                                        .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
-                                        .foregroundStyle(pathColor(snapshot.pathKind))
-                                }
-                                Spacer()
-                                VStack(alignment: .trailing, spacing: 3) {
-                                    Text("\(snapshot.score)")
-                                        .font(Theme.Fonts.number(Theme.Fonts.Size.callout, weight: .bold))
-                                        .foregroundStyle(scoreColor(snapshot.score))
-                                    Text(snapshot.p95Latency.map { String(format: "P95 %.0fms", $0) } ?? "P95 —")
-                                        .font(Theme.Fonts.number(Theme.Fonts.Size.caption))
-                                        .foregroundStyle(Theme.Colors.textSecondary)
-                                }
-                            }
-                            .padding(10)
-                            .background(Theme.Colors.cardBackground.opacity(0.55))
-                            .cornerRadius(Theme.Radius.md)
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-private func statsPanel<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-    content()
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: Theme.Radius.xl)
-                .fill(.ultraThinMaterial)
-                .shadow(color: .black.opacity(0.05), radius: 8, y: 3)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.Radius.xl)
-                .stroke(Theme.Colors.cardBorder, lineWidth: 1)
-        )
-}
-
-@MainActor
-private func scoreColor(_ score: Int) -> Color {
-    Theme.Status.score(score)
-}
-
-@MainActor
-private func pathLabel(_ path: ProbePathKind) -> String {
-    let languageManager = LanguageManager.shared
-    switch path {
-    case .direct:
-        return languageManager.t("diagnostics.path.direct")
-    case .relay:
-        return languageManager.t("diagnostics.path.relay")
-    case .unknown:
-        return "—"
-    }
-}
-
-@MainActor
-private func pathColor(_ path: ProbePathKind) -> Color {
-    Theme.Status.path(path)
-}
-
-@MainActor
-private func windowLabel(_ window: NetworkQualityWindow) -> String {
-    let languageManager = LanguageManager.shared
-    switch window {
-    case .oneMinute:
-        return languageManager.t("dashboard.window_1m")
-    case .fiveMinutes:
-        return languageManager.t("dashboard.window_5m")
-    case .oneHour:
-        return languageManager.t("dashboard.window_1h")
     }
 }
 
@@ -1515,10 +639,9 @@ struct MonitorTab: View {
         ZStack {
             VStack(spacing: 0) {
                 // 工具栏
-                HStack {
-                    Text("\(languageManager.t("monitor.title")) (\(viewModel.hosts.count))")
-                        .font(.headline)
-                    Spacer()
+                ToolbarRow(
+                    title: "\(languageManager.t("monitor.title")) (\(viewModel.hosts.count))"
+                ) {
                     Button {
                         showingAddHost = true
                     } label: {
@@ -1527,51 +650,56 @@ struct MonitorTab: View {
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
                 }
-                .padding()
-                .background(.ultraThinMaterial)
-                
+                .padding(.horizontal, Theme.Space.pagePadding)
+                .padding(.top, Theme.Space.pageTopGap)
+                .padding(.bottom, Theme.Space.controlGap)
+
                 if viewModel.hosts.isEmpty {
                     ContentUnavailableView(languageManager.t("monitor.no_hosts"), systemImage: "network", description: Text(languageManager.t("monitor.add_host_hint")))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     ScrollView {
-                        // Insert Quick Access Services Ribbon here
-                        QuickAccessServicesRibbon(viewModel: viewModel)
-                        
-                        LazyVGrid(columns: [
-                            GridItem(.adaptive(minimum: 280, maximum: .infinity), spacing: 12)
-                        ], spacing: 12) {
-                            ForEach(viewModel.hosts) { host in
-                                EditableHostCard(
-                                    host: host,
-                                    viewModel: viewModel,
-                                    onEdit: {
-                                        editingHost = host
-                                        newHostName = host.name
-                                        newHostAddress = host.address
-                                        newHostCommand = host.command
-                                        newHostRules = host.displayRules
-                                        newHostProbeMode = host.probeMode
-                                        newHostTCPPort = host.tcpPort
-                                    },
-                                    onDelete: {
-                                        if let index = viewModel.hosts.firstIndex(where: { $0.id == host.id }) {
-                                            viewModel.removeHost(at: index)
+                        // 快捷服务条与主机网格各自成卡（解包原来的整页巨卡，消除"卡中卡"）。
+                        VStack(alignment: .leading, spacing: Theme.Space.sectionGap) {
+                            QuickAccessServicesRibbon(viewModel: viewModel)
+
+                            LazyVGrid(columns: [
+                                GridItem(.adaptive(minimum: 280, maximum: .infinity), spacing: Theme.Space.tileGap)
+                            ], spacing: Theme.Space.tileGap) {
+                                ForEach(viewModel.hosts) { host in
+                                    EditableHostCard(
+                                        host: host,
+                                        viewModel: viewModel,
+                                        onEdit: {
+                                            editingHost = host
+                                            newHostName = host.name
+                                            newHostAddress = host.address
+                                            newHostCommand = host.command
+                                            newHostRules = host.displayRules
+                                            newHostProbeMode = host.probeMode
+                                            newHostTCPPort = host.tcpPort
+                                        },
+                                        onDelete: {
+                                            if let index = viewModel.hosts.firstIndex(where: { $0.id == host.id }) {
+                                                viewModel.removeHost(at: index)
+                                            }
+                                        }
+                                    )
+                                    .onTapGesture {
+                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                            selectedHost = host
                                         }
                                     }
-                                )
-                                .onTapGesture {
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                        selectedHost = host
+                                    .onDrag {
+                                        NSItemProvider(object: host.id.uuidString as NSString)
                                     }
+                                    .onDrop(of: [.text], delegate: HostDropDelegate(item: host, viewModel: viewModel))
                                 }
-                                .onDrag {
-                                    NSItemProvider(object: host.id.uuidString as NSString)
-                                }
-                                .onDrop(of: [.text], delegate: HostDropDelegate(item: host, viewModel: viewModel))
                             }
+                            .padding(.top, Theme.Space.xs)
                         }
-                        .padding()
+                        .padding(.horizontal, Theme.Space.pagePadding)
+                        .padding(.bottom, Theme.Space.pagePadding)
                     }
                 }
             }
@@ -1680,7 +808,7 @@ struct QuickAccessServicesRibbon: View {
             VStack(spacing: 0) {
                 // Header — always visible
                 HStack(spacing: 0) {
-                    HStack(spacing: 5) {
+                    HStack(spacing: Theme.Space.xs) {
                         Image(systemName: "bolt.fill")
                             .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
                             .foregroundStyle(Theme.Colors.accentOrange)
@@ -1688,7 +816,7 @@ struct QuickAccessServicesRibbon: View {
                             .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote, weight: .semibold))
                             .foregroundStyle(Theme.Colors.textSecondary)
                     }
-                    .padding(.leading, 14)
+                    .padding(.leading, Theme.Space.lg)
 
                     Spacer()
 
@@ -1704,7 +832,7 @@ struct QuickAccessServicesRibbon: View {
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .padding(.trailing, 8)
+                    .padding(.trailing, Theme.Space.sm)
                 }
                 .frame(height: 36)
 
@@ -1713,31 +841,26 @@ struct QuickAccessServicesRibbon: View {
                     Rectangle()
                         .fill(Theme.Colors.separator)
                         .frame(height: 1)
-                        .padding(.horizontal, 14)
+                        .padding(.horizontal, Theme.Space.lg)
 
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: Theme.Space.xxs) {
                         ForEach(hostGroups, id: \.host.id) { group in
                             hostRow(group: group)
                         }
                     }
-                    .padding(.vertical, 6)
+                    .padding(.vertical, Theme.Space.xs)
                 }
             }
-            .background(Theme.Colors.cardBackground.opacity(0.42))
-            .overlay(
-                Rectangle()
-                    .fill(Theme.Colors.separator)
-                    .frame(height: 1),
-                alignment: .bottom
-            )
+            // 独立标准卡（原先嵌在整页巨卡里的半透明条，现与主机卡同级同观感）。
+            .card(padding: 0)
         }
     }
 
     @ViewBuilder
     private func hostRow(group: (host: HostConfig, shortcuts: [ServiceShortcut])) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: Theme.Space.controlGap) {
             // Status dot + host name (fixed-width label column)
-            HStack(spacing: 5) {
+            HStack(spacing: Theme.Space.xs) {
                 Circle()
                     .fill(hostStatusColor(group.host))
                     .frame(width: 6, height: 6)
@@ -1751,7 +874,7 @@ struct QuickAccessServicesRibbon: View {
 
             // All chips — horizontal scroll so every shortcut is reachable
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 4) {
+                HStack(spacing: Theme.Space.xs) {
                     ForEach(group.shortcuts) { shortcut in
                         serviceChip(shortcut: shortcut, host: group.host)
                     }
@@ -1759,7 +882,7 @@ struct QuickAccessServicesRibbon: View {
             }
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 4)
+        .padding(.vertical, Theme.Space.xs)
     }
 
     @ViewBuilder
@@ -1777,7 +900,7 @@ struct QuickAccessServicesRibbon: View {
                     .lineLimit(1)
                 typePill(shortcut.type)
             }
-            .padding(.horizontal, 8)
+            .padding(.horizontal, Theme.Space.sm)
             .padding(.vertical, 5)
             .background(serviceColor(for: shortcut.type).opacity(0.10))
             .cornerRadius(Theme.Radius.md)
@@ -1803,7 +926,7 @@ struct QuickAccessServicesRibbon: View {
             .font(Theme.Fonts.ui(Theme.Fonts.Size.micro, weight: .semibold))
             .foregroundStyle(serviceColor(for: type))
             .padding(.horizontal, 6)
-            .padding(.vertical, 2)
+            .padding(.vertical, Theme.Space.xxs)
             .background(serviceColor(for: type).opacity(0.12))
             .cornerRadius(Theme.Radius.pill)
     }
@@ -1938,54 +1061,31 @@ struct HostManagementTab: View {
     @ObservedObject var viewModel: PingMonitorViewModel
     @State private var selectedSection = 0
     @ObservedObject private var languageManager = LanguageManager.shared
-    @Namespace private var animation
     
     var body: some View {
         VStack(spacing: 0) {
-            // Custom Segmented Control
-            HStack(spacing: 0) {
-                customTabButton(title: "\(languageManager.t("host.manage.section.saved")) (\(viewModel.hosts.count))", section: 0)
-                customTabButton(title: "\(languageManager.t("host.manage.section.presets")) (\(viewModel.presets.count))", section: 1)
-            }
-            .padding(4)
-            .background(Theme.Colors.cardBackground)
-            .cornerRadius(Theme.Radius.md)
-            .padding()
-            
+            SegmentedSwitcher(
+                options: [0, 1],
+                selection: $selectedSection,
+                title: { section in
+                    section == 0
+                        ? languageManager.t("host.manage.section.saved")
+                        : languageManager.t("host.manage.section.presets")
+                },
+                count: { section in
+                    section == 0 ? viewModel.hosts.count : viewModel.presets.count
+                }
+            )
+            .padding(.horizontal, Theme.Space.pagePadding)
+            .padding(.top, Theme.Space.pageTopGap)
+            .padding(.bottom, Theme.Space.controlGap)
+
             if selectedSection == 0 {
                 HostsManagementView(viewModel: viewModel)
             } else {
                 PresetsManagementView(viewModel: viewModel)
             }
         }
-    }
-    
-    @ViewBuilder
-    private func customTabButton(title: String, section: Int) -> some View {
-        Button {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                selectedSection = section
-            }
-        } label: {
-            Text(title)
-                .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
-                .fontWeight(selectedSection == section ? .medium : .regular)
-                .foregroundStyle(selectedSection == section ? Theme.Colors.onAccent : Theme.Colors.textSecondary)
-                .padding(.vertical, 6)
-                .padding(.horizontal, 16)
-                .frame(maxWidth: .infinity)
-                .background(
-                    ZStack {
-                        if selectedSection == section {
-                            RoundedRectangle(cornerRadius: Theme.Radius.sm)
-                                .fill(Theme.Colors.accentBlue)
-                                .matchedGeometryEffect(id: "HostManageTabBackground", in: animation)
-                        }
-                    }
-                )
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
     }
 }
 
@@ -2006,7 +1106,7 @@ struct HostsManagementView: View {
         VStack(spacing: 0) {
             HStack {
                 Text(languageManager.t("sidebar.hosts"))
-                    .font(.caption)
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                     .foregroundStyle(Theme.Colors.textSecondary)
                 Spacer()
                 Button {
@@ -2018,7 +1118,7 @@ struct HostsManagementView: View {
                 .controlSize(.small)
             }
             .padding(.horizontal)
-            .padding(.bottom, 12)
+            .padding(.bottom, Theme.Space.md)
             
             if viewModel.hosts.isEmpty {
                 ContentUnavailableView(languageManager.t("host.manage.no_hosts"), systemImage: "server.rack", description: Text(languageManager.t("host.manage.add_hint")))
@@ -2026,8 +1126,8 @@ struct HostsManagementView: View {
             } else {
                 ScrollView {
                     LazyVGrid(columns: [
-                        GridItem(.adaptive(minimum: Theme.Layout.hostGridMinWidth), spacing: 12)
-                    ], spacing: 12) {
+                        GridItem(.adaptive(minimum: Theme.Layout.hostGridMinWidth), spacing: Theme.Space.md)
+                    ], spacing: Theme.Space.md) {
                         ForEach(viewModel.hosts) { host in
                             HostManagementCard(
                                 host: host,
@@ -2178,7 +1278,7 @@ struct HostManagementCard: View {
             }
             
             // Address
-            HStack(spacing: 4) {
+            HStack(spacing: Theme.Space.xs) {
                 Image(systemName: "globe")
                     .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
                     .foregroundStyle(Theme.Colors.textSecondary)
@@ -2190,12 +1290,12 @@ struct HostManagementCard: View {
             
             // Display rules
             if !host.displayRules.filter({ $0.enabled }).isEmpty {
-                HStack(spacing: 4) {
+                HStack(spacing: Theme.Space.xs) {
                     ForEach(host.displayRules.filter { $0.enabled }.prefix(3)) { rule in
                         Text("\(rule.condition == "less" ? "<" : ">")\(Int(rule.threshold))ms→\(rule.label)")
                             .font(Theme.Fonts.ui(Theme.Fonts.Size.micro, weight: .medium))
                             .padding(.horizontal, 5)
-                            .padding(.vertical, 2)
+                            .padding(.vertical, Theme.Space.xxs)
                             .background(
                                 Capsule()
                                     .fill(rule.condition == "less" ? Theme.Colors.accentGreen.opacity(0.15) : Theme.Colors.accentOrange.opacity(0.15))
@@ -2205,7 +1305,7 @@ struct HostManagementCard: View {
                 }
             }
 
-            HStack(spacing: 4) {
+            HStack(spacing: Theme.Space.xs) {
                 Image(systemName: host.probeMode == .tcp ? "cable.connector" : "waveform.path.ecg")
                     .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
                     .foregroundStyle(Theme.Colors.textSecondary)
@@ -2216,7 +1316,7 @@ struct HostManagementCard: View {
             
             // Custom command
             if !host.command.isEmpty {
-                HStack(spacing: 4) {
+                HStack(spacing: Theme.Space.xs) {
                     Image(systemName: "terminal")
                         .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
                         .foregroundStyle(Theme.Colors.accentPurple.opacity(0.7))
@@ -2228,17 +1328,9 @@ struct HostManagementCard: View {
             }
         }
         .frame(maxHeight: .infinity, alignment: .top)
-        .padding(14)
-        .background(
-            RoundedRectangle(cornerRadius: Theme.Radius.lg)
-                .fill(.ultraThinMaterial)
-                .shadow(color: .black.opacity(isHovered ? 0.08 : 0.03), radius: isHovered ? 8 : 4, y: 2)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.Radius.lg)
-                .stroke(isHovered ? Theme.Colors.accentBlue.opacity(0.15) : Theme.Colors.textTertiary.opacity(0.08), lineWidth: 1)
-        )
-        .scaleEffect(isHovered ? 1.01 : 1.0)
+        .padding(Theme.Space.md)
+        // 统一实心卡外壳：原材质卡是本页独有样式，深浅色下与其他卡片不一致（有意视觉变更）。
+        .hoverLift(isHovered: isHovered)
         .contextMenu {
             Button { onEdit() } label: { Label(languageManager.t("menu.edit"), systemImage: "pencil") }
             Divider()
@@ -2262,7 +1354,7 @@ struct PresetsManagementView: View {
         VStack(spacing: 0) {
             HStack {
                 Text(languageManager.t("host.manage.quick_add"))
-                    .font(.caption)
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                     .foregroundStyle(Theme.Colors.textSecondary)
                 Spacer()
                 Button {
@@ -2274,7 +1366,7 @@ struct PresetsManagementView: View {
                 .controlSize(.small)
             }
             .padding(.horizontal)
-            .padding(.bottom, 12)
+            .padding(.bottom, Theme.Space.md)
             
             if viewModel.presets.isEmpty {
                 ContentUnavailableView(languageManager.t("host.manage.no_presets"), systemImage: "bookmark", description: Text(languageManager.t("host.manage.add_preset_hint")))
@@ -2282,8 +1374,8 @@ struct PresetsManagementView: View {
             } else {
                 ScrollView {
                     LazyVGrid(columns: [
-                        GridItem(.adaptive(minimum: Theme.Layout.hostGridMinWidth), spacing: 12)
-                    ], spacing: 12) {
+                        GridItem(.adaptive(minimum: Theme.Layout.hostGridMinWidth), spacing: Theme.Space.md)
+                    ], spacing: Theme.Space.md) {
                         ForEach(viewModel.presets) { preset in
                             PresetManagementCard(
                                 preset: preset,
@@ -2381,7 +1473,7 @@ struct PresetManagementCard: View {
                 .help(languageManager.t("menu.add_to_monitor"))
             }
             
-            HStack(spacing: 4) {
+            HStack(spacing: Theme.Space.xs) {
                 Image(systemName: "globe")
                     .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
                     .foregroundStyle(Theme.Colors.textSecondary)
@@ -2392,7 +1484,7 @@ struct PresetManagementCard: View {
             }
             
             if !preset.command.isEmpty {
-                HStack(spacing: 4) {
+                HStack(spacing: Theme.Space.xs) {
                     Image(systemName: "terminal")
                         .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
                         .foregroundStyle(Theme.Colors.accentPurple.opacity(0.7))
@@ -2404,7 +1496,7 @@ struct PresetManagementCard: View {
             }
             
             // Action buttons
-            HStack(spacing: 8) {
+            HStack(spacing: Theme.Space.sm) {
                 Spacer()
                 Button { onEdit() } label: {
                     Image(systemName: "pencil.circle.fill")
@@ -2422,18 +1514,10 @@ struct PresetManagementCard: View {
             }
             .opacity(isHovered ? 1 : 0.2)
         }
-        .padding(14)
+        .padding(Theme.Space.md)
         .frame(height: 110, alignment: .top)
-        .background(
-            RoundedRectangle(cornerRadius: Theme.Radius.lg)
-                .fill(.ultraThinMaterial)
-                .shadow(color: .black.opacity(isHovered ? 0.08 : 0.03), radius: isHovered ? 8 : 4, y: 2)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.Radius.lg)
-                .stroke(isHovered ? Theme.Colors.accentOrange.opacity(0.15) : Theme.Colors.textTertiary.opacity(0.08), lineWidth: 1)
-        )
-        .scaleEffect(isHovered ? 1.01 : 1.0)
+        // 统一实心卡外壳：原材质卡是本页独有样式，深浅色下与其他卡片不一致（有意视觉变更）。
+        .hoverLift(isHovered: isHovered, accent: Theme.Colors.accentOrange)
         .contextMenu {
             Button { onAdd() } label: { Label(languageManager.t("menu.add_to_monitor"), systemImage: "plus.circle") }
             Button { onEdit() } label: { Label(languageManager.t("menu.edit"), systemImage: "pencil") }
@@ -2458,9 +1542,9 @@ struct HostEditorSheet: View {
     @ObservedObject private var languageManager = LanguageManager.shared
 
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: Theme.Space.lg) {
             Text(title)
-                .font(.headline)
+                .font(Theme.Fonts.ui(Theme.Fonts.Size.headline, weight: .semibold))
 
             ScrollView {
                 Form {
@@ -2486,13 +1570,13 @@ struct HostEditorSheet: View {
                             }
                         }
                         
-                        VStack(alignment: .leading, spacing: 4) {
+                        VStack(alignment: .leading, spacing: Theme.Space.xs) {
                             TextField(languageManager.t("editor.command"), text: $command)
                             Text(languageManager.t("editor.command_hint"))
-                                .font(.caption2)
+                                .font(Theme.Fonts.ui(Theme.Fonts.Size.micro))
                                 .foregroundStyle(Theme.Colors.textSecondary)
                             Text(languageManager.t("editor.command_follows_interval"))
-                                .font(.caption2)
+                                .font(Theme.Fonts.ui(Theme.Fonts.Size.micro))
                                 .foregroundStyle(Theme.Colors.accentBlue)
                         }
                     }
@@ -2533,7 +1617,7 @@ struct HostEditorSheet: View {
                 .disabled(name.isEmpty || address.isEmpty)
             }
         }
-        .padding()
+        .padding(Theme.Space.lg)
         .frame(width: 420, height: 500)
         .sheet(isPresented: $showingAddRule) {
             AddRuleSheet(isPresented: $showingAddRule, rules: $displayRules)
@@ -2556,23 +1640,24 @@ struct RuleEditorRow: View {
                 Spacer()
                 Button(role: .destructive, action: onDelete) {
                     Image(systemName: "trash")
-                        .font(.caption)
+                        .font(Theme.Fonts.icon(Theme.Fonts.Size.caption))
                 }
                 .buttonStyle(.borderless)
             }
             
             // Row 2: Condition + Threshold + Label (properly spaced)
-            HStack(spacing: 8) {
+            HStack(spacing: Theme.Space.sm) {
                 // Condition picker
                 Picker("", selection: $rule.condition) {
                     Text(languageManager.t("editor.rule.less")).tag("less")
                     Text(languageManager.t("editor.rule.greater")).tag("greater")
                 }
                 .pickerStyle(.segmented)
+                .controlSize(.small)
                 .frame(width: 90)
                 
                 // Threshold
-                HStack(spacing: 4) {
+                HStack(spacing: Theme.Space.xs) {
                     TextField("", value: $rule.threshold, format: .number)
                         .textFieldStyle(.roundedBorder)
                         .multilineTextAlignment(.center)
@@ -2596,7 +1681,7 @@ struct RuleEditorRow: View {
             }
             .frame(height: 28) // Force consistent height to fix vertical alignment
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, Theme.Space.sm)
     }
 }
 
@@ -2609,9 +1694,9 @@ struct AddRuleSheet: View {
     @ObservedObject private var languageManager = LanguageManager.shared
     
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: Theme.Space.xl) {
             Text(languageManager.t("editor.add_rule"))
-                .font(.headline)
+                .font(Theme.Fonts.ui(Theme.Fonts.Size.headline, weight: .semibold))
             
             Form {
                 Picker(languageManager.t("editor.rule.condition"), selection: $condition) {
@@ -2648,7 +1733,7 @@ struct AddRuleSheet: View {
                 .buttonStyle(.borderedProminent)
             }
         }
-        .padding()
+        .padding(Theme.Space.lg)
         .frame(width: 350)
     }
 }
@@ -2663,22 +1748,22 @@ struct PresetEditorSheet: View {
     @ObservedObject private var languageManager = LanguageManager.shared
 
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: Theme.Space.xl) {
             Text(title)
-                .font(.headline)
+                .font(Theme.Fonts.ui(Theme.Fonts.Size.headline, weight: .semibold))
 
             Form {
                 TextField(languageManager.t("editor.name"), text: $name)
                 TextField(languageManager.t("editor.address"), text: $address)
                     .textContentType(.URL)
                 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: Theme.Space.xs) {
                     TextField(languageManager.t("editor.command"), text: $command)
                     Text(languageManager.t("editor.command_hint"))
-                        .font(.caption2)
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.micro))
                         .foregroundStyle(Theme.Colors.textSecondary)
                     Text(languageManager.t("editor.command_follows_interval"))
-                        .font(.caption2)
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.micro))
                         .foregroundStyle(Theme.Colors.accentBlue)
                 }
             }
@@ -2700,7 +1785,7 @@ struct PresetEditorSheet: View {
                 .disabled(name.isEmpty || address.isEmpty)
             }
         }
-        .padding()
+        .padding(Theme.Space.lg)
         .frame(width: 380)
     }
 }
@@ -2722,8 +1807,13 @@ struct LogsTab: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                Picker(languageManager.t("logs.level"), selection: $selectedLevel) {
+            // 工具栏：统一的卡片式工具行（不用材质铺底），承载级别筛选 + 清空 / 导出。
+            HStack(spacing: Theme.Space.md) {
+                Text(languageManager.t("logs.level"))
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .semibold))
+                    .foregroundStyle(Theme.Colors.textPrimary)
+
+                Picker("", selection: $selectedLevel) {
                     Text(languageManager.t("logs.level.all")).tag(nil as LogManager.LogLevel?)
                     ForEach(LogManager.LogLevel.allCases, id: \.self) { level in
                         Text(languageManager.t("logs.level.\(level.rawValue.lowercased())")).tag(level as LogManager.LogLevel?)
@@ -2731,16 +1821,16 @@ struct LogsTab: View {
                 }
                 .pickerStyle(.segmented)
                 .fixedSize()
-                
+                .controlSize(.small)
+
                 Spacer()
-                
-                Button(action: {
-                    logManager.clear()
-                }) {
+
+                Button(action: { logManager.clear() }) {
                     Label(languageManager.t("logs.clear"), systemImage: "trash")
                 }
                 .buttonStyle(.borderless)
-                
+                .foregroundStyle(Theme.Colors.textSecondary)
+
                 Button(action: {
                     if let url = logManager.exportToFile() {
                         exportURL = url
@@ -2750,16 +1840,59 @@ struct LogsTab: View {
                     Label(languageManager.t("logs.export"), systemImage: "square.and.arrow.up")
                 }
                 .buttonStyle(.borderless)
+                .foregroundStyle(Theme.Colors.textSecondary)
             }
-            .padding()
-            .background(.ultraThinMaterial)
-            
-            List(filteredLogs.reversed()) { entry in
-                LogRow(entry: entry)
-                    .listRowSeparator(.visible)
+            .padding(.horizontal, Theme.Space.pagePadding)
+            .padding(.vertical, Theme.Space.md)
+
+            Divider()
+
+            // 表头行：列宽与 LogRow 共用 LogColumnWidths 唯一出处。
+            HStack(spacing: LogColumnWidths.rowSpacing) {
+                Text("")
+                    .frame(width: LogColumnWidths.marker)
+                Text(languageManager.t("logs.time"))
+                    .frame(width: LogColumnWidths.time, alignment: .leading)
+                Text(languageManager.t("logs.level"))
+                    .frame(width: LogColumnWidths.level, alignment: .leading)
+                Text(languageManager.t("logs.host"))
+                    .frame(width: LogColumnWidths.host, alignment: .leading)
+                Text(languageManager.t("logs.message"))
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .listStyle(.plain)
+            .font(Theme.Fonts.ui(Theme.Fonts.Size.caption, weight: .medium))
+            .foregroundStyle(Theme.Colors.textTertiary)
+            .padding(.horizontal, Theme.Space.lg)
+            .padding(.vertical, Theme.Space.sm)
+            .background(Theme.Colors.surfaceOverlay)
+
+            Divider()
+
+            ScrollView {
+                if filteredLogs.isEmpty {
+                    ContentUnavailableView(languageManager.t("logs.empty"), systemImage: "doc.text")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    LazyVStack(spacing: 0) {
+                        ForEach(filteredLogs.reversed()) { entry in
+                            LogRow(entry: entry)
+                                .padding(.horizontal, Theme.Space.lg)
+                            Divider()
+                                .padding(.leading, Theme.Space.lg)
+                        }
+                    }
+                }
+            }
         }
+        .background(Theme.Colors.cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.Radius.lg)
+                .stroke(Theme.Colors.cardBorder, lineWidth: 1)
+        )
+        .padding(.horizontal, Theme.Layout.cardPadding)
+        .padding(.top, Theme.Layout.cardPadding)
+        .padding(.bottom, Theme.Layout.cardPadding)
         .fileExporter(
             isPresented: $showingExportSheet,
             document: LogFileDocument(url: exportURL),
@@ -2782,37 +1915,37 @@ struct LogRow: View {
     }
     
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: LogColumnWidths.rowSpacing) {
             Circle()
                 .fill(levelColor)
-                .frame(width: 6, height: 6)
-            
-            HStack(alignment: .top, spacing: 12) {
-                Text(entry.formattedTimestamp)
-                    .font(Theme.Fonts.number(Theme.Fonts.Size.caption))
-                    .foregroundStyle(.tertiary)
-                    .frame(width: 130, alignment: .leading)
-                
-                Text(languageManager.t("logs.level.\(entry.level.rawValue.lowercased())"))
-                    .font(Theme.Fonts.ui(Theme.Fonts.Size.micro, weight: .bold))
-                    .foregroundStyle(levelColor)
-                    .frame(width: 50, alignment: .leading)
-                
-                VStack(alignment: .leading, spacing: 3) {
-                    if let host = entry.host {
-                        Text(host)
-                            .font(Theme.Fonts.ui(Theme.Fonts.Size.caption, weight: .medium))
-                            .foregroundStyle(Theme.Colors.textSecondary)
-                            .lineLimit(1)
-                    }
-                    Text(entry.message)
-                        .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
-                        .foregroundStyle(Theme.Colors.textPrimary)
-                        .textSelection(.enabled)
-                }
-            }
+                .frame(width: 7, height: 7)
+                .frame(width: LogColumnWidths.marker, alignment: .center)
+
+            Text(entry.formattedTimestamp)
+                .font(Theme.Fonts.number(Theme.Fonts.Size.caption))
+                .foregroundStyle(Theme.Colors.textSecondary)
+                .frame(width: LogColumnWidths.time, alignment: .leading)
+
+            Text(languageManager.t("logs.level.\(entry.level.rawValue.lowercased())"))
+                .font(Theme.Fonts.ui(Theme.Fonts.Size.caption, weight: .semibold))
+                .foregroundStyle(levelColor)
+                .frame(width: LogColumnWidths.level, alignment: .leading)
+
+            Text(entry.host ?? "-")
+                .font(Theme.Fonts.number(Theme.Fonts.Size.caption, weight: .medium)) // 主机名走等宽数字字体，与时间列纵向对齐
+                .foregroundStyle(entry.host == nil ? Theme.Colors.textTertiary : Theme.Colors.textSecondary)
+                .lineLimit(1)
+                .frame(width: LogColumnWidths.host, alignment: .leading)
+
+            Text(entry.message)
+                .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
+                .foregroundStyle(Theme.Colors.textPrimary)
+                .lineLimit(2) // 消息最多两行截断；完整内容以导出文件为准
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.vertical, 3)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, Theme.Space.sm)
     }
 }
 
@@ -2847,77 +1980,72 @@ struct SettingsTab: View {
     @ObservedObject private var tailscale = TailscaleManager.shared
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                // MARK: - General
-                ModernCard {
-                    VStack(alignment: .leading, spacing: 16) {
-                        SectionHeader(title: languageManager.t("settings.section.system"), icon: "gear")
-                        
-                        HStack {
-                            Text(languageManager.t("settings.language"))
-                            Spacer()
-                            Picker("", selection: $languageManager.currentLanguage) {
-                                Text("中文").tag(Language.zh)
-                                Text("English").tag(Language.en)
-                            }
-                            .pickerStyle(.segmented)
-                            .frame(width: 220, alignment: .trailing)
-                            .onChange(of: languageManager.currentLanguage) { _, newValue in
-                                LogManager.shared.info("Language changed to \(newValue.rawValue)")
-                                languageManager.languageString = newValue.rawValue
-                            }
+        ScrollPage {
+            // MARK: - General
+            ModernCard {
+                VStack(alignment: .leading, spacing: Theme.Space.lg) {
+                    SectionHeader(title: languageManager.t("settings.section.system"), icon: "gear")
+
+                    SettingsRow(label: languageManager.t("settings.language")) {
+                        Picker("", selection: $languageManager.currentLanguage) {
+                            Text("中文").tag(Language.zh)
+                            Text("English").tag(Language.en)
                         }
-                        
-                        Divider()
-                        
-                        HStack {
-                            Text(languageManager.t("settings.appearance"))
-                            Spacer()
-                            Picker("", selection: $viewModel.appAppearance) {
-                                Text(languageManager.t("settings.appearance.light")).tag("light")
-                                Text(languageManager.t("settings.appearance.system")).tag("system")
-                                Text(languageManager.t("settings.appearance.dark")).tag("dark")
-                            }
-                            .pickerStyle(.segmented)
-                            .frame(width: 220, alignment: .trailing)
-                            .onChange(of: viewModel.appAppearance) { _, newValue in
-                                LogManager.shared.info("Appearance changed to \(newValue)")
-                                viewModel.saveSettings()
-                            }
+                        .pickerStyle(.segmented)
+                        .onChange(of: languageManager.currentLanguage) { _, newValue in
+                            LogManager.shared.info("Language changed to \(newValue.rawValue)")
+                            languageManager.languageString = newValue.rawValue
                         }
-                        
-                        Divider()
-                        
-                        Toggle(languageManager.t("settings.auto_start"), isOn: $viewModel.autoStart)
+                    }
+
+                    Divider()
+
+                    SettingsRow(label: languageManager.t("settings.appearance")) {
+                        Picker("", selection: $viewModel.appAppearance) {
+                            Text(languageManager.t("settings.appearance.light")).tag("light")
+                            Text(languageManager.t("settings.appearance.system")).tag("system")
+                            Text(languageManager.t("settings.appearance.dark")).tag("dark")
+                        }
+                        .pickerStyle(.segmented)
+                        .onChange(of: viewModel.appAppearance) { _, newValue in
+                            LogManager.shared.info("Appearance changed to \(newValue)")
+                            viewModel.saveSettings()
+                        }
+                    }
+
+                    Divider()
+
+                    SettingsRow(label: languageManager.t("settings.auto_start")) {
+                        Toggle("", isOn: $viewModel.autoStart)
+                            .labelsHidden()
                             .onChange(of: viewModel.autoStart) { _, newValue in
                                 viewModel.toggleAutoStart(newValue)
                             }
+                    }
 
-                        Divider()
+                    Divider()
 
-                        Toggle(languageManager.t("settings.tailscale"), isOn: $enableTailscale)
+                    SettingsRow(
+                        label: languageManager.t("settings.tailscale"),
+                        description: tailscaleIntegrationStatus
+                    ) {
+                        Toggle("", isOn: $enableTailscale)
+                            .labelsHidden()
                             .help(languageManager.t("settings.tailscale.help"))
                             .onChange(of: enableTailscale) { _, newValue in
                                 TailscaleManager.shared.setEnabled(newValue)
                             }
+                    }
 
-                        Text(tailscaleIntegrationStatus)
-                            .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
+                    Divider()
+
+                    SettingsRow(label: languageManager.t("settings.version")) {
+                        Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "2.0") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"))")
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
                             .foregroundStyle(Theme.Colors.textSecondary)
-                            .padding(.top, -8)
-
-                        Divider()
-
-                        HStack {
-                            Text(languageManager.t("settings.version"))
-                            Spacer()
-                            Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "2.0") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"))")
-                                .foregroundStyle(Theme.Colors.textSecondary)
-                                .frame(width: 220, alignment: .trailing)
-                        }
                     }
                 }
+            }
 
                 // MARK: - Tailscale 全局监管凭据
                 if enableTailscale {
@@ -2926,12 +2054,13 @@ struct SettingsTab: View {
 
                 // MARK: - Display (Status Bar & Widget)
                 ModernCard {
-                    VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: Theme.Space.lg) {
                         SectionHeader(title: languageManager.t("settings.section.status_bar"), icon: "menubar.rectangle")
-                        
-                        HStack {
-                            Text(languageManager.t("settings.display_mode"))
-                            Spacer()
+
+                        SettingsRow(
+                            label: languageManager.t("settings.display_mode"),
+                            description: statusBarDescription
+                        ) {
                             Picker("", selection: $viewModel.statusBarDisplayMode) {
                                 Text(languageManager.t("settings.display.average")).tag(StatusBarDisplayMode.average)
                                 Text(languageManager.t("settings.display.worst")).tag(StatusBarDisplayMode.worst)
@@ -2939,23 +2068,17 @@ struct SettingsTab: View {
                                 Text(languageManager.t("settings.display.first")).tag(StatusBarDisplayMode.first)
                             }
                             .pickerStyle(.segmented)
-                            .frame(width: 220, alignment: .trailing)
                             .onChange(of: viewModel.statusBarDisplayMode) { _, newValue in
                                 LogManager.shared.info("Display mode changed to \(newValue.rawValue)")
                                 viewModel.saveSettings()
                             }
                         }
-                        
-                        Text(statusBarDescription)
-                            .font(.caption)
-                            .foregroundStyle(Theme.Colors.textSecondary)
-                            .padding(.top, -8)
-                        
+
                         let activeMenuCount = [viewModel.showIconInMenu, viewModel.showLatencyInMenu, viewModel.showLabelsInMenu, viewModel.showSpeedInMenu].filter { $0 }.count
-                        
+
                         Divider()
-                        
-                        HStack(spacing: 24) {
+
+                        HStack(spacing: Theme.Space.xxl) {
                             Toggle(languageManager.t("settings.show_icon"), isOn: $viewModel.showIconInMenu)
                                 .disabled((viewModel.showIconInMenu && activeMenuCount <= 1) || (!viewModel.showIconInMenu && activeMenuCount >= 3))
                                 .onChange(of: viewModel.showIconInMenu) { _, newValue in
@@ -2987,240 +2110,131 @@ struct SettingsTab: View {
                         
                         if viewModel.showSpeedInMenu {
                             Divider()
-                            HStack {
-                                Text(languageManager.t("settings.speed_unit"))
-                                Spacer()
+                            SettingsRow(label: languageManager.t("settings.speed_unit")) {
                                 Picker("", selection: $viewModel.speedUnit) {
                                     Text(languageManager.t("settings.speed_unit.auto")).tag("auto")
                                     Text("KB/s").tag("KB")
                                     Text("MB/s").tag("MB")
                                 }
                                 .pickerStyle(.segmented)
-                                .frame(width: 220, alignment: .trailing)
                                 .onChange(of: viewModel.speedUnit) { _, newValue in
                                     LogManager.shared.info("Speed unit changed to \(newValue)")
                                     viewModel.saveSettings()
                                 }
                             }
                         }
-                        
+
                         if viewModel.showIconInMenu {
                             Divider()
-                            HStack {
-                                Text(languageManager.t("settings.icon_width"))
-                                Spacer()
-                                HStack(spacing: 8) {
-                                    Button {
-                                        if viewModel.statusBarIconWidth > 10 {
-                                            viewModel.statusBarIconWidth -= 2
-                                            viewModel.saveSettings()
-                                        }
-                                    } label: { Image(systemName: "minus.circle").font(Theme.Fonts.icon(Theme.Fonts.Size.headline)) }
-                                    .buttonStyle(.borderless)
-                                    .disabled(viewModel.statusBarIconWidth <= 10)
-                                    
-                                    Text("\(viewModel.statusBarIconWidth)")
-                                        .font(.system(.body, design: .monospaced))
-                                        .frame(width: 36, alignment: .center)
-                                    
-                                    Button {
-                                        if viewModel.statusBarIconWidth < 100 {
-                                            viewModel.statusBarIconWidth += 2
-                                            viewModel.saveSettings()
-                                        }
-                                    } label: { Image(systemName: "plus.circle").font(Theme.Fonts.icon(Theme.Fonts.Size.headline)) }
-                                    .buttonStyle(.borderless)
-                                    .disabled(viewModel.statusBarIconWidth >= 100)
-                                }
-                                .frame(width: 220, alignment: .trailing)
+                            StepperRow(
+                                label: languageManager.t("settings.icon_width"),
+                                value: viewModel.statusBarIconWidth,
+                                range: 10...100,
+                                step: 2
+                            ) { delta in
+                                viewModel.statusBarIconWidth += delta
+                                viewModel.saveSettings()
                             }
                         }
-                        
+
                         if viewModel.showLatencyInMenu {
                             Divider()
-                            HStack {
-                                Text(languageManager.t("settings.latency_width"))
-                                Spacer()
-                                HStack(spacing: 8) {
-                                    Button {
-                                        if viewModel.statusBarLatencyWidth > 20 {
-                                            viewModel.statusBarLatencyWidth -= 5
-                                            viewModel.saveSettings()
-                                        }
-                                    } label: { Image(systemName: "minus.circle").font(Theme.Fonts.icon(Theme.Fonts.Size.headline)) }
-                                    .buttonStyle(.borderless)
-                                    .disabled(viewModel.statusBarLatencyWidth <= 20)
-                                    
-                                    Text("\(viewModel.statusBarLatencyWidth)")
-                                        .font(.system(.body, design: .monospaced))
-                                        .frame(width: 36, alignment: .center)
-                                    
-                                    Button {
-                                        if viewModel.statusBarLatencyWidth < 200 {
-                                            viewModel.statusBarLatencyWidth += 5
-                                            viewModel.saveSettings()
-                                        }
-                                    } label: { Image(systemName: "plus.circle").font(Theme.Fonts.icon(Theme.Fonts.Size.headline)) }
-                                    .buttonStyle(.borderless)
-                                    .disabled(viewModel.statusBarLatencyWidth >= 200)
-                                }
-                                .frame(width: 220, alignment: .trailing)
+                            StepperRow(
+                                label: languageManager.t("settings.latency_width"),
+                                value: viewModel.statusBarLatencyWidth,
+                                range: 20...200,
+                                step: 5
+                            ) { delta in
+                                viewModel.statusBarLatencyWidth += delta
+                                viewModel.saveSettings()
                             }
                         }
-                        
+
                         if viewModel.showLabelsInMenu {
                             Divider()
-                            HStack {
-                                Text(languageManager.t("settings.label_width"))
-                                Spacer()
-                                HStack(spacing: 8) {
-                                    Button {
-                                        if viewModel.statusBarLabelWidth > 20 {
-                                            viewModel.statusBarLabelWidth -= 5
-                                            viewModel.saveSettings()
-                                        }
-                                    } label: { Image(systemName: "minus.circle").font(Theme.Fonts.icon(Theme.Fonts.Size.headline)) }
-                                    .buttonStyle(.borderless)
-                                    .disabled(viewModel.statusBarLabelWidth <= 20)
-                                    
-                                    Text("\(viewModel.statusBarLabelWidth)")
-                                        .font(.system(.body, design: .monospaced))
-                                        .frame(width: 36, alignment: .center)
-                                    
-                                    Button {
-                                        if viewModel.statusBarLabelWidth < 200 {
-                                            viewModel.statusBarLabelWidth += 5
-                                            viewModel.saveSettings()
-                                        }
-                                    } label: { Image(systemName: "plus.circle").font(Theme.Fonts.icon(Theme.Fonts.Size.headline)) }
-                                    .buttonStyle(.borderless)
-                                    .disabled(viewModel.statusBarLabelWidth >= 200)
-                                }
-                                .frame(width: 220, alignment: .trailing)
+                            StepperRow(
+                                label: languageManager.t("settings.label_width"),
+                                value: viewModel.statusBarLabelWidth,
+                                range: 20...200,
+                                step: 5
+                            ) { delta in
+                                viewModel.statusBarLabelWidth += delta
+                                viewModel.saveSettings()
                             }
                         }
-                        
+
                         if viewModel.showSpeedInMenu {
                             Divider()
-                            HStack {
-                                Text(languageManager.t("settings.speed_width"))
-                                Spacer()
-                                HStack(spacing: 8) {
-                                    Button {
-                                        if viewModel.statusBarSpeedWidth > 40 {
-                                            viewModel.statusBarSpeedWidth -= 5
-                                            viewModel.saveSettings()
-                                        }
-                                    } label: { Image(systemName: "minus.circle").font(Theme.Fonts.icon(Theme.Fonts.Size.headline)) }
-                                    .buttonStyle(.borderless)
-                                    .disabled(viewModel.statusBarSpeedWidth <= 40)
-                                    
-                                    Text("\(viewModel.statusBarSpeedWidth)")
-                                        .font(.system(.body, design: .monospaced))
-                                        .frame(width: 36, alignment: .center)
-                                    
-                                    Button {
-                                        if viewModel.statusBarSpeedWidth < 250 {
-                                            viewModel.statusBarSpeedWidth += 5
-                                            viewModel.saveSettings()
-                                        }
-                                    } label: { Image(systemName: "plus.circle").font(Theme.Fonts.icon(Theme.Fonts.Size.headline)) }
-                                    .buttonStyle(.borderless)
-                                    .disabled(viewModel.statusBarSpeedWidth >= 250)
-                                }
-                                .frame(width: 220, alignment: .trailing)
+                            StepperRow(
+                                label: languageManager.t("settings.speed_width"),
+                                value: viewModel.statusBarSpeedWidth,
+                                range: 40...250,
+                                step: 5
+                            ) { delta in
+                                viewModel.statusBarSpeedWidth += delta
+                                viewModel.saveSettings()
                             }
                         }
-                        
+
                         Divider()
-                        
-                        HStack {
-                            Text(languageManager.t("settings.font_size"))
-                            Spacer()
-                            HStack(spacing: 8) {
-                                Button {
-                                    if viewModel.statusBarFontSize > 6 {
-                                        viewModel.statusBarFontSize -= 1
-                                        viewModel.saveSettings()
-                                    }
-                                } label: { Image(systemName: "minus.circle").font(Theme.Fonts.icon(Theme.Fonts.Size.headline)) }
-                                .buttonStyle(.borderless)
-                                .disabled(viewModel.statusBarFontSize <= 6)
-                                
-                                Text("\(viewModel.statusBarFontSize)")
-                                    .font(.system(.body, design: .monospaced))
-                                    .frame(width: 36, alignment: .center)
-                                
-                                Button {
-                                    if viewModel.statusBarFontSize < 18 {
-                                        viewModel.statusBarFontSize += 1
-                                        viewModel.saveSettings()
-                                    }
-                                } label: { Image(systemName: "plus.circle").font(Theme.Fonts.icon(Theme.Fonts.Size.headline)) }
-                                .buttonStyle(.borderless)
-                                .disabled(viewModel.statusBarFontSize >= 18)
-                            }
-                            .frame(width: 220, alignment: .trailing)
+
+                        StepperRow(
+                            label: languageManager.t("settings.font_size"),
+                            value: viewModel.statusBarFontSize,
+                            range: 6...18,
+                            step: 1
+                        ) { delta in
+                            viewModel.statusBarFontSize += delta
+                            viewModel.saveSettings()
                         }
-                        
+
                         Divider()
-                        
-                        HStack {
-                            Text(languageManager.t("settings.font_weight"))
-                            Spacer()
+
+                        SettingsRow(label: languageManager.t("settings.font_weight")) {
                             Picker("", selection: $viewModel.statusBarFontWeight) {
                                 Text(languageManager.t("settings.font_weight.regular")).tag("regular")
                                 Text(languageManager.t("settings.font_weight.medium")).tag("medium")
                                 Text(languageManager.t("settings.font_weight.bold")).tag("bold")
                             }
                             .pickerStyle(.segmented)
-                            .frame(width: 220, alignment: .trailing)
                             .onChange(of: viewModel.statusBarFontWeight) { _, newValue in
                                 LogManager.shared.info("Status bar font weight changed to \(newValue)")
                                 viewModel.saveSettings()
                             }
                         }
-                        
+
                         Divider()
-                        
-                        HStack {
-                            Text(languageManager.t("settings.status_bar_color"))
-                            Spacer()
+
+                        SettingsRow(label: languageManager.t("settings.status_bar_color")) {
                             Picker("", selection: $viewModel.statusBarColorMode) {
                                 Text(languageManager.t("settings.status_bar_color.auto")).tag("auto")
                                 Text(languageManager.t("settings.status_bar_color.light")).tag("light")
                                 Text(languageManager.t("settings.status_bar_color.dark")).tag("dark")
                             }
                             .pickerStyle(.segmented)
-                            .frame(width: 220, alignment: .trailing)
                             .onChange(of: viewModel.statusBarColorMode) { _, newValue in
                                 LogManager.shared.info("Status bar color mode changed to \(newValue)")
                                 viewModel.saveSettings()
                             }
                         }
-                        
+
                         Divider()
-                        
-                        HStack {
-                            Text(languageManager.t("settings.widget.mode"))
-                            Spacer()
+
+                        SettingsRow(label: languageManager.t("settings.widget.mode")) {
                             Picker("", selection: $viewModel.widgetDisplayMode) {
                                 Text(languageManager.t("settings.widget.auto")).tag("auto")
                                 Text(languageManager.t("settings.widget.specific")).tag("specific")
                             }
                             .pickerStyle(.segmented)
-                            .frame(width: 220, alignment: .trailing)
                             .onChange(of: viewModel.widgetDisplayMode) { _, newValue in
                                 LogManager.shared.info("Widget display mode changed to \(newValue)")
                                 viewModel.syncToWidget()
                             }
                         }
-                        
+
                         if viewModel.widgetDisplayMode == "specific" {
                             Divider()
-                            HStack {
-                                Text(languageManager.t("settings.widget.select_host"))
-                                Spacer()
+                            SettingsRow(label: languageManager.t("settings.widget.select_host")) {
                                 Picker("", selection: $viewModel.widgetSelectedHostId) {
                                     Text(languageManager.t("settings.widget.none")).tag("")
                                     ForEach(viewModel.hosts) { host in
@@ -3228,7 +2242,6 @@ struct SettingsTab: View {
                                     }
                                 }
                                 .pickerStyle(.menu)
-                                .frame(width: 220, alignment: .trailing)
                                 .onChange(of: viewModel.widgetSelectedHostId) { _, newValue in
                                     LogManager.shared.info("Widget host changed to \(newValue)")
                                     viewModel.syncToWidget()
@@ -3240,12 +2253,10 @@ struct SettingsTab: View {
                 
                 // MARK: - Monitor & Logs
                 ModernCard {
-                    VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: Theme.Space.lg) {
                         SectionHeader(title: languageManager.t("settings.section.monitor"), icon: "waveform.path.ecg")
-                        
-                        HStack {
-                            Text(languageManager.t("settings.interval"))
-                            Spacer()
+
+                        SettingsRow(label: languageManager.t("settings.interval")) {
                             Picker("", selection: $viewModel.pingInterval) {
                                 Text(languageManager.t("settings.interval.3s")).tag(3.0)
                                 Text(languageManager.t("settings.interval.5s")).tag(5.0)
@@ -3254,25 +2265,21 @@ struct SettingsTab: View {
                                 Text(languageManager.t("settings.interval.30s")).tag(30.0)
                             }
                             .pickerStyle(.segmented)
-                            .frame(width: 220, alignment: .trailing)
                             .onChange(of: viewModel.pingInterval) { _, newValue in
                                 LogManager.shared.info("Ping interval changed to \(Int(newValue))s")
                                 viewModel.applyPingIntervalChange()
                             }
                         }
-                        
+
                         Divider()
-                        
-                        HStack {
-                            Text(languageManager.t("logs.level"))
-                            Spacer()
+
+                        SettingsRow(label: languageManager.t("logs.level")) {
                             Picker("", selection: $viewModel.logLevel) {
                                 ForEach(LogManager.LogLevel.allCases, id: \.self) { level in
                                     Text(languageManager.t("logs.level.\(level.rawValue.lowercased())")).tag(level)
                                 }
                             }
                             .pickerStyle(.segmented)
-                            .frame(width: 220, alignment: .trailing)
                             .onChange(of: viewModel.logLevel) { _, newValue in
                                 LogManager.shared.info("Log level changed to \(newValue.rawValue)")
                                 viewModel.saveSettings()
@@ -3280,44 +2287,41 @@ struct SettingsTab: View {
                         }
                     }
                 }
-                
+
                 // MARK: - Notifications
                 ModernCard {
-                    VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: Theme.Space.lg) {
                         SectionHeader(title: languageManager.t("settings.section.notify"), icon: "bell.badge.fill")
-                        
-                        Toggle(languageManager.t("settings.notify.enable"), isOn: $viewModel.notificationEnabled)
-                            .onChange(of: viewModel.notificationEnabled) { _, newValue in
-                                LogManager.shared.info("Notifications enabled: \(newValue)")
-                                viewModel.saveSettings()
-                            }
-                        
+
+                        SettingsRow(label: languageManager.t("settings.notify.enable")) {
+                            Toggle("", isOn: $viewModel.notificationEnabled)
+                                .labelsHidden()
+                                .onChange(of: viewModel.notificationEnabled) { _, newValue in
+                                    LogManager.shared.info("Notifications enabled: \(newValue)")
+                                    viewModel.saveSettings()
+                                }
+                        }
+
                         if viewModel.notificationEnabled {
                             Divider()
-                            
-                            HStack {
-                                Text(languageManager.t("settings.notify.type"))
-                                Spacer()
+
+                            SettingsRow(label: languageManager.t("settings.notify.type")) {
                                 Picker("", selection: $viewModel.notificationType) {
                                     Text(languageManager.t("settings.notify.system")).tag("system")
                                     Text(languageManager.t("settings.notify.bark")).tag("bark")
                                 }
                                 .pickerStyle(.segmented)
-                                .frame(width: 220, alignment: .trailing)
                                 .onChange(of: viewModel.notificationType) { _, newValue in
                                     LogManager.shared.info("Notification type changed to \(newValue)")
                                     viewModel.saveSettings()
                                 }
                             }
-                            
+
                             if viewModel.notificationType == "bark" {
                                 Divider()
-                                HStack {
-                                    Text("Bark URL")
-                                    Spacer()
+                                SettingsRow(label: "Bark URL") {
                                     TextField("https://api.day.app/...", text: $viewModel.barkURL)
                                         .textFieldStyle(.roundedBorder)
-                                        .frame(width: 220, alignment: .trailing)
                                         .onChange(of: viewModel.barkURL) { _, _ in
                                             viewModel.saveSettings()
                                         }
@@ -3327,11 +2331,7 @@ struct SettingsTab: View {
                     }
                 }
             }
-            .padding(Theme.Layout.cardPadding)
-        }
-        .background(Theme.Colors.background)
-        .padding()
-        .onAppear {
+            .onAppear {
             // 安装 Tailscale 后无需重启应用：打开设置页即重新检测 CLI。
             if enableTailscale { TailscaleManager.shared.detectCLI() }
         }
@@ -3361,6 +2361,45 @@ struct SettingsTab: View {
             return languageManager.t("settings.tailscale.status.control_plane")
         }
         return languageManager.t("settings.tailscale.status.not_detected")
+    }
+}
+
+/// 设置页步进行：− / 值 / + 三段控件，右缘对齐 SettingsRow 的控件槽。
+/// 仅设置页使用，不进公共组件层。
+private struct StepperRow: View {
+    let label: String
+    let value: Int
+    let range: ClosedRange<Int>
+    let step: Int
+    /// delta 为 ±step；调用方负责改值并持久化。
+    let onStep: (Int) -> Void
+
+    var body: some View {
+        SettingsRow(label: label) {
+            HStack(spacing: Theme.Space.sm) {
+                Button {
+                    onStep(-step)
+                } label: {
+                    Image(systemName: "minus.circle")
+                        .font(Theme.Fonts.icon(Theme.Fonts.Size.headline))
+                }
+                .buttonStyle(.borderless)
+                .disabled(value <= range.lowerBound)
+
+                Text("\(value)")
+                    .font(Theme.Fonts.number(Theme.Fonts.Size.body))
+                    .frame(width: 36, alignment: .center)
+
+                Button {
+                    onStep(step)
+                } label: {
+                    Image(systemName: "plus.circle")
+                        .font(Theme.Fonts.icon(Theme.Fonts.Size.headline))
+                }
+                .buttonStyle(.borderless)
+                .disabled(value >= range.upperBound)
+            }
+        }
     }
 }
 

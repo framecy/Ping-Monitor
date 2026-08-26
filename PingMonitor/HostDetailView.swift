@@ -180,7 +180,7 @@ struct HostDetailView: View {
     // MARK: - Header
     
     private var headerView: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Theme.Space.md) {
             Button(action: onClose) {
                 HStack(spacing: 6) {
                     Image(systemName: "chevron.left")
@@ -240,8 +240,8 @@ struct HostDetailView: View {
                 }
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.horizontal, Theme.Space.lg)
+        .padding(.vertical, Theme.Space.md)
         .background(.ultraThinMaterial)
     }
     
@@ -249,7 +249,7 @@ struct HostDetailView: View {
     
     private var statusCard: some View {
         ModernCard {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: Theme.Space.md) {
                 HStack {
                     Image(systemName: "antenna.radiowaves.left.and.right")
                         .foregroundStyle(Theme.Colors.accentBlue)
@@ -259,8 +259,8 @@ struct HostDetailView: View {
                     Spacer()
                 }
                 
-                HStack(spacing: 20) {
-                    VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: Theme.Space.xl) {
+                    VStack(alignment: .leading, spacing: Theme.Space.xs) {
                         Text(languageManager.t("host_detail.status"))
                             .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                             .foregroundStyle(Theme.Colors.textSecondary)
@@ -276,7 +276,7 @@ struct HostDetailView: View {
                     
                     Divider().frame(height: 30).opacity(0.3)
                     
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: Theme.Space.xs) {
                         Text(languageManager.t("host_detail.uptime"))
                             .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                             .foregroundStyle(Theme.Colors.textSecondary)
@@ -294,7 +294,7 @@ struct HostDetailView: View {
                 
                 Spacer()
                 
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: Theme.Space.sm) {
                     diagnosticInfoRow(
                         title: languageManager.t("host_detail.probe_mode"),
                         icon: currentHost?.probeMode == .tcp ? "cable.connector" : "waveform.path.ecg",
@@ -349,7 +349,7 @@ struct HostDetailView: View {
 
     @ViewBuilder
     private func diagnosticInfoRow(title: String, icon: String, text: String, color: Color) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
+        HStack(alignment: .firstTextBaseline, spacing: Theme.Space.sm) {
             Text(title)
                 .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                 .foregroundStyle(Theme.Colors.textSecondary)
@@ -374,7 +374,7 @@ struct HostDetailView: View {
     
     private var latencyStatsCard: some View {
         ModernCard {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: Theme.Space.md) {
                 HStack {
                     Image(systemName: "gauge.with.dots.needle.67percent")
                         .foregroundStyle(Theme.Colors.accentGreen)
@@ -390,19 +390,19 @@ struct HostDetailView: View {
                         value: currentHost?.lastLatency != nil ? "\(Int(currentHost!.lastLatency!)) ms" : "--",
                         color: currentHost?.lastLatency != nil ? latencyColor(currentHost!.lastLatency!) : Theme.Colors.textTertiary
                     )
-                    Divider().frame(height: 30).padding(.horizontal, 8).opacity(0.3)
+                    Divider().frame(height: 30).padding(.horizontal, Theme.Space.sm).opacity(0.3)
                     DetailStatItem(
                         label: languageManager.t("host_detail.min"),
                         value: stats?.minLatency != nil ? String(format: "%.1f ms", stats!.minLatency!) : "--",
                         color: Theme.Colors.accentGreen
                     )
-                    Divider().frame(height: 30).padding(.horizontal, 8).opacity(0.3)
+                    Divider().frame(height: 30).padding(.horizontal, Theme.Space.sm).opacity(0.3)
                     DetailStatItem(
                         label: languageManager.t("host_detail.max"),
                         value: stats?.maxLatency != nil ? String(format: "%.1f ms", stats!.maxLatency!) : "--",
                         color: Theme.Colors.accentRed
                     )
-                    Divider().frame(height: 30).padding(.horizontal, 8).opacity(0.3)
+                    Divider().frame(height: 30).padding(.horizontal, Theme.Space.sm).opacity(0.3)
                     DetailStatItem(
                         label: languageManager.t("host_detail.avg"),
                         value: stats != nil && stats!.avgLatency > 0 ? String(format: "%.1f ms", stats!.avgLatency) : "--",
@@ -433,7 +433,7 @@ struct HostDetailView: View {
     
     private var latencyChartCard: some View {
         ModernCard {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: Theme.Space.md) {
                 HStack {
                     Image(systemName: "chart.xyaxis.line")
                         .foregroundStyle(Theme.Colors.accentPurple)
@@ -556,7 +556,7 @@ struct HostDetailView: View {
     
     private var packetStatsCard: some View {
         ModernCard {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: Theme.Space.md) {
                 HStack {
                     Image(systemName: "shippingbox")
                         .foregroundStyle(Theme.Colors.accentOrange)
@@ -572,13 +572,13 @@ struct HostDetailView: View {
                         value: "\(stats?.totalPings ?? 0)",
                         color: Theme.Colors.accentBlue
                     )
-                    Divider().frame(height: 30).padding(.horizontal, 8).opacity(0.3)
+                    Divider().frame(height: 30).padding(.horizontal, Theme.Space.sm).opacity(0.3)
                     DetailStatItem(
                         label: languageManager.t("host_detail.success"),
                         value: "\(stats?.successfulPings ?? 0)",
                         color: Theme.Colors.accentGreen
                     )
-                    Divider().frame(height: 30).padding(.horizontal, 8).opacity(0.3)
+                    Divider().frame(height: 30).padding(.horizontal, Theme.Space.sm).opacity(0.3)
                     DetailStatItem(
                         label: languageManager.t("host_detail.failed"),
                         value: "\(stats?.failedPings ?? 0)",
@@ -589,7 +589,7 @@ struct HostDetailView: View {
                 Spacer()
                 
                 // Success rate bar
-                HStack(spacing: 8) {
+                HStack(spacing: Theme.Space.sm) {
                     Text(languageManager.t("host_detail.success_rate"))
                         .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                         .foregroundStyle(Theme.Colors.textSecondary)
@@ -620,7 +620,7 @@ struct HostDetailView: View {
     
     private var trafficCard: some View {
         ModernCard {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: Theme.Space.md) {
                 HStack {
                     Image(systemName: "arrow.up.arrow.down.circle")
                         .foregroundStyle(Theme.Colors.accentPurple)
@@ -631,8 +631,8 @@ struct HostDetailView: View {
                 }
                 
                 HStack(spacing: 0) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 4) {
+                    VStack(alignment: .leading, spacing: Theme.Space.xs) {
+                        HStack(spacing: Theme.Space.xs) {
                             Image(systemName: "arrow.up")
                                 .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
                                 .foregroundStyle(Theme.Colors.accentGreen)
@@ -646,10 +646,10 @@ struct HostDetailView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     
-                    Divider().frame(height: 30).padding(.horizontal, 8).opacity(0.3)
+                    Divider().frame(height: 30).padding(.horizontal, Theme.Space.sm).opacity(0.3)
                     
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 4) {
+                    VStack(alignment: .leading, spacing: Theme.Space.xs) {
+                        HStack(spacing: Theme.Space.xs) {
                             Image(systemName: "arrow.down")
                                 .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
                                 .foregroundStyle(Theme.Colors.accentBlue)
@@ -683,7 +683,7 @@ struct HostDetailView: View {
     
     private var displayRulesCard: some View {
         ModernCard {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: Theme.Space.md) {
                 HStack {
                     Image(systemName: "tag")
                         .foregroundStyle(Theme.Colors.accentBlue)
@@ -717,14 +717,14 @@ struct HostDetailView: View {
                         Text(rule.enabled ? languageManager.t("host_detail.enabled") : languageManager.t("host_detail.disabled"))
                             .font(Theme.Fonts.ui(Theme.Fonts.Size.caption, weight: .medium))
                             .foregroundStyle(rule.enabled ? Theme.Colors.accentGreen : Theme.Colors.textTertiary)
-                            .padding(.horizontal, 8)
+                            .padding(.horizontal, Theme.Space.sm)
                             .padding(.vertical, 3)
                             .background(
                                 Capsule()
                                     .fill(rule.enabled ? Theme.Colors.accentGreen.opacity(0.1) : Theme.Colors.cardBackground)
                             )
                     }
-                    .padding(.vertical, 4)
+                    .padding(.vertical, Theme.Space.xs)
                     
                     if rule.id != host.displayRules.last?.id {
                         Divider().opacity(0.15)
@@ -756,7 +756,7 @@ struct HostDetailView: View {
     
     private var serviceShortcutsCard: some View {
         ModernCard {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: Theme.Space.md) {
                 HStack {
                     Image(systemName: "square.grid.2x2.fill")
                         .foregroundStyle(Theme.Colors.accentGreen)
@@ -769,14 +769,14 @@ struct HostDetailView: View {
                         editingShortcut = nil
                         showShortcutEditor = true
                     }) {
-                        HStack(spacing: 4) {
+                        HStack(spacing: Theme.Space.xs) {
                             Image(systemName: "plus")
                                 .font(Theme.Fonts.icon(Theme.Fonts.Size.caption, weight: .semibold))
                             Text(languageManager.t("services.add"))
                                 .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                         }
                         .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
+                        .padding(.vertical, Theme.Space.xs)
                         .background(Theme.Colors.accentGreen.opacity(0.15))
                         .cornerRadius(Theme.Radius.sm)
                     }
@@ -790,14 +790,14 @@ struct HostDetailView: View {
                         .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
                         .foregroundStyle(Theme.Colors.textSecondary)
                         .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.vertical, 16)
+                        .padding(.vertical, Theme.Space.lg)
                 } else {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 10)], spacing: 10) {
                         ForEach(shortcuts) { shortcut in
                             Button(action: {
                                 openShortcut(shortcut)
                             }) {
-                                HStack(spacing: 8) {
+                                HStack(spacing: Theme.Space.sm) {
                                     Image(systemName: shortcut.icon)
                                         .font(Theme.Fonts.icon(Theme.Fonts.Size.callout))
                                         .foregroundStyle(shortcutColor(for: shortcut.type))
@@ -821,7 +821,7 @@ struct HostDetailView: View {
                                         .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
                                         .foregroundStyle(Theme.Colors.textTertiary)
                                 }
-                                .padding(8)
+                                .padding(Theme.Space.sm)
                                 .background(Theme.Colors.cardBackground)
                                 .cornerRadius(Theme.Radius.md)
                                 .overlay(
@@ -892,7 +892,7 @@ struct HostDetailView: View {
     
     private var recordsCard: some View {
         ModernCard {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: Theme.Space.md) {
                 HStack {
                     Image(systemName: "note.text")
                         .foregroundStyle(Theme.Colors.accentOrange)
@@ -905,14 +905,14 @@ struct HostDetailView: View {
                         editingRecord = nil
                         showRecordEditor = true
                     }) {
-                        HStack(spacing: 4) {
+                        HStack(spacing: Theme.Space.xs) {
                             Image(systemName: "plus")
                                 .font(Theme.Fonts.icon(Theme.Fonts.Size.caption, weight: .semibold))
                             Text("Add")
                                 .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                         }
                         .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
+                        .padding(.vertical, Theme.Space.xs)
                         .background(Theme.Colors.accentOrange.opacity(0.15))
                         .cornerRadius(Theme.Radius.sm)
                     }
@@ -926,9 +926,9 @@ struct HostDetailView: View {
                         .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
                         .foregroundStyle(Theme.Colors.textSecondary)
                         .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.vertical, 16)
+                        .padding(.vertical, Theme.Space.lg)
                 } else {
-                    VStack(spacing: 12) {
+                    VStack(spacing: Theme.Space.md) {
                         ForEach(records.sorted(by: { $0.createdAt > $1.createdAt })) { record in
                             VStack(alignment: .leading, spacing: 6) {
                                 HStack(alignment: .top) {
@@ -946,7 +946,7 @@ struct HostDetailView: View {
                                     .foregroundStyle(Theme.Colors.textSecondary)
                                     .lineLimit(3)
                             }
-                            .padding(12)
+                            .padding(Theme.Space.md)
                             .background(Theme.Colors.background.opacity(0.5))
                             .cornerRadius(Theme.Radius.md)
                             .contextMenu {
@@ -977,7 +977,7 @@ struct HostDetailView: View {
     
     private var logsCard: some View {
         ModernCard {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: Theme.Space.md) {
                 HStack {
                     Image(systemName: "list.bullet.rectangle")
                         .foregroundStyle(Theme.Colors.accentOrange)
@@ -991,14 +991,14 @@ struct HostDetailView: View {
                             NSWorkspace.shared.activateFileViewerSelecting([url])
                         }
                     }) {
-                        HStack(spacing: 4) {
+                        HStack(spacing: Theme.Space.xs) {
                             Image(systemName: "square.and.arrow.up")
                                 .font(Theme.Fonts.icon(Theme.Fonts.Size.caption, weight: .semibold))
                             Text(languageManager.t("logs.export"))
                                 .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                         }
                         .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
+                        .padding(.vertical, Theme.Space.xs)
                         .background(Theme.Colors.cardBackground)
                         .cornerRadius(Theme.Radius.sm)
                         .overlay(
@@ -1016,11 +1016,11 @@ struct HostDetailView: View {
                         .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
                         .foregroundStyle(Theme.Colors.textSecondary)
                         .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.vertical, 20)
+                        .padding(.vertical, Theme.Space.xl)
                 } else {
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: Theme.Space.sm) {
                          ForEach(Array(hostLogs), id: \.id) { log in
-                             HStack(alignment: .top, spacing: 8) {
+                             HStack(alignment: .top, spacing: Theme.Space.sm) {
                                  Text(log.formattedTimestamp)
                                      .font(Theme.Fonts.number(Theme.Fonts.Size.footnote, weight: .regular))
                                      .foregroundStyle(Theme.Colors.textSecondary)
@@ -1083,7 +1083,7 @@ struct DetailStatItem: View {
     let color: Color
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: Theme.Space.xs) {
             Text(label)
                 .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                 .foregroundStyle(Theme.Colors.textSecondary)
@@ -1121,7 +1121,7 @@ struct RecordEditorSheet: View {
                 }
                 .buttonStyle(.plain)
             }
-            .padding()
+            .padding(Theme.Space.lg)
             .background(Theme.Colors.sidebarBackground)
             
             // Form
@@ -1140,8 +1140,8 @@ struct RecordEditorSheet: View {
                         )
                 }
             }
-            .padding()
-            
+            .padding(Theme.Space.lg)
+
             // Footer
             HStack {
                 Spacer()
@@ -1164,7 +1164,7 @@ struct RecordEditorSheet: View {
                 .keyboardShortcut(.defaultAction)
                 .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
-            .padding()
+            .padding(Theme.Space.lg)
             .background(Theme.Colors.sidebarBackground)
         }
         .frame(width: 400, height: 350)

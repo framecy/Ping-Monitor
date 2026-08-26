@@ -23,47 +23,43 @@ struct DashboardView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: Theme.Layout.gridSpacing) {
-                if showsTwoColumns {
-                    // 每行独立 Grid：单 GridRow 2 个 cell → 列等分跟随窗口；cell maxHeight:.infinity 撑满行高实现同行等高。
-                    Grid(horizontalSpacing: Theme.Layout.gridSpacing, verticalSpacing: Theme.Layout.gridSpacing) {
-                        GridRow {
-                            QualityScoreCard(snapshot: globalSnapshot, selectedWindow: $selectedWindow)
-                                .gridCell()
-                            QualityDimensionsCard(snapshot: globalSnapshot)
-                                .gridCell()
-                        }
+        ScrollPage {
+            if showsTwoColumns {
+                // 每行独立 Grid：单 GridRow 2 个 cell → 列等分跟随窗口；cell maxHeight:.infinity 撑满行高实现同行等高。
+                Grid(horizontalSpacing: Theme.Layout.gridSpacing, verticalSpacing: Theme.Layout.gridSpacing) {
+                    GridRow {
+                        QualityScoreCard(snapshot: globalSnapshot, selectedWindow: $selectedWindow)
+                            .gridCell()
+                        QualityDimensionsCard(snapshot: globalSnapshot)
+                            .gridCell()
                     }
-                    Grid(horizontalSpacing: Theme.Layout.gridSpacing, verticalSpacing: Theme.Layout.gridSpacing) {
-                        GridRow {
-                            QualityTrendCard(snapshot: globalSnapshot, trendPoints: trendPoints)
-                                .gridCell()
-                            RecentEventsCard(events: globalSnapshot.recentEvents)
-                                .gridCell()
-                        }
-                    }
-                } else {
-                    QualityScoreCard(snapshot: globalSnapshot, selectedWindow: $selectedWindow)
-                        .frame(maxWidth: .infinity)
-                    QualityDimensionsCard(snapshot: globalSnapshot)
-                        .frame(maxWidth: .infinity)
-                    QualityTrendCard(snapshot: globalSnapshot, trendPoints: trendPoints)
-                        .frame(maxWidth: .infinity)
-                    RecentEventsCard(events: globalSnapshot.recentEvents)
-                        .frame(maxWidth: .infinity)
                 }
-
-                // 长卡：整行全宽自然高度，无并排对手 → 不存在等高/重叠问题。
-                HostHealthCard(snapshots: globalSnapshot.worstHosts)
+                Grid(horizontalSpacing: Theme.Layout.gridSpacing, verticalSpacing: Theme.Layout.gridSpacing) {
+                    GridRow {
+                        QualityTrendCard(snapshot: globalSnapshot, trendPoints: trendPoints)
+                            .gridCell()
+                        RecentEventsCard(events: globalSnapshot.recentEvents)
+                            .gridCell()
+                    }
+                }
+            } else {
+                QualityScoreCard(snapshot: globalSnapshot, selectedWindow: $selectedWindow)
                     .frame(maxWidth: .infinity)
-                TrafficContextCard(speedManager: speedManager, snapshot: globalSnapshot)
+                QualityDimensionsCard(snapshot: globalSnapshot)
+                    .frame(maxWidth: .infinity)
+                QualityTrendCard(snapshot: globalSnapshot, trendPoints: trendPoints)
+                    .frame(maxWidth: .infinity)
+                RecentEventsCard(events: globalSnapshot.recentEvents)
                     .frame(maxWidth: .infinity)
             }
-            .padding(Theme.Layout.cardPadding)
+
+            // 长卡：整行全宽自然高度，无并排对手 → 不存在等高/重叠问题。
+            HostHealthCard(snapshots: globalSnapshot.worstHosts)
+                .frame(maxWidth: .infinity)
+            TrafficContextCard(speedManager: speedManager, snapshot: globalSnapshot)
+                .frame(maxWidth: .infinity)
         }
         .measureContainerWidth { detailWidth = $0 }
-        .background(Theme.Colors.background)
         .onAppear {
             speedManager.startMonitoring()
         }
@@ -82,7 +78,7 @@ private struct QualityScoreCard: View {
 
     var body: some View {
         ModernCard {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: Theme.Space.lg) {
                 HStack {
                     SectionHeader(title: languageManager.t("dashboard.quality_score"), icon: "waveform.badge.magnifyingglass")
                     Spacer()
@@ -105,75 +101,47 @@ private struct QualityScoreCard: View {
                         .foregroundStyle(Theme.Colors.textSecondary)
                 }
 
-                HStack(spacing: 12) {
-                    metricBlock(
+                // 上下文指标用 plain 瓦片（主文字色），色彩语义留给顶部总分与状态瓦片。
+                HStack(spacing: Theme.Space.tileGap) {
+                    StatTile(
                         title: languageManager.t("dashboard.p95_latency"),
-                        value: snapshot.averageP95Latency.map { String(format: "%.0f ms", $0) } ?? "—",
-                        color: Theme.Colors.accentBlue
+                        value: snapshot.averageP95Latency.map { String(format: "%.0f ms", $0) } ?? "—"
                     )
-                    metricBlock(
+                    StatTile(
                         title: languageManager.t("dashboard.avg_loss"),
-                        value: String(format: "%.1f%%", snapshot.averagePacketLoss),
-                        color: Theme.Colors.accentRed
+                        value: String(format: "%.1f%%", snapshot.averagePacketLoss)
                     )
-                    metricBlock(
+                    StatTile(
                         title: languageManager.t("dashboard.avg_jitter"),
-                        value: String(format: "%.1f ms", snapshot.averageJitter),
-                        color: Theme.Colors.accentOrange
+                        value: String(format: "%.1f ms", snapshot.averageJitter)
                     )
                 }
 
                 Divider().opacity(0.15)
 
-                HStack(spacing: 12) {
-                    statusPill(
+                HStack(spacing: Theme.Space.tileGap) {
+                    StatTile(
                         title: languageManager.t("dashboard.healthy_hosts"),
                         value: "\(snapshot.healthyHostCount)",
-                        color: Theme.Colors.accentGreen
+                        color: Theme.Colors.accentGreen,
+                        style: .tinted
                     )
-                    statusPill(
+                    StatTile(
                         title: languageManager.t("dashboard.degraded_hosts"),
                         value: "\(snapshot.degradedHostCount)",
-                        color: Theme.Colors.accentOrange
+                        color: Theme.Colors.accentOrange,
+                        style: .tinted
                     )
-                    statusPill(
+                    StatTile(
                         title: languageManager.t("dashboard.critical_hosts"),
                         value: "\(snapshot.criticalHostCount)",
-                        color: Theme.Colors.accentRed
+                        color: Theme.Colors.accentRed,
+                        style: .tinted
                     )
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
-    }
-
-    private func metricBlock(title: String, value: String, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
-                .foregroundStyle(Theme.Colors.textSecondary)
-            Text(value)
-                .font(Theme.Fonts.number(Theme.Fonts.Size.title, weight: .semibold))
-                .foregroundStyle(color)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func statusPill(title: String, value: String, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title)
-                .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
-                .foregroundStyle(Theme.Colors.textSecondary)
-            Text(value)
-                .font(Theme.Fonts.ui(Theme.Fonts.Size.headline, weight: .bold))
-                .foregroundStyle(color)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(10)
-        .background(color.opacity(0.08))
-        .cornerRadius(Theme.Radius.md)
     }
 }
 
@@ -183,7 +151,7 @@ private struct QualityDimensionsCard: View {
 
     var body: some View {
         ModernCard {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: Theme.Space.md) {
                 SectionHeader(title: languageManager.t("dashboard.dimension_breakdown"), icon: "slider.horizontal.3")
 
                 dimensionRow(languageManager.t("dashboard.latency_trend"), value: snapshot.dimensions.latency, color: Theme.Colors.accentBlue)
@@ -242,7 +210,7 @@ private struct QualityTrendCard: View {
 
     var body: some View {
         ModernCard {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: Theme.Space.md) {
                 HStack {
                     SectionHeader(title: languageManager.t("dashboard.latency_trend"), icon: "chart.xyaxis.line")
                     Spacer()
@@ -308,7 +276,7 @@ private struct QualityTrendCard: View {
                     }
                     .frame(height: 180)
 
-                    HStack(spacing: 16) {
+                    HStack(spacing: Theme.Space.lg) {
                         summaryTag(
                             title: languageManager.t("dashboard.quality_score"),
                             value: "\(snapshot.score)",
@@ -332,7 +300,7 @@ private struct QualityTrendCard: View {
     }
 
     private func summaryTag(title: String, value: String, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: Theme.Space.xxs) {
             Text(title)
                 .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                 .foregroundStyle(Theme.Colors.textSecondary)
@@ -349,7 +317,7 @@ private struct RecentEventsCard: View {
 
     var body: some View {
         ModernCard {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: Theme.Space.md) {
                 SectionHeader(title: languageManager.t("dashboard.recent_events"), icon: "exclamationmark.bubble")
 
                 if events.isEmpty {
@@ -366,7 +334,7 @@ private struct RecentEventsCard: View {
                                     .frame(width: 8, height: 8)
                                     .padding(.top, 5)
 
-                                VStack(alignment: .leading, spacing: 2) {
+                                VStack(alignment: .leading, spacing: Theme.Space.xxs) {
                                     HStack {
                                         Text(event.title)
                                             .font(Theme.Fonts.ui(Theme.Fonts.Size.body, weight: .semibold))
@@ -421,7 +389,7 @@ private struct HostHealthCard: View {
 
     var body: some View {
         ModernCard {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: Theme.Space.md) {
                 SectionHeader(title: languageManager.t("dashboard.host_health"), icon: "server.rack")
 
                 if snapshots.isEmpty {
@@ -508,7 +476,7 @@ private struct HostHealthCard: View {
     }
 
     private func nameCell(_ snapshot: HostQualitySnapshot) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: Theme.Space.xxs) {
             Text(snapshot.hostName)
                 .font(Theme.Fonts.ui(Theme.Fonts.Size.body, weight: .semibold))
                 .foregroundStyle(Theme.Colors.textPrimary)
@@ -532,7 +500,7 @@ private struct HostHealthCard: View {
                 // 单列竖排：主机名 + 指标堆叠
                 VStack(alignment: .leading, spacing: 6) {
                     nameCell(snapshot)
-                    HStack(spacing: 12) {
+                    HStack(spacing: Theme.Space.md) {
                         valueCell("\(snapshot.score)", color: qualityColor(snapshot.score))
                         valueCell(snapshot.p95Latency.map { String(format: "%.0f", $0) } ?? "—", suffix: "ms")
                         Text(pathLabel(snapshot.pathKind))
@@ -590,7 +558,7 @@ private struct TrafficContextCard: View {
             VStack(alignment: .leading, spacing: 14) {
                 SectionHeader(title: languageManager.t("netspeed.title"), icon: "chart.line.uptrend.xyaxis")
 
-                HStack(spacing: 12) {
+                HStack(spacing: Theme.Space.md) {
                     trafficPanel(
                         title: languageManager.t("dashboard.physical_traffic"),
                         down: NetworkSpeedManager.formatSpeed(speedManager.totalSpeedIn),
@@ -636,7 +604,7 @@ private struct TrafficContextCard: View {
                         .foregroundStyle(Theme.Colors.textSecondary)
                     if let topProcess {
                         HStack {
-                            VStack(alignment: .leading, spacing: 2) {
+                            VStack(alignment: .leading, spacing: Theme.Space.xxs) {
                                 Text(topProcess.processName)
                                     .font(Theme.Fonts.ui(Theme.Fonts.Size.body, weight: .semibold))
                                     .foregroundStyle(Theme.Colors.textPrimary)
@@ -645,7 +613,7 @@ private struct TrafficContextCard: View {
                                     .foregroundStyle(Theme.Colors.textTertiary)
                             }
                             Spacer()
-                            VStack(alignment: .trailing, spacing: 2) {
+                            VStack(alignment: .trailing, spacing: Theme.Space.xxs) {
                                 Text("↓ \(NetworkSpeedManager.formatSpeed(topProcess.speedIn))")
                                     .font(Theme.Fonts.number(Theme.Fonts.Size.footnote, weight: .semibold))
                                     .foregroundStyle(Theme.Colors.accentCyan)
@@ -682,16 +650,6 @@ private struct TrafficContextCard: View {
         .background(accent.opacity(0.08))
         .cornerRadius(Theme.Radius.md)
     }
-}
-
-private func scoreBadge(_ score: Int) -> some View {
-    Text("\(score)")
-        .font(Theme.Fonts.number(Theme.Fonts.Size.body, weight: .bold))
-        .foregroundStyle(qualityColor(score))
-        .padding(.horizontal, 10)
-        .padding(.vertical, 5)
-        .background(qualityColor(score).opacity(0.12))
-        .cornerRadius(Theme.Radius.pill)
 }
 
 private func qualityColor(_ score: Int) -> Color {

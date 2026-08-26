@@ -46,23 +46,19 @@ struct ServicesTab: View {
     private var totalCount: Int { webCount + sshCount + customCount }
     
     var body: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                // Stats + Controls header
-                statsCard
-                
-                // Services list
-                if hostsWithServices.isEmpty {
-                    emptyState
-                } else {
-                    ForEach(hostsWithServices) { host in
-                        hostServicesCard(host)
-                    }
+        ScrollPage {
+            // Stats + Controls header
+            statsCard
+
+            // Services list
+            if hostsWithServices.isEmpty {
+                emptyState
+            } else {
+                ForEach(hostsWithServices) { host in
+                    hostServicesCard(host)
                 }
             }
-            .padding(Theme.Layout.cardPadding)
         }
-        .background(Theme.Colors.background)
         .sheet(isPresented: $showShortcutEditor) {
             ShortcutEditorSheet(
                 existingShortcut: editingShortcut,
@@ -92,95 +88,73 @@ struct ServicesTab: View {
     
     private var statsCard: some View {
         ModernCard {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: Theme.Space.sectionGap) {
                 HStack {
                     SectionHeader(title: languageManager.t("services.title"), icon: "square.grid.2x2.fill")
                     Spacer()
-                    
+
                     // Add button
                     Button(action: {
                         editingShortcut = nil
                         editingHostId = viewModel.hosts.first?.id
                         showShortcutEditor = true
                     }) {
-                        HStack(spacing: 4) {
+                        HStack(spacing: Theme.Space.xs) {
                             Image(systemName: "plus")
                                 .font(Theme.Fonts.icon(Theme.Fonts.Size.caption, weight: .semibold))
                             Text(languageManager.t("services.add"))
                                 .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                         }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
+                        .padding(.horizontal, Theme.Space.sm)
+                        .padding(.vertical, Theme.Space.xs)
                         .background(Theme.Colors.accentBlue.opacity(0.15))
                         .cornerRadius(Theme.Radius.sm)
                     }
                     .buttonStyle(.plain)
                     .disabled(viewModel.hosts.isEmpty)
                 }
-                
+
                 // Stats badges row
-                HStack(spacing: 10) {
-                    statBadge(
+                HStack(spacing: Theme.Space.controlGap) {
+                    FilterChip(
                         label: languageManager.t("services.all"),
                         count: totalCount,
                         color: Theme.Colors.textPrimary,
                         isSelected: filterType == nil
                     ) { filterType = nil }
-                    
-                    statBadge(
+
+                    FilterChip(
                         label: "Web",
                         count: webCount,
                         color: Theme.Colors.accentBlue,
                         isSelected: filterType == .web
                     ) { filterType = filterType == .web ? nil : .web }
-                    
-                    statBadge(
+
+                    FilterChip(
                         label: "SSH",
                         count: sshCount,
                         color: Theme.Colors.accentGreen,
                         isSelected: filterType == .ssh
                     ) { filterType = filterType == .ssh ? nil : .ssh }
-                    
-                    statBadge(
+
+                    FilterChip(
                         label: languageManager.t("services.type.custom"),
                         count: customCount,
                         color: Theme.Colors.accentOrange,
                         isSelected: filterType == .custom
                     ) { filterType = filterType == .custom ? nil : .custom }
-                    
+
                     Spacer()
                 }
             }
         }
     }
     
-    private func statBadge(label: String, count: Int, color: Color, isSelected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 5) {
-                Text("\(count)")
-                    .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .bold))
-                    .foregroundStyle(isSelected ? color : Theme.Colors.textSecondary)
-                Text(label)
-                    .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
-                    .foregroundStyle(isSelected ? Theme.Colors.textPrimary : Theme.Colors.textTertiary)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(isSelected ? color.opacity(0.12) : Theme.Colors.cardBackground)
-            .cornerRadius(Theme.Radius.md)
-            .overlay(
-                RoundedRectangle(cornerRadius: Theme.Radius.md)
-                    .stroke(isSelected ? color.opacity(0.3) : Theme.Colors.cardBorder, lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-    }
-    
     // MARK: - Empty State
     
     private var emptyState: some View {
         ModernCard {
-            VStack(spacing: 16) {
+            VStack(spacing: Theme.Space.lg) {
                 Image(systemName: "square.grid.2x2")
                     .font(Theme.Fonts.icon(Theme.Fonts.Size.giant))
                     .foregroundStyle(Theme.Colors.textTertiary)
@@ -199,14 +173,14 @@ struct ServicesTab: View {
                         editingHostId = viewModel.hosts.first?.id
                         showShortcutEditor = true
                     }) {
-                        HStack(spacing: 4) {
+                        HStack(spacing: Theme.Space.xs) {
                             Image(systemName: "plus.circle.fill")
                                 .font(Theme.Fonts.icon(Theme.Fonts.Size.body))
                             Text(languageManager.t("services.add"))
                                 .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
+                        .padding(.horizontal, Theme.Space.lg)
+                        .padding(.vertical, Theme.Space.sm)
                         .background(Theme.Colors.accentBlue.opacity(0.15))
                         .cornerRadius(Theme.Radius.md)
                     }
@@ -214,7 +188,7 @@ struct ServicesTab: View {
                 }
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 40)
+            .padding(.vertical, Theme.Space.huge)
         }
     }
     
@@ -226,7 +200,7 @@ struct ServicesTab: View {
         }
         
         return ModernCard {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: Theme.Space.md) {
                 HStack {
                     Circle()
                         .fill(host.isReachable ? Theme.Colors.accentGreen : Theme.Colors.accentRed.opacity(0.5))
@@ -256,8 +230,8 @@ struct ServicesTab: View {
                     Text("\(shortcuts.count)")
                         .font(Theme.Fonts.ui(Theme.Fonts.Size.caption, weight: .bold))
                         .foregroundStyle(Theme.Colors.textSecondary)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 2)
+                        .padding(.horizontal, Theme.Space.sm)
+                        .padding(.vertical, Theme.Space.xxs)
                         .background(Theme.Colors.cardBackground)
                         .cornerRadius(Theme.Radius.xs)
                 }
@@ -287,7 +261,7 @@ struct ServicesTab: View {
                     .background(serviceColor(for: shortcut.type).opacity(0.12))
                     .cornerRadius(Theme.Radius.md)
                 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: Theme.Space.xxs) {
                     Text(shortcut.name)
                         .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
                         .foregroundStyle(Theme.Colors.textPrimary)
@@ -314,7 +288,7 @@ struct ServicesTab: View {
                     .font(Theme.Fonts.ui(Theme.Fonts.Size.micro, weight: .bold))
                     .foregroundStyle(serviceColor(for: shortcut.type))
                     .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
+                    .padding(.vertical, Theme.Space.xxs)
                     .background(serviceColor(for: shortcut.type).opacity(0.12))
                     .cornerRadius(Theme.Radius.xs)
                 
@@ -442,7 +416,7 @@ struct ShortcutEditorSheet: View {
     }
     
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: Theme.Space.xl) {
             // Title
             Text(existingShortcut != nil ? languageManager.t("services.edit") : languageManager.t("services.add"))
                 .font(Theme.Fonts.ui(Theme.Fonts.Size.headline, weight: .semibold))
@@ -451,7 +425,7 @@ struct ShortcutEditorSheet: View {
             VStack(alignment: .leading, spacing: 14) {
                 // Host selector (only in add mode from ServicesTab)
                 if let hosts = hostSelector, existingShortcut == nil {
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: Theme.Space.xs) {
                         Text(languageManager.t("services.select_host"))
                             .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                             .foregroundStyle(Theme.Colors.textSecondary)
@@ -468,7 +442,7 @@ struct ShortcutEditorSheet: View {
                 }
                 
                 // Type
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: Theme.Space.xs) {
                     Text(languageManager.t("services.type"))
                         .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                         .foregroundStyle(Theme.Colors.textSecondary)
@@ -491,7 +465,7 @@ struct ShortcutEditorSheet: View {
                 }
                 
                 // Name
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: Theme.Space.xs) {
                     Text(languageManager.t("services.name"))
                         .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                         .foregroundStyle(Theme.Colors.textSecondary)
@@ -500,7 +474,7 @@ struct ShortcutEditorSheet: View {
                 }
                 
                 // URL / Host
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: Theme.Space.xs) {
                     Text(type == .ssh ? languageManager.t("services.ssh.host") : languageManager.t("services.url"))
                         .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                         .foregroundStyle(Theme.Colors.textSecondary)
@@ -510,8 +484,8 @@ struct ShortcutEditorSheet: View {
                 
                 // SSH-specific fields
                 if type == .ssh {
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: Theme.Space.md) {
+                        VStack(alignment: .leading, spacing: Theme.Space.xs) {
                             Text(languageManager.t("services.ssh.user"))
                                 .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                                 .foregroundStyle(Theme.Colors.textSecondary)
@@ -519,7 +493,7 @@ struct ShortcutEditorSheet: View {
                                 .textFieldStyle(.roundedBorder)
                         }
                         
-                        VStack(alignment: .leading, spacing: 4) {
+                        VStack(alignment: .leading, spacing: Theme.Space.xs) {
                             Text(languageManager.t("services.ssh.port"))
                                 .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                                 .foregroundStyle(Theme.Colors.textSecondary)
@@ -530,7 +504,7 @@ struct ShortcutEditorSheet: View {
                     }
                     
                     // Auth Mode Toggle
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: Theme.Space.xs) {
                         Text(languageManager.t("services.ssh.auth_mode"))
                             .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                             .foregroundStyle(Theme.Colors.textSecondary)
@@ -543,7 +517,7 @@ struct ShortcutEditorSheet: View {
                     
                     // Conditional: Key Path or Password
                     if sshAuthMode == .key {
-                        VStack(alignment: .leading, spacing: 4) {
+                        VStack(alignment: .leading, spacing: Theme.Space.xs) {
                             Text(languageManager.t("services.ssh.key"))
                                 .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                                 .foregroundStyle(Theme.Colors.textSecondary)
@@ -551,7 +525,7 @@ struct ShortcutEditorSheet: View {
                                 .textFieldStyle(.roundedBorder)
                         }
                     } else {
-                        VStack(alignment: .leading, spacing: 4) {
+                        VStack(alignment: .leading, spacing: Theme.Space.xs) {
                             Text(languageManager.t("services.ssh.password"))
                                 .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                                 .foregroundStyle(Theme.Colors.textSecondary)
@@ -560,14 +534,14 @@ struct ShortcutEditorSheet: View {
                         }
                     }
                     
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: Theme.Space.xs) {
                         Text(languageManager.t("services.ssh.preview"))
                             .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                             .foregroundStyle(Theme.Colors.textSecondary)
                         Text(previewSSHCommand)
                             .font(Theme.Fonts.number(Theme.Fonts.Size.body))
                             .foregroundStyle(Theme.Colors.accentGreen)
-                            .padding(8)
+                            .padding(Theme.Space.sm)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(Color.black.opacity(0.3))
                             .cornerRadius(Theme.Radius.sm)
@@ -575,11 +549,11 @@ struct ShortcutEditorSheet: View {
                 }
                 
                 // Icon
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: Theme.Space.xs) {
                     Text(languageManager.t("services.icon"))
                         .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                         .foregroundStyle(Theme.Colors.textSecondary)
-                    LazyVGrid(columns: Array(repeating: GridItem(.fixed(36), spacing: 8), count: 8), spacing: 8) {
+                    LazyVGrid(columns: Array(repeating: GridItem(.fixed(36), spacing: Theme.Space.sm), count: 8), spacing: Theme.Space.sm) {
                         ForEach(iconOptions, id: \.self) { iconName in
                             Button(action: { icon = iconName }) {
                                 Image(systemName: iconName)
@@ -617,7 +591,7 @@ struct ShortcutEditorSheet: View {
                 .disabled(name.isEmpty || url.isEmpty)
             }
         }
-        .padding(24)
+        .padding(Theme.Space.xxl)
         .frame(width: 420)
         .onAppear {
             if let s = existingShortcut {

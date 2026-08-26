@@ -183,6 +183,9 @@ public final class LanguageManager: ObservableObject {
             "logs.all": "All",
             "logs.clear": "Clear",
             "logs.export": "Export",
+            "logs.time": "Time",
+            "logs.host": "Host",
+            "logs.message": "Message",
             
             // Settings
             "settings.display_mode": "Display Mode",
@@ -752,6 +755,9 @@ public final class LanguageManager: ObservableObject {
             "logs.all": "全部",
             "logs.clear": "清空",
             "logs.export": "导出",
+            "logs.time": "时间",
+            "logs.host": "主机",
+            "logs.message": "消息",
             
             // Settings
             "settings.display_mode": "显示策略",

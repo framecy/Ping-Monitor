@@ -1,5 +1,7 @@
 import SwiftUI
 
+// MARK: - 单侧边栏（LM Studio 二级导航风格）
+// 图标在导航行内，不再保留独立图标栏——应用只有一级导航，两段式会重复且占宽度。
 struct SidebarView: View {
     @Binding var selectedItem: SidebarItem
     @ObservedObject private var languageManager = LanguageManager.shared
@@ -10,13 +12,32 @@ struct SidebarView: View {
     private var tailscaleVisible: Bool {
         (tailscale.isAvailable || tailscale.hasInventoryCredentials) && enableTailscale
     }
-    
+
+    var body: some View {
+        NavPanel(selectedItem: $selectedItem, tailscaleVisible: tailscaleVisible)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Theme.Colors.navBackground)
+    }
+}
+
+// MARK: - 导航面板
+private struct NavPanel: View {
+    @Binding var selectedItem: SidebarItem
+    let tailscaleVisible: Bool
+    @ObservedObject private var languageManager = LanguageManager.shared
+    /// 折叠分组集合，默认全部展开。
+    @State private var collapsedSections: Set<String> = []
+
+    private func itemVisible(_ item: SidebarItem) -> Bool {
+        item != .tailscale || tailscaleVisible
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            // App Branding
-            HStack(spacing: 12) {
+            // 面板头部：App 图标 + 名称
+            HStack(spacing: Theme.Space.controlGap) {
                 Image(systemName: "network.badge.shield.half.filled")
-                    .font(Theme.Fonts.icon(Theme.Fonts.Size.display))
+                    .font(Theme.Fonts.icon(Theme.Fonts.Size.headline))
                     .foregroundStyle(
                         .linearGradient(
                             colors: [Theme.Colors.accentBlue, Theme.Colors.accentPurple],
@@ -24,137 +45,168 @@ struct SidebarView: View {
                             endPoint: .bottomTrailing
                         )
                     )
-                
                 Text("PingMonitor")
-                    .font(Theme.Fonts.ui(Theme.Fonts.Size.title, weight: .semibold))
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .semibold))
                     .foregroundStyle(Theme.Colors.textPrimary)
-                
                 Spacer()
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 24)
-            
-            ScrollView {
-                VStack(spacing: 4) {
-                    SidebarSectionHeader(title: languageManager.t("sidebar.overview"))
-                    SidebarRow(item: .monitor, selectedItem: $selectedItem, icon: SidebarItem.monitor.icon, title: SidebarItem.monitor.title)
-                    SidebarRow(item: .statistics, selectedItem: $selectedItem, icon: SidebarItem.statistics.icon, title: SidebarItem.statistics.title)
-                    SidebarRow(item: .traceroute, selectedItem: $selectedItem, icon: SidebarItem.traceroute.icon, title: SidebarItem.traceroute.title)
-                    SidebarRow(item: .netspeed, selectedItem: $selectedItem, icon: SidebarItem.netspeed.icon, title: SidebarItem.netspeed.title)
-                    
-                    if tailscaleVisible {
-                        SidebarRow(item: .tailscale, selectedItem: $selectedItem, icon: SidebarItem.tailscale.icon, title: SidebarItem.tailscale.title)
-                    }
-                    
-                    Spacer().frame(height: 16)
-                    
-                    SidebarSectionHeader(title: languageManager.t("sidebar.management"))
-                    SidebarRow(item: .hosts, selectedItem: $selectedItem, icon: SidebarItem.hosts.icon, title: SidebarItem.hosts.title)
-                    SidebarRow(item: .services, selectedItem: $selectedItem, icon: SidebarItem.services.icon, title: SidebarItem.services.title)
-                    SidebarRow(item: .logs, selectedItem: $selectedItem, icon: SidebarItem.logs.icon, title: SidebarItem.logs.title)
-                    
-                    Spacer().frame(height: 16)
-                    
-                    SidebarSectionHeader(title: languageManager.t("sidebar.config"))
-                     // Placeholder link
-                     SidebarRow(item: .settings, selectedItem: $selectedItem, icon: SidebarItem.settings.icon, title: SidebarItem.settings.title)
+            // 横向留白取 lg，与下方导航行（滚动容器 sm + 行内 sm）的图标左缘对齐。
+            .padding(.horizontal, Theme.Space.lg)
+            .padding(.top, Theme.Space.pageTopGap)
+            .padding(.bottom, Theme.Space.controlGap)
 
+            ScrollView {
+                VStack(alignment: .leading, spacing: Theme.Space.xxs) {
+                    NavSection(
+                        title: languageManager.t("sidebar.overview"),
+                        isCollapsed: collapsedSections.contains("overview"),
+                        onToggle: { toggle("overview") }
+                    ) {
+                        NavRow(item: .monitor, selectedItem: $selectedItem)
+                        NavRow(item: .statistics, selectedItem: $selectedItem)
+                        NavRow(item: .traceroute, selectedItem: $selectedItem)
+                        NavRow(item: .netspeed, selectedItem: $selectedItem)
+                        if itemVisible(.tailscale) {
+                            NavRow(item: .tailscale, selectedItem: $selectedItem)
+                        }
+                    }
+
+                    Spacer().frame(height: Theme.Space.lg)
+
+                    NavSection(
+                        title: languageManager.t("sidebar.management"),
+                        isCollapsed: collapsedSections.contains("management"),
+                        onToggle: { toggle("management") }
+                    ) {
+                        NavRow(item: .hosts, selectedItem: $selectedItem)
+                        NavRow(item: .services, selectedItem: $selectedItem)
+                        NavRow(item: .logs, selectedItem: $selectedItem)
+                    }
+
+                    Spacer().frame(height: Theme.Space.lg)
+
+                    NavSection(
+                        title: languageManager.t("sidebar.config"),
+                        isCollapsed: collapsedSections.contains("config"),
+                        onToggle: { toggle("config") }
+                    ) {
+                        NavRow(item: .settings, selectedItem: $selectedItem)
+                    }
                 }
-                .padding(.horizontal, 10)
+                .padding(.horizontal, Theme.Space.sm)
             }
-            
-            // Bottom Area (User/Version)
-            VStack(spacing: 12) {
-                 Rectangle()
+
+            // 底部：用户 + 版本
+            VStack(spacing: Theme.Space.sm) {
+                Rectangle()
                     .fill(Theme.Colors.separator)
                     .frame(height: 1)
-                
-                HStack {
+
+                HStack(spacing: Theme.Space.controlGap) {
                     Circle()
-                         .fill(Theme.Colors.cardBackground)
-                         .frame(width: 32, height: 32)
-                         .overlay(Image(systemName: "person.fill").foregroundStyle(Theme.Colors.textSecondary))
-                    
-                    VStack(alignment: .leading) {
-                         let userName = NSFullUserName().isEmpty ? NSUserName() : NSFullUserName()
-                         Text(userName)
-                            .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
+                        .fill(Theme.Colors.cardBackground)
+                        .frame(width: 28, height: 28)
+                        .overlay(
+                            Image(systemName: "person.fill")
+                                .font(Theme.Fonts.icon(Theme.Fonts.Size.footnote))
+                                .foregroundStyle(Theme.Colors.textSecondary)
+                        )
+
+                    VStack(alignment: .leading, spacing: 1) {
+                        let userName = NSFullUserName().isEmpty ? NSUserName() : NSFullUserName()
+                        Text(userName)
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote, weight: .medium))
                             .foregroundStyle(Theme.Colors.textPrimary)
-                         if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String {
-                             Text("v\(version)")
-                                 .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
-                                 .foregroundStyle(Theme.Colors.textSecondary)
-                         }
+                            .lineLimit(1)
+                        if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String {
+                            Text("v\(version)")
+                                .font(Theme.Fonts.number(Theme.Fonts.Size.caption))
+                                .foregroundStyle(Theme.Colors.textTertiary)
+                        }
                     }
                     Spacer()
-                    Image(systemName: "gear")
-                        .font(Theme.Fonts.icon(Theme.Fonts.Size.callout))
-                        .foregroundStyle(Theme.Colors.textSecondary)
-                        .onTapGesture {
-                            selectedItem = .settings
-                        }
                 }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 20)
+                .padding(.horizontal, Theme.Space.md)
+                .padding(.bottom, Theme.Space.md)
+            }
+        }
+    }
+
+    private func toggle(_ section: String) {
+        if collapsedSections.contains(section) {
+            collapsedSections.remove(section)
+        } else {
+            collapsedSections.insert(section)
+        }
+    }
+}
+
+// MARK: - 分组头（可折叠）
+private struct NavSection<Content: View>: View {
+    let title: String
+    let isCollapsed: Bool
+    let onToggle: () -> Void
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.Space.xxs) {
+            Button(action: onToggle) {
+                HStack(spacing: Theme.Space.xs) {
+                    Text(title)
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
+                        .foregroundStyle(Theme.Colors.textTertiary)
+                        .textCase(.uppercase)
+                    Spacer()
+                    Image(systemName: "chevron.down")
+                        .font(Theme.Fonts.icon(Theme.Fonts.Size.micro, weight: .semibold))
+                        .foregroundStyle(Theme.Colors.textTertiary)
+                        .rotationEffect(.degrees(isCollapsed ? -90 : 0))
+                }
+                .padding(.horizontal, Theme.Space.sm)
+                .padding(.vertical, Theme.Space.xs)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if !isCollapsed {
+                content
             }
         }
     }
 }
 
-struct SidebarRow: View {
+// MARK: - 导航行（LM Studio 式浅灰胶囊选中态）
+private struct NavRow: View {
     let item: SidebarItem
     @Binding var selectedItem: SidebarItem
-    let icon: String
-    let title: String
-    
-    var isSelected: Bool {
-        selectedItem == item
-    }
-    
+    @State private var hovering = false
+
+    private var isSelected: Bool { selectedItem == item }
+
     var body: some View {
         Button(action: { selectedItem = item }) {
-            HStack(spacing: 10) {
-                // Colored Bar Indicator
-                RoundedRectangle(cornerRadius: Theme.Radius.xs)
-                    .fill(isSelected ? item.activeColor : Color.clear)
-                    .frame(width: 4, height: 16)
-                
-                Image(systemName: icon)
-                    .font(Theme.Fonts.icon(Theme.Fonts.Size.callout))
-                    .foregroundStyle(isSelected ? item.activeColor : Theme.Colors.textSecondary)
+            HStack(spacing: Theme.Space.controlGap) {
+                Image(systemName: item.icon)
+                    .font(Theme.Fonts.icon(Theme.Fonts.Size.body, weight: .medium))
+                    .foregroundStyle(isSelected ? Theme.Colors.accentBlue : Theme.Colors.textSecondary)
                     .frame(width: 20)
-                
-                Text(title)
-                    .font(Theme.Fonts.ui(Theme.Fonts.Size.callout))
+
+                Text(item.title)
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: isSelected ? .medium : .regular))
                     .foregroundStyle(isSelected ? Theme.Colors.textPrimary : Theme.Colors.textSecondary)
-                
+
                 Spacer()
             }
-            .padding(.vertical, 8)
-            .padding(.horizontal, 8)
+            .padding(.vertical, Theme.Space.xs)
+            .padding(.horizontal, Theme.Space.sm)
             .background(
-                isSelected ? Theme.Colors.cardBackground : Color.clear
+                RoundedRectangle(cornerRadius: Theme.Radius.md)
+                    .fill(isSelected ? Theme.Colors.navSelection
+                                     : (hovering ? Theme.Colors.hoverOverlay : Color.clear))
             )
-            .cornerRadius(Theme.Radius.md)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-    }
-}
-
-struct SidebarSectionHeader: View {
-    let title: String
-    
-    var body: some View {
-        HStack {
-            Text(title)
-                .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
-                .foregroundStyle(Theme.Colors.textTertiary)
-                .textCase(.uppercase)
-            Spacer()
-        }
-        .padding(.horizontal, 16)
-        .padding(.top, 8)
-        .padding(.bottom, 4)
+        .onHover { hovering = $0 }
     }
 }
