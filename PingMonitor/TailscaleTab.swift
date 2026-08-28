@@ -532,12 +532,12 @@ struct TailscaleTab: View {
     private var quickCommandsCard: some View {
         ModernCard {
             VStack(alignment: .leading, spacing: 12) {
-                SectionHeader(title: "Quick Commands", icon: "command")
+                SectionHeader(title: languageManager.t("tailscale.quick_commands"), icon: "command")
                 
                 HStack(spacing: 12) {
-                    CommandButton(title: "Status", icon: "terminal", action: { tailscale.fetchStatus() })
-                    CommandButton(title: "Netcheck", icon: "shield.checkered", action: { tailscale.fetchNetcheck() })
-                    CommandButton(title: "Ping All", icon: "waveform", action: { executeTailscale("ping --all") })
+                    CommandButton(title: languageManager.t("tailscale.cmd_status"), icon: "terminal", action: { tailscale.fetchStatus() })
+                    CommandButton(title: languageManager.t("tailscale.cmd_netcheck"), icon: "shield.checkered", action: { tailscale.fetchNetcheck() })
+                    CommandButton(title: languageManager.t("tailscale.cmd_ping_all"), icon: "waveform", action: { executeTailscale("ping --all") })
                 }
             }
         }
@@ -638,7 +638,7 @@ struct TailscaleTab: View {
                     Divider().opacity(0.2)
                     HStack(spacing: 20) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Global IPv4")
+                            Text(languageManager.t("tailscale.global_ipv4"))
                                 .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                                 .foregroundStyle(Theme.Colors.textSecondary)
                             Text(tailscale.globalIPv4)
@@ -646,7 +646,7 @@ struct TailscaleTab: View {
                                 .foregroundStyle(Theme.Colors.textPrimary)
                         }
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Global IPv6")
+                            Text(languageManager.t("tailscale.global_ipv6"))
                                 .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                                 .foregroundStyle(Theme.Colors.textSecondary)
                             Text(tailscale.globalIPv6)
@@ -928,7 +928,7 @@ struct TailscaleTab: View {
                         Image(systemName: "arrow.up.right.circle.fill")
                             .font(Theme.Fonts.icon(Theme.Fonts.Size.caption))
                             .foregroundStyle(Theme.Colors.accentPurple)
-                            .help(node.exitNode ? "Active Exit Node" : "Exit Node Available")
+                            .help(node.exitNode ? languageManager.t("tailscale.exit_active") : languageManager.t("tailscale.exit_available"))
                     }
                     
                     if !node.isSelf {

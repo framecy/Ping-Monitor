@@ -1,6 +1,12 @@
 import WidgetKit
 import SwiftUI
 
+/// 从 Widget 扩展自身的 Info.plist 读取版本号（随构建自动同步），不再硬编码。
+private let widgetAppVersion: String = {
+    let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
+    return "v\(version)"
+}()
+
 @main
 struct PingMonitorWidgetBundle: WidgetBundle {
     var body: some Widget {
@@ -160,12 +166,12 @@ struct SmallView: View {
                      // Fallback to first entry display
                      Text(first.name)
                 } else {
-                    Text("No Hosts (v2.0.51)")
+                    Text("No Hosts (\(widgetAppVersion))")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
-            Text("v2.0.51")
+            Text(widgetAppVersion)
                 .font(.system(size: 8))
                 .foregroundStyle(.tertiary)
         }

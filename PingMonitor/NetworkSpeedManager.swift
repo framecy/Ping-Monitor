@@ -585,10 +585,15 @@ class NetworkSpeedManager: ObservableObject {
         // If SIGTERM fails (e.g. permission denied), try with privilege escalation
         PrivilegedManager.shared.run("kill -9 \(pid)")
         
-        LogManager.shared.info("Force-terminated process PID \(pid) with PrivilegedManager")
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+        LogManager.shared.info("Sent kill -9 to PID \(pid) via PrivilegedManager; verifying")
+        // PrivilegedManager.run 无执行回执：延迟后用信号 0 复核进程是否真的已退出，
+        // 避免"强杀失败仍提示已结束"的假成功（ESRCH = 进程不存在）。
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
             self?.refreshProcessList()
-            completion(true)
+            let probe = kill(pid, 0)
+            let gone = probe == -1 && errno == ESRCH
+            LogManager.shared.info("PID \(pid) after kill -9: \(gone ? "gone" : "still alive")")
+            completion(gone)
         }
     }
     

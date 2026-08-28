@@ -12,6 +12,7 @@ struct HostDetailView: View {
     @State private var showRecordEditor = false
     @State private var editingRecord: HostRecord? = nil
     @State private var detailWidth: CGFloat = 800
+    @State private var showResetConfirmation = false
 
     private var showsTwoColumns: Bool {
         Theme.Layout.fitsTwoColumns(detailWidth)
@@ -116,10 +117,20 @@ struct HostDetailView: View {
                         .buttonStyle(.bordered)
                         
                         Button(languageManager.t("stats.reset_current")) {
-                            viewModel.resetStats(for: host.id)
+                            showResetConfirmation = true
                         }
                         .buttonStyle(.bordered)
                         .foregroundStyle(Theme.Colors.accentRed)
+                        .alert(languageManager.t("stats.reset_current"), isPresented: $showResetConfirmation) {
+                            Button(role: .destructive) {
+                                viewModel.resetStats(for: host.id)
+                            } label: {
+                                Text(languageManager.t("common.confirm"))
+                            }
+                            Button(languageManager.t("common.cancel"), role: .cancel) {}
+                        } message: {
+                            Text(languageManager.t("stats.reset_confirm_message"))
+                        }
                     }
                     
                     // Row 5: Display Rules
@@ -896,7 +907,7 @@ struct HostDetailView: View {
                 HStack {
                     Image(systemName: "note.text")
                         .foregroundStyle(Theme.Colors.accentOrange)
-                    Text("Records")
+                    Text(languageManager.t("host.records.title"))
                         .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .semibold))
                         .foregroundStyle(Theme.Colors.textPrimary)
                     Spacer()
@@ -908,7 +919,7 @@ struct HostDetailView: View {
                         HStack(spacing: 4) {
                             Image(systemName: "plus")
                                 .font(Theme.Fonts.icon(Theme.Fonts.Size.caption, weight: .semibold))
-                            Text("Add")
+                            Text(languageManager.t("host.records.add"))
                                 .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                         }
                         .padding(.horizontal, 10)
@@ -922,7 +933,7 @@ struct HostDetailView: View {
                 let records = currentHost?.records ?? []
                 
                 if records.isEmpty {
-                    Text("No records yet")
+                    Text(languageManager.t("host.records.empty"))
                         .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
                         .foregroundStyle(Theme.Colors.textSecondary)
                         .frame(maxWidth: .infinity, alignment: .center)
@@ -954,7 +965,7 @@ struct HostDetailView: View {
                                     editingRecord = record
                                     showRecordEditor = true
                                 } label: {
-                                    Label("Edit", systemImage: "pencil")
+                                    Label(languageManager.t("host.records.edit"), systemImage: "pencil")
                                 }
                                 Divider()
                                 Button(role: .destructive) {
@@ -963,7 +974,7 @@ struct HostDetailView: View {
                                         viewModel.saveSettings()
                                     }
                                 } label: {
-                                    Label("Delete", systemImage: "trash")
+                                    Label(languageManager.t("host.records.delete"), systemImage: "trash")
                                 }
                             }
                         }
@@ -1103,7 +1114,8 @@ struct DetailStatItem: View {
 struct RecordEditorSheet: View {
     let existingRecord: HostRecord?
     let onSave: (HostRecord) -> Void
-    
+
+    @ObservedObject private var languageManager = LanguageManager.shared
     @Environment(\.presentationMode) var presentationMode
     @State private var title: String = ""
     @State private var content: String = ""
@@ -1126,12 +1138,12 @@ struct RecordEditorSheet: View {
             
             // Form
             Form {
-                Section(header: Text("Title")) {
-                    TextField("Record title", text: $title)
+                Section(header: Text(languageManager.t("host.records.field_title"))) {
+                    TextField(languageManager.t("host.records.placeholder_title"), text: $title)
                         .textFieldStyle(.roundedBorder)
                 }
                 
-                Section(header: Text("Content")) {
+                Section(header: Text(languageManager.t("host.records.field_content"))) {
                     TextEditor(text: $content)
                         .frame(minHeight: 120)
                         .overlay(
@@ -1145,12 +1157,12 @@ struct RecordEditorSheet: View {
             // Footer
             HStack {
                 Spacer()
-                Button("Cancel") {
+                Button(languageManager.t("common.cancel")) {
                     presentationMode.wrappedValue.dismiss()
                 }
                 .keyboardShortcut(.cancelAction)
                 
-                Button("Save") {
+                Button(languageManager.t("common.save")) {
                     let record = HostRecord(
                         id: existingRecord?.id ?? UUID(),
                         title: title.trimmingCharacters(in: .whitespacesAndNewlines),

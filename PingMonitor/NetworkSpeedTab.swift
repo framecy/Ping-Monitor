@@ -17,6 +17,7 @@ struct NetworkSpeedTab: View {
     @State private var tabMode: NetSpeedTabMode = .interfaces
     /// 默认只展开承载真实流量的两族，其余（管理口、回环等）收起。
     @State private var expandedFamilies: Set<InterfaceFamily> = [.wifi, .ethernet]
+    @State private var showResetConfirmation = false
     
     var body: some View {
         VStack(spacing: 0) {
@@ -183,7 +184,7 @@ struct NetworkSpeedTab: View {
 
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("Tunnel/VPN")
+                            Text(languageManager.t("netspeed.tunnel_row"))
                                 .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                                 .foregroundStyle(Theme.Colors.textSecondary)
                             HStack(spacing: 8) {
@@ -198,7 +199,7 @@ struct NetworkSpeedTab: View {
 
                         Spacer()
 
-                        Text("Physical totals exclude tunnel bytes to avoid double-counting")
+                        Text(languageManager.t("netspeed.tunnel_note"))
                             .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                             .foregroundStyle(Theme.Colors.textTertiary)
                     }
@@ -713,11 +714,21 @@ struct NetworkSpeedTab: View {
                     .help(languageManager.t("stats.export_current"))
                     
                     Button {
-                        speedManager.resetTrafficStats()
+                        showResetConfirmation = true
                     } label: { Image(systemName: "trash") }
                     .buttonStyle(.plain)
                     .foregroundStyle(Theme.Colors.accentRed)
                     .help(languageManager.t("stats.reset_current"))
+                    .alert(languageManager.t("stats.reset_current"), isPresented: $showResetConfirmation) {
+                        Button(role: .destructive) {
+                            speedManager.resetTrafficStats()
+                        } label: {
+                            Text(languageManager.t("common.confirm"))
+                        }
+                        Button(languageManager.t("common.cancel"), role: .cancel) {}
+                    } message: {
+                        Text(languageManager.t("stats.reset_confirm_message"))
+                    }
                 }
                 
                 HStack(spacing: 16) {

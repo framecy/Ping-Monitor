@@ -287,7 +287,7 @@ class TailscaleManager: ObservableObject {
     func fetchStatus() {
         guard isEnabled else { return }
         guard let cli = cliPath else {
-            lastError = "Tailscale CLI not found"
+            lastError = LanguageManager.shared.t("tailscale.error.cli_not_found")
             return
         }
         
@@ -321,7 +321,7 @@ class TailscaleManager: ObservableObject {
                     await MainActor.run {
                         self.isLoading = false
                         self.isConnected = false
-                        self.lastError = "Tailscale not running (exit code \(process.terminationStatus))"
+                        self.lastError = String(format: LanguageManager.shared.t("tailscale.error.not_running"), process.terminationStatus)
                     }
                     return
                 }
@@ -330,7 +330,7 @@ class TailscaleManager: ObservableObject {
                 guard dataSize > 0 else {
                     await MainActor.run {
                         self.isLoading = false
-                        self.lastError = "No data received from tailscale"
+                        self.lastError = LanguageManager.shared.t("tailscale.error.no_data")
                     }
                     return
                 }
@@ -417,7 +417,7 @@ class TailscaleManager: ObservableObject {
             } catch {
                 await MainActor.run {
                     self.isLoading = false
-                    self.lastError = "Failed to parse Tailscale status: \(error.localizedDescription)"
+                    self.lastError = String(format: LanguageManager.shared.t("tailscale.error.parse_status"), error.localizedDescription)
                 }
             }
         }
@@ -757,7 +757,13 @@ class TailscaleManager: ObservableObject {
             nodes[index].lastPingResult = nil
         }
         
-        Task.detached { [cli, ip = node.tailscaleIP] in
+        // 文案模板在 MainActor 上取好再带入 detached 闭包（Swift 6 隔离安全）；
+        // 连接类型由响应字段直接判定，不再依赖对展示文案做子串匹配。
+        let resultTemplate = LanguageManager.shared.t("tailscale.ping.result")
+        let errorTemplate = LanguageManager.shared.t("tailscale.ping.error")
+        let parseFailedText = LanguageManager.shared.t("tailscale.ping.parse_failed")
+        let doneText = LanguageManager.shared.t("tailscale.ping.done")
+        Task.detached { [cli, ip = node.tailscaleIP, resultTemplate, errorTemplate, parseFailedText, doneText] in
             let process = Process()
             let pipe = Pipe()
             process.executableURL = URL(fileURLWithPath: cli)
@@ -774,32 +780,33 @@ class TailscaleManager: ObservableObject {
                 let lines = output.components(separatedBy: .newlines).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
                 
                 var finalResult = ""
+                var resolvedType: TailscaleConnectionType?
                 if let lastLine = lines.last, let lineData = lastLine.data(using: .utf8) {
                     if let pingRes = try? decoder.decode(TailscalePingResponse.self, from: lineData) {
                         if let err = pingRes.Err, !err.isEmpty {
-                            finalResult = "Error: \(err)"
+                            finalResult = String(format: errorTemplate, err)
                         } else {
                             let type = pingRes.IsP2P == true ? "P2P" : "Relay"
+                            resolvedType = pingRes.IsP2P == true ? .p2p : .relay
                             let endpoint = pingRes.Endpoint ?? pingRes.DERPRegionCode ?? "unknown"
                             let latency = String(format: "%.1fms", (pingRes.LatencySeconds ?? 0) * 1000)
-                            finalResult = "\(type) via \(endpoint) (\(latency))"
+                            finalResult = String(format: resultTemplate, type, endpoint, latency)
                         }
-                    } else { finalResult = "Failed to parse result" }
-                } else { finalResult = "Check complete" }
+                    } else { finalResult = parseFailedText }
+                } else { finalResult = doneText }
                 
                 await MainActor.run {
                     if let index = self.nodes.firstIndex(where: { $0.tailscaleIP == ip }) {
                         self.nodes[index].isCheckingPath = false
                         self.nodes[index].lastPingResult = finalResult
-                        if finalResult.contains("P2P") { self.nodes[index].connectionType = .p2p }
-                        else if finalResult.contains("Relay") { self.nodes[index].connectionType = .relay }
+                        if let resolved = resolvedType { self.nodes[index].connectionType = resolved }
                     }
                 }
             } catch {
                 await MainActor.run {
                     if let index = self.nodes.firstIndex(where: { $0.tailscaleIP == ip }) {
                         self.nodes[index].isCheckingPath = false
-                        self.nodes[index].lastPingResult = "Error: \(error.localizedDescription)"
+                        self.nodes[index].lastPingResult = String(format: LanguageManager.shared.t("tailscale.ping.error"), error.localizedDescription)
                     }
                 }
             }

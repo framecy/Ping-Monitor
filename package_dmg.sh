@@ -1,8 +1,12 @@
 #!/bin/bash
 set -e
-APP_PATH="/Users/framed/Documents/PingMonitor/build/Build/Products/Debug/PingMonitor.app"
+# 打包本地 Debug 构建产物（不做版本递增）。
+# 产物路径可用 APP_PATH 环境变量覆盖；默认取仓库内 build/ 下的 Debug 产物。
+APP_PATH="${APP_PATH:-$(cd "$(dirname "$0")" && pwd)/build/Build/Products/Debug/PingMonitor.app}"
 if [ ! -d "$APP_PATH" ]; then
-    echo "❌ PingMonitor.app not found in $APP_PATH"
+    echo "❌ PingMonitor.app not found at $APP_PATH"
+    echo "   先执行: xcodebuild -scheme PingMonitor -configuration Debug -derivedDataPath ./build build"
+    echo "   或指定: APP_PATH=/path/to/PingMonitor.app ./package_dmg.sh"
     exit 1
 fi
 

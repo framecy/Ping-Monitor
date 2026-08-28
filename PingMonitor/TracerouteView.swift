@@ -413,7 +413,7 @@ struct TracerouteView: View {
                     .frame(width: w.avg, alignment: .trailing)
                 Text(languageManager.t("traceroute.loss"))
                     .frame(width: w.loss, alignment: .trailing)
-                Text("Location") // Note: should localize if possible, but hardcoded here if missing translation
+                Text(languageManager.t("traceroute.location"))
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.leading, 8)
             }
