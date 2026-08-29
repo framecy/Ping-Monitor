@@ -95,7 +95,7 @@ struct SidebarView: View {
                         }
                 }
                 .padding(.horizontal, 16)
-                .padding(.bottom, 20)
+                .padding(.bottom, 16)
             }
         }
     }
@@ -113,7 +113,7 @@ struct SidebarRow: View {
     
     var body: some View {
         Button(action: { selectedItem = item }) {
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 // Colored Bar Indicator
                 RoundedRectangle(cornerRadius: Theme.Radius.xs)
                     .fill(isSelected ? item.activeColor : Color.clear)

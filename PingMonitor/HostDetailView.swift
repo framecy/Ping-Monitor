@@ -213,7 +213,7 @@ struct HostDetailView: View {
                 .frame(width: 8, height: 8)
                 .shadow(color: currentHost?.isReachable == true ? Theme.Colors.accentGreen.opacity(0.5) : .clear, radius: 4)
             
-            VStack(alignment: .leading, spacing: 1) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(host.name)
                     .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .semibold))
                     .foregroundStyle(Theme.Colors.textPrimary)
@@ -230,11 +230,11 @@ struct HostDetailView: View {
                     Circle()
                         .fill(latencyColor(latency))
                         .frame(width: 6, height: 6)
-                    Text("\(Int(latency)) ms")
+                    Text("\(Int(latency))ms")
                         .font(Theme.Fonts.number(Theme.Fonts.Size.headline, weight: .bold))
                         .foregroundStyle(latencyColor(latency))
                 }
-                .padding(.horizontal, 14)
+                .padding(.horizontal, 16)
                 .padding(.vertical, 6)
                 .background(
                     RoundedRectangle(cornerRadius: Theme.Radius.md)
@@ -278,7 +278,7 @@ struct HostDetailView: View {
                     Spacer()
                 }
                 
-                HStack(spacing: 20) {
+                HStack(spacing: 16) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(languageManager.t("host_detail.status"))
                             .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
@@ -406,25 +406,25 @@ struct HostDetailView: View {
                 HStack(spacing: 0) {
                     DetailStatItem(
                         label: languageManager.t("host_detail.current"),
-                        value: currentHost?.lastLatency != nil ? "\(Int(currentHost!.lastLatency!)) ms" : "--",
+                        value: currentHost?.lastLatency != nil ? "\(Int(currentHost!.lastLatency!))ms" : "--",
                         color: currentHost?.lastLatency != nil ? latencyColor(currentHost!.lastLatency!) : Theme.Colors.textTertiary
                     )
                     Divider().frame(height: 30).padding(.horizontal, 8).opacity(0.3)
                     DetailStatItem(
                         label: languageManager.t("host_detail.min"),
-                        value: stats?.minLatency != nil ? String(format: "%.1f ms", stats!.minLatency!) : "--",
+                        value: stats?.minLatency != nil ? String(format: "%.1fms", stats!.minLatency!) : "--",
                         color: Theme.Colors.accentGreen
                     )
                     Divider().frame(height: 30).padding(.horizontal, 8).opacity(0.3)
                     DetailStatItem(
                         label: languageManager.t("host_detail.max"),
-                        value: stats?.maxLatency != nil ? String(format: "%.1f ms", stats!.maxLatency!) : "--",
+                        value: stats?.maxLatency != nil ? String(format: "%.1fms", stats!.maxLatency!) : "--",
                         color: Theme.Colors.accentRed
                     )
                     Divider().frame(height: 30).padding(.horizontal, 8).opacity(0.3)
                     DetailStatItem(
                         label: languageManager.t("host_detail.avg"),
-                        value: stats != nil && stats!.avgLatency > 0 ? String(format: "%.1f ms", stats!.avgLatency) : "--",
+                        value: stats != nil && stats!.avgLatency > 0 ? String(format: "%.1fms", stats!.avgLatency) : "--",
                         color: Theme.Colors.accentBlue
                     )
                 }
@@ -437,7 +437,7 @@ struct HostDetailView: View {
                         Text(languageManager.t("host_detail.jitter"))
                             .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                             .foregroundStyle(Theme.Colors.textSecondary)
-                        Text(String(format: "%.1f ms", max - min))
+                        Text(String(format: "%.1fms", max - min))
                             .font(Theme.Fonts.number(Theme.Fonts.Size.body, weight: .semibold))
                             .foregroundStyle(Theme.Colors.accentOrange)
                     }
@@ -523,7 +523,7 @@ struct HostDetailView: View {
                                 .foregroundStyle(Theme.Colors.accentOrange.opacity(0.6))
                                 .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 3]))
                                 .annotation(position: .top, alignment: .trailing) {
-                                    Text(String(format: "%.0f ms", avg))
+                                    Text(String(format: "%.0fms", avg))
                                         .font(Theme.Fonts.number(Theme.Fonts.Size.micro))
                                         .foregroundStyle(Theme.Colors.accentOrange)
                                 }
@@ -713,7 +713,7 @@ struct HostDetailView: View {
                 }
                 
                 ForEach(host.displayRules) { rule in
-                    HStack(spacing: 10) {
+                    HStack(spacing: 12) {
                         // Status dot
                         let isActive = isRuleActive(rule)
                         Circle()
@@ -726,7 +726,7 @@ struct HostDetailView: View {
                             .foregroundStyle(isActive ? Theme.Colors.textPrimary : Theme.Colors.textTertiary)
                         
                         // Condition
-                        Text(rule.condition == "less" ? "< \(Int(rule.threshold)) ms" : "> \(Int(rule.threshold)) ms")
+                        Text(rule.condition == "less" ? "< \(Int(rule.threshold))ms" : "> \(Int(rule.threshold))ms")
                             .font(Theme.Fonts.number(Theme.Fonts.Size.footnote))
                             .foregroundStyle(Theme.Colors.textSecondary)
                         
@@ -737,7 +737,7 @@ struct HostDetailView: View {
                             .font(Theme.Fonts.ui(Theme.Fonts.Size.caption, weight: .medium))
                             .foregroundStyle(rule.enabled ? Theme.Colors.accentGreen : Theme.Colors.textTertiary)
                             .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
+                            .padding(.vertical, 4)
                             .background(
                                 Capsule()
                                     .fill(rule.enabled ? Theme.Colors.accentGreen.opacity(0.1) : Theme.Colors.cardBackground)
@@ -811,7 +811,7 @@ struct HostDetailView: View {
                         .frame(maxWidth: .infinity, alignment: .center)
                         .padding(.vertical, 16)
                 } else {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 10)], spacing: 10) {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 12)], spacing: 12) {
                         ForEach(shortcuts) { shortcut in
                             Button(action: {
                                 openShortcut(shortcut)
@@ -824,7 +824,7 @@ struct HostDetailView: View {
                                         .background(shortcutColor(for: shortcut.type).opacity(0.12))
                                         .cornerRadius(Theme.Radius.sm)
                                     
-                                    VStack(alignment: .leading, spacing: 1) {
+                                    VStack(alignment: .leading, spacing: 2) {
                                         Text(shortcut.name)
                                             .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                                             .foregroundStyle(Theme.Colors.textPrimary)

@@ -26,7 +26,7 @@ struct TailscaleOAuthSettingsCard: View {
 
     var body: some View {
         ModernCard {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 16) {
                 SectionHeader(title: languageManager.t("settings.tailscale.oauth"), icon: "key.horizontal.fill")
 
                 Text(languageManager.t("settings.tailscale.oauth.help"))
@@ -78,7 +78,7 @@ struct TailscaleOAuthSettingsCard: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                HStack(spacing: 10) {
+                HStack(spacing: 12) {
                     Button(action: saveAndValidate) {
                         HStack(spacing: 6) {
                             if isValidating {
@@ -118,7 +118,7 @@ struct TailscaleOAuthSettingsCard: View {
     // MARK: 获取凭据的分步引导
 
     private var guideSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             Button(action: { showGuide = !isGuideExpanded }) {
                 HStack(spacing: 6) {
                     Image(systemName: isGuideExpanded ? "chevron.down" : "chevron.right")
@@ -143,14 +143,14 @@ struct TailscaleOAuthSettingsCard: View {
 
                     HStack(spacing: 8) {
                         Button(action: { NSWorkspace.shared.open(Self.consoleURL) }) {
-                            HStack(spacing: 5) {
+                            HStack(spacing: 6) {
                                 Image(systemName: "arrow.up.forward.square")
                                     .font(Theme.Fonts.icon(Theme.Fonts.Size.caption))
                                 Text(languageManager.t("settings.tailscale.open_console"))
                                     .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote, weight: .medium))
                             }
                             .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
+                            .padding(.vertical, 6)
                             .background(Theme.Colors.accentBlue.opacity(0.15))
                             .foregroundStyle(Theme.Colors.accentBlue)
                             .cornerRadius(Theme.Radius.sm)
@@ -164,7 +164,7 @@ struct TailscaleOAuthSettingsCard: View {
                             Text(languageManager.t("settings.tailscale.copy_link"))
                                 .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                                 .padding(.horizontal, 10)
-                                .padding(.vertical, 5)
+                                .padding(.vertical, 6)
                                 .background(Theme.Colors.cardBackground)
                                 .foregroundStyle(Theme.Colors.textSecondary)
                                 .cornerRadius(Theme.Radius.sm)
@@ -375,7 +375,7 @@ struct SettingsTab: View {
                         
                         Divider()
                         
-                        HStack(spacing: 24) {
+                        HStack(spacing: 16) {
                             Toggle(languageManager.t("settings.show_icon"), isOn: $viewModel.showIconInMenu)
                                 .disabled((viewModel.showIconInMenu && activeMenuCount <= 1) || (!viewModel.showIconInMenu && activeMenuCount >= 3))
                                 .onChange(of: viewModel.showIconInMenu) { _, newValue in

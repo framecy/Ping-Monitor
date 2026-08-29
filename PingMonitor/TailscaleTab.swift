@@ -85,7 +85,7 @@ struct TailscaleTab: View {
     // MARK: - 标签编辑
 
     private func tagEditor(_ device: TailnetDevice) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             Text(String(format: languageManager.t("tailscale.admin.edit_tags_title"), device.hostname))
                 .font(Theme.Fonts.ui(Theme.Fonts.Size.headline, weight: .semibold))
 
@@ -120,7 +120,7 @@ struct TailscaleTab: View {
                 .keyboardShortcut(.defaultAction)
             }
         }
-        .padding(20)
+        .padding(16)
     }
     
     // MARK: - Tailnet Inventory Card（控制面全局监管）
@@ -131,7 +131,7 @@ struct TailscaleTab: View {
 
     private var tailnetInventoryCard: some View {
         ModernCard {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 16) {
                 HStack {
                     SectionHeader(title: languageManager.t("tailscale.inventory.title"), icon: "list.bullet.rectangle.portrait")
                     Spacer()
@@ -251,7 +251,7 @@ struct TailscaleTab: View {
                 .fixedSize(horizontal: false, vertical: true)
             Spacer()
         }
-        .padding(10)
+        .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(color.opacity(0.08))
         .cornerRadius(Theme.Radius.md)
@@ -295,7 +295,7 @@ struct TailscaleTab: View {
         let isMonitored = monitoredAddresses.contains(device.tailscaleIP)
         let localPath = tailscale.localNode(forIP: device.tailscaleIP)
 
-        return HStack(spacing: 10) {
+        return HStack(spacing: 12) {
             Circle()
                 .fill(device.isOnline ? Theme.Colors.accentGreen : Theme.Colors.textTertiary)
                 .frame(width: 8, height: 8)
@@ -354,7 +354,7 @@ struct TailscaleTab: View {
                     Text(languageManager.t("tailscale.import"))
                         .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                         .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
+                        .padding(.vertical, 4)
                         .background(Theme.Colors.accentBlue.opacity(0.15))
                         .foregroundStyle(Theme.Colors.accentBlue)
                         .cornerRadius(Theme.Radius.xs)
@@ -471,7 +471,7 @@ struct TailscaleTab: View {
                     .disabled(tailscale.isLoading)
                 }
                 
-                HStack(spacing: 24) {
+                HStack(spacing: 16) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(languageManager.t("tailscale.status"))
                             .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
@@ -580,7 +580,7 @@ struct TailscaleTab: View {
     
     private var netcheckCard: some View {
         ModernCard {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 16) {
                 HStack {
                     SectionHeader(title: languageManager.t("tailscale.netcheck"), icon: "shield.checkered")
                     Spacer()
@@ -624,7 +624,7 @@ struct TailscaleTab: View {
                 Divider().opacity(0.2)
                 
                 // Protocol indicators
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 3), spacing: 12) {
                     protocolBadge(label: "UDP", enabled: tailscale.udpEnabled)
                     protocolBadge(label: "IPv4", enabled: tailscale.ipv4Enabled)
                     protocolBadge(label: "IPv6", enabled: tailscale.ipv6Enabled)
@@ -636,7 +636,7 @@ struct TailscaleTab: View {
                 // Global IPs
                 if tailscale.globalIPv4 != "—" || tailscale.globalIPv6 != "—" {
                     Divider().opacity(0.2)
-                    HStack(spacing: 20) {
+                    HStack(spacing: 16) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(languageManager.t("tailscale.global_ipv4"))
                                 .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
@@ -670,7 +670,7 @@ struct TailscaleTab: View {
                 SectionHeader(title: languageManager.t("tailscale.derp_latency"), icon: "globe.americas.fill")
                 
                 ForEach(tailscale.regionLatencies.prefix(10)) { region in
-                    HStack(spacing: 10) {
+                    HStack(spacing: 12) {
                         Text(region.regionName)
                             .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
                             .foregroundStyle(Theme.Colors.textPrimary)
@@ -741,7 +741,7 @@ struct TailscaleTab: View {
         Group {
             if !tailscale.healthAdvice.isEmpty {
                 ModernCard {
-                    VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 12) {
                         SectionHeader(title: languageManager.t("tailscale.health_report"), icon: "heart.text.square.fill")
                         
                         ForEach(tailscale.healthAdvice, id: \.self) { advice in
@@ -755,7 +755,7 @@ struct TailscaleTab: View {
                                     .foregroundStyle(Theme.Colors.textPrimary)
                                     .fixedSize(horizontal: false, vertical: true)
                             }
-                            .padding(10)
+                            .padding(12)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(Theme.Colors.cardBackground.opacity(0.5))
                             .cornerRadius(Theme.Radius.md)
@@ -781,7 +781,7 @@ struct TailscaleTab: View {
             }
         }()
         
-        HStack(spacing: 3) {
+        HStack(spacing: 4) {
             Image(systemName: icon)
                 .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
             Text(type.rawValue)

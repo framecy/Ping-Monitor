@@ -61,7 +61,7 @@ struct TracerouteView: View {
                                 .font(Theme.Fonts.ui(Theme.Fonts.Size.body, weight: .medium))
                         }
                         .padding(.horizontal, 10)
-                        .padding(.vertical, 7)
+                        .padding(.vertical, 8)
                         .background(
                             Capsule()
                                 .fill(Theme.Colors.cardBackground)
@@ -126,8 +126,8 @@ struct TracerouteView: View {
                             Text(manager.isRunning ? languageManager.t("traceroute.stop") : languageManager.t("traceroute.start"))
                                 .font(Theme.Fonts.ui(Theme.Fonts.Size.body, weight: .medium))
                         }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 7)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
                         .background(
                             Capsule()
                                 .fill(manager.isRunning ? Theme.Colors.accentRed.opacity(0.15) : Theme.Colors.accentBlue.opacity(0.15))
@@ -152,8 +152,8 @@ struct TracerouteView: View {
                             Text(languageManager.t("traceroute.nslookup"))
                                 .font(Theme.Fonts.ui(Theme.Fonts.Size.body, weight: .medium))
                         }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 7)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
                         .background(
                             Capsule()
                                 .fill(Theme.Colors.cardBackground)
@@ -178,7 +178,7 @@ struct TracerouteView: View {
                                     .font(Theme.Fonts.ui(Theme.Fonts.Size.body, weight: .medium))
                             }
                             .padding(.horizontal, 10)
-                            .padding(.vertical, 7)
+                            .padding(.vertical, 8)
                             .background(
                                 Capsule()
                                     .fill(showCopied ? Theme.Colors.accentGreen.opacity(0.15) : Theme.Colors.cardBackground)
@@ -209,7 +209,7 @@ struct TracerouteView: View {
     
     private var emptyStateView: some View {
         ScrollView {
-            VStack(spacing: 20) {
+            VStack(spacing: 16) {
                 Spacer(minLength: 30)
                 
                 ZStack {
@@ -299,7 +299,7 @@ struct TracerouteView: View {
             .padding(.horizontal, 16)
             
             // Host cards grid
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 200), spacing: 10)], spacing: 10) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 200), spacing: Theme.Layout.gridSpacing)], spacing: Theme.Layout.gridSpacing) {
                 ForEach(viewModel.hosts) { host in
                     MonitoredHostCard(host: host) {
                         targetHost = host.address
@@ -324,8 +324,8 @@ struct TracerouteView: View {
     // MARK: - Status Bar
     
     private var statusBar: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
                 if manager.isRunning {
                     ProgressView()
                         .controlSize(.small)
@@ -358,7 +358,7 @@ struct TracerouteView: View {
                             validHops.compactMap({ $0.avgLatency }).reduce(0, +) / Double(validHops.compactMap({ $0.avgLatency }).count) {
                             HopSummaryBadge(
                                 icon: "timer",
-                                value: String(format: "%.1f ms", avgAll),
+                                value: String(format: "%.1fms", avgAll),
                                 label: languageManager.t("traceroute.avg"),
                                 color: latencyColor(avgAll)
                             )
@@ -470,7 +470,7 @@ struct TracerouteView: View {
     @ViewBuilder
     private func routeContextView(_ routeContext: TraceRouteContext) -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 RouteContextBadge(
                     icon: routeContext.isTunnelInterface ? "point.3.connected.trianglepath.dotted" : "network",
                     title: languageManager.t("traceroute.source"),
@@ -527,7 +527,7 @@ struct TracerouteView: View {
                 if !result.records.isEmpty {
                     VStack(spacing: 8) {
                         ForEach(result.records) { record in
-                            HStack(alignment: .top, spacing: 10) {
+                            HStack(alignment: .top, spacing: 12) {
                                 Text(record.label)
                                     .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote, weight: .semibold))
                                     .foregroundStyle(Theme.Colors.textSecondary)
@@ -547,7 +547,7 @@ struct TracerouteView: View {
                     .foregroundStyle(Theme.Colors.textTertiary)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(10)
+                    .padding(12)
                     .background(Theme.Colors.surfaceOverlay)
                     .cornerRadius(Theme.Radius.md)
             } else if let error = manager.nsLookupError {
@@ -728,7 +728,7 @@ struct QuickTargetButton: View {
                 Text(label)
                     .font(Theme.Fonts.number(Theme.Fonts.Size.body, weight: .medium))
             }
-            .padding(.horizontal, 14)
+            .padding(.horizontal, 16)
             .padding(.vertical, 8)
             .background(Theme.Colors.cardBackground)
             .cornerRadius(Theme.Radius.md)
@@ -797,7 +797,7 @@ struct MonitoredHostCard: View {
     
     var body: some View {
         Button(action: onTrace) {
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 // Status indicator
                 Circle()
                     .fill(host.isReachable ? latencyColor : Theme.Colors.textTertiary.opacity(0.5))

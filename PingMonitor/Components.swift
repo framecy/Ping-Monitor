@@ -106,7 +106,7 @@ struct CardSegmentedControl: View {
                 segmentButton(title: segments[index], index: index)
             }
         }
-        .padding(3)
+        .padding(4)
         .background(Theme.Colors.surfaceOverlay)
         .cornerRadius(Theme.Radius.md)
     }

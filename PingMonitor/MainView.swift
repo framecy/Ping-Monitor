@@ -169,7 +169,7 @@ struct MainView: View {
 
     // MARK: - Header（卡片式：与页内 ModernCard 同一视觉语言）
     private var headerView: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: 16) {
             // Animated status indicator
             ZStack {
                 if viewModel.isRunning {
@@ -220,8 +220,8 @@ struct MainView: View {
                     Text(viewModel.isRunning ? languageManager.t("header.stop") : languageManager.t("header.start"))
                         .font(Theme.Fonts.ui(Theme.Fonts.Size.body, weight: .medium))
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 7)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
                 .background(
                     Capsule()
                         .fill(viewModel.isRunning ? Theme.Colors.accentRed.opacity(0.15) : Theme.Colors.accentGreen.opacity(0.15))
@@ -230,8 +230,8 @@ struct MainView: View {
             }
             .buttonStyle(.plain)
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 14)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
         .background(Theme.Colors.cardBackground)
         .cornerRadius(Theme.Layout.cardCornerRadius)
         .overlay(

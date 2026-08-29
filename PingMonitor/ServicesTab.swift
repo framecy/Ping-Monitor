@@ -92,7 +92,7 @@ struct ServicesTab: View {
     
     private var statsCard: some View {
         ModernCard {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 16) {
                 HStack {
                     SectionHeader(title: languageManager.t("services.title"), icon: "square.grid.2x2.fill")
                     Spacer()
@@ -110,7 +110,7 @@ struct ServicesTab: View {
                                 .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                         }
                         .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
+                        .padding(.vertical, 6)
                         .background(Theme.Colors.accentBlue.opacity(0.15))
                         .cornerRadius(Theme.Radius.sm)
                     }
@@ -119,7 +119,7 @@ struct ServicesTab: View {
                 }
                 
                 // Stats badges row
-                HStack(spacing: 10) {
+                HStack(spacing: 12) {
                     statBadge(
                         label: languageManager.t("services.all"),
                         count: totalCount,
@@ -156,7 +156,7 @@ struct ServicesTab: View {
     
     private func statBadge(label: String, count: Int, color: Color, isSelected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 5) {
+            HStack(spacing: 6) {
                 Text("\(count)")
                     .font(Theme.Fonts.ui(Theme.Fonts.Size.callout, weight: .bold))
                     .foregroundStyle(isSelected ? color : Theme.Colors.textSecondary)
@@ -263,8 +263,8 @@ struct ServicesTab: View {
                 }
                 
                 LazyVGrid(columns: [
-                    GridItem(.adaptive(minimum: 200), spacing: 10)
-                ], spacing: 10) {
+                    GridItem(.adaptive(minimum: 200), spacing: Theme.Layout.gridSpacing)
+                ], spacing: Theme.Layout.gridSpacing) {
                     ForEach(shortcuts) { shortcut in
                         serviceItem(shortcut, host: host)
                     }
@@ -279,7 +279,7 @@ struct ServicesTab: View {
         Button(action: {
             openService(shortcut, host: host)
         }) {
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 Image(systemName: shortcut.icon)
                     .font(Theme.Fonts.icon(Theme.Fonts.Size.headline))
                     .foregroundStyle(serviceColor(for: shortcut.type))
@@ -322,7 +322,8 @@ struct ServicesTab: View {
                     .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
                     .foregroundStyle(Theme.Colors.textTertiary)
             }
-            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(12)
             .background(Theme.Colors.cardBackground)
             .cornerRadius(Theme.Radius.md)
             .overlay(
@@ -442,13 +443,13 @@ struct ShortcutEditorSheet: View {
     }
     
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 16) {
             // Title
             Text(existingShortcut != nil ? languageManager.t("services.edit") : languageManager.t("services.add"))
                 .font(Theme.Fonts.ui(Theme.Fonts.Size.headline, weight: .semibold))
                 .foregroundStyle(Theme.Colors.textPrimary)
             
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 16) {
                 // Host selector (only in add mode from ServicesTab)
                 if let hosts = hostSelector, existingShortcut == nil {
                     VStack(alignment: .leading, spacing: 4) {
@@ -617,7 +618,7 @@ struct ShortcutEditorSheet: View {
                 .disabled(name.isEmpty || url.isEmpty)
             }
         }
-        .padding(24)
+        .padding(16)
         .frame(width: 420)
         .onAppear {
             if let s = existingShortcut {

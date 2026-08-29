@@ -96,7 +96,7 @@ private struct QualityScoreCard: View {
                     .controlSize(.small)
                 }
 
-                HStack(alignment: .lastTextBaseline, spacing: 10) {
+                HStack(alignment: .lastTextBaseline, spacing: 12) {
                     Text("\(snapshot.score)")
                         .font(Theme.Fonts.ui(Theme.Fonts.Size.giant, weight: .bold))
                         .foregroundStyle(qualityColor(snapshot.score))
@@ -108,7 +108,7 @@ private struct QualityScoreCard: View {
                 HStack(spacing: 12) {
                     metricBlock(
                         title: languageManager.t("dashboard.p95_latency"),
-                        value: snapshot.averageP95Latency.map { String(format: "%.0f ms", $0) } ?? "—",
+                        value: snapshot.averageP95Latency.map { String(format: "%.0fms", $0) } ?? "—",
                         color: Theme.Colors.accentBlue
                     )
                     metricBlock(
@@ -118,7 +118,7 @@ private struct QualityScoreCard: View {
                     )
                     metricBlock(
                         title: languageManager.t("dashboard.avg_jitter"),
-                        value: String(format: "%.1f ms", snapshot.averageJitter),
+                        value: String(format: "%.1fms", snapshot.averageJitter),
                         color: Theme.Colors.accentOrange
                     )
                 }
@@ -171,7 +171,7 @@ private struct QualityScoreCard: View {
                 .foregroundStyle(color)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(10)
+        .padding(12)
         .background(color.opacity(0.08))
         .cornerRadius(Theme.Radius.md)
     }
@@ -316,7 +316,7 @@ private struct QualityTrendCard: View {
                         )
                         summaryTag(
                             title: languageManager.t("dashboard.p95_latency"),
-                            value: snapshot.averageP95Latency.map { String(format: "%.0f ms", $0) } ?? "—",
+                            value: snapshot.averageP95Latency.map { String(format: "%.0fms", $0) } ?? "—",
                             color: Theme.Colors.accentBlue
                         )
                         summaryTag(
@@ -358,13 +358,13 @@ private struct RecentEventsCard: View {
                         .foregroundStyle(Theme.Colors.textSecondary)
                         .frame(maxWidth: .infinity, minHeight: 180, alignment: .leading)
                 } else {
-                    VStack(spacing: 10) {
+                    VStack(spacing: 12) {
                         ForEach(events) { event in
-                            HStack(alignment: .top, spacing: 10) {
+                            HStack(alignment: .top, spacing: 12) {
                                 Circle()
                                     .fill(eventColor(event.severity))
                                     .frame(width: 8, height: 8)
-                                    .padding(.top, 5)
+                                    .padding(.top, 4)
 
                                 VStack(alignment: .leading, spacing: 2) {
                                     HStack {
@@ -389,7 +389,7 @@ private struct RecentEventsCard: View {
                                         .fixedSize(horizontal: false, vertical: true)
                                 }
                             }
-                            .padding(10)
+                            .padding(12)
                             .background(Theme.Colors.cardBackground.opacity(0.65))
                             .cornerRadius(Theme.Radius.md)
                         }
@@ -587,7 +587,7 @@ private struct TrafficContextCard: View {
 
     var body: some View {
         ModernCard {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 16) {
                 SectionHeader(title: languageManager.t("netspeed.title"), icon: "chart.line.uptrend.xyaxis")
 
                 HStack(spacing: 12) {
@@ -678,7 +678,7 @@ private struct TrafficContextCard: View {
                 .foregroundStyle(accent.opacity(0.85))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(10)
+        .padding(12)
         .background(accent.opacity(0.08))
         .cornerRadius(Theme.Radius.md)
     }
@@ -689,7 +689,7 @@ private func scoreBadge(_ score: Int) -> some View {
         .font(Theme.Fonts.number(Theme.Fonts.Size.body, weight: .bold))
         .foregroundStyle(qualityColor(score))
         .padding(.horizontal, 10)
-        .padding(.vertical, 5)
+        .padding(.vertical, 6)
         .background(qualityColor(score).opacity(0.12))
         .cornerRadius(Theme.Radius.pill)
 }

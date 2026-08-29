@@ -31,7 +31,7 @@ struct TracerouteHop: Identifiable, Sendable {
     
     var formattedAvg: String {
         guard let avg = avgLatency else { return "*" }
-        return String(format: "%.1f ms", avg)
+        return String(format: "%.1fms", avg)
     }
     
     var formattedLoss: String {

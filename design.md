@@ -54,6 +54,15 @@ xs 4（徽标）/ sm 6（小控件、输入框）/ md 8（按钮、列表行）/
 ### 2.4 布局常量（Theme.Layout）
 cardCornerRadius 12、cardPadding 16、gridSpacing 16、twoColumnMinWidth 280、hostGridMinWidth 260、narrowTableBreakpoint 540、sidebar 220（min 180 / max 360 / 拖拽热区 8）、detailMinWidth 672、tableCellPadding 10×8；`fitsTwoColumns(w) = w ≥ 280×2+16`。
 
+### 2.4.1 间距刻度（2026-08-29 统一）
+全部 UI 间距只允许取 **2 / 4 / 6 / 8 / 12 / 16** 六档（Theme.Layout.spacingXXS/XS/SM/MD/LG + cardPadding/gridSpacing=16）。归一映射：3→4、5→6、7→8、10→12、14→16、20/24→16；卡片网格间隙（原 10/12）全部统一为 gridSpacing。`spacing: 0` 表示显式无间距，合法。
+
+- **cardBorder 对比度（2026-08-29 再次上调）**：dark 5%→7%、light 6%→9%——用户反馈卡片与背景难以区分。
+
+### 2.4.2 文本格式规范（2026-08-29 统一）
+- **延迟单位 ms 一律紧贴数字无空格**（`16ms`、`1.9ms`、`< 50ms`）——此前同一张卡内头部 `16 ms` 与 P95 `16ms` 混用，全库 15 处带空格写法已归一。
+- 速率单位（KB/s、MB/s）保留空格（`formatSpeed` 既有约定，B/s → GB/s 梯度）；Traceroute 解析器的 `"ms"` token 为输出解析常量，非展示文案。
+
 ### 2.5 语义状态色（Theme.Status）
 - **延迟分档**：host（80/180）、hop（50/100）、overlay（50/150）→ <good 绿 / <warning 橙 / 否则红；
 - **分数**：≥90 绿 / 75–89 蓝 / 40–74 橙 / <40 红；
@@ -137,7 +146,8 @@ cardCornerRadius 12、cardPadding 16、gridSpacing 16、twoColumnMinWidth 280、
 ### 6.1 监控页 MonitorTab
 - 工具栏（**cardBar 卡片**）：标题"监控 (N)" + borderedProminent "+" 添加主机；空态 `ContentUnavailableView`。
 - **QuickAccessServicesRibbon**（快捷服务带）：
-  - 折叠头 36pt：`bolt.fill` 橙图标 + "快捷访问" + chevron（`@AppStorage("pm.quickAccessExpanded")` 持久化，spring 0.28/0.82）。
+  - **卡片容器（2026-08-29 重做）**：ModernCard 规格（cardBackground + 12pt 圆角 + cardBorder，左右 16pt 边距），替换原 42% 透明度条带 + 底部分隔线。
+  - 标题行（整行可点展开/收起）：`bolt.fill` 橙图标 + "快捷入口"（headline semibold）+ `Badge` 快捷方式总数（橙）+ chevron；`@AppStorage("pm.quickAccessExpanded")` 持久化，spring 0.28/0.82。
   - 每行：6pt 状态圆点 + 主机名（110pt 固定列）+ 水平滚动服务 chips（SF 图标 + 名称 + WEB/SSH/CMD pill）。点击打开：web/custom `NSWorkspace.open`；ssh 生成 `/tmp/pm_ssh_<8位>.command` 脚本（自删 + chmod +x，绕过 AppleScript 授权）。`.help` 显示目标预览；右键：打开 / 复制目标。
 - **主机网格**：`LazyVGrid(adaptive minimum:280, spacing:12)`，项为 `EditableHostCard`；点击卡片 spring 打开 HostDetailView 侧滑覆盖层（move(edge:.trailing) + 背景 blur 2pt + 遮罩点击关闭）；**拖拽排序**：onDrag(NSItemProvider UUID) + HostDropDelegate（dropEntered 异步 moveHost）。
 
@@ -465,3 +475,20 @@ i18n 双字典（**每语言 63 key**，localStorage `pm-lang`）、GitHub relea
 - **修正 3 处直接色**：LogsTab 时间戳 `.foregroundStyle(.tertiary)`→`textTertiary`；ServicesTab 命令预览黑底 → 新令牌 `Theme.Colors.codeBackground`（黑 30%）；TailscaleTab 结果胶囊黑底 → 新令牌 `Theme.Colors.chipOverlay`（黑 10%）。
 - **豁免例外（功能用途，非样式）**：MonitorTab 0.1% 透明点击遮罩；PingMonitorApp 状态栏 NSColor.white/black（用户显式选择"浅色/深色"文字颜色）；Widget 的 `.system(size:)`（Widget target 不含 Theme.swift，像素规格由 §9 单独定义）。
 - **容器间距**：各页滚动列 padding=cardPadding(16)、卡片间距=gridSpacing(16)（本日早前已统一）；组件内 ≤14pt 的微间距属组件规格（design.md 各节已标注），不设全局令牌。
+
+### 2026-08-29 追加：全模块间距归一
+- 全库盘点发现 13 种 spacing 值 / 9 种 padding 值混用（离群：3/5/7/10/14/20/24）。
+- 新增 `Theme.Layout` 间距刻度令牌（spacingXXS 2 / XS 4 / SM 6 / MD 8 / LG 12，16 复用 cardPadding/gridSpacing），101 处 + 8 处 spacing:1 全部吸附到刻度；监控/主机管理/服务/追踪的卡片网格间隙统一 gridSpacing(16)。
+- 归一后全库分布：0 / 2 / 4 / 6 / 8 / 12 / 16，无离群值。
+
+### 2026-08-29 追加：卡片对齐与密度四项修复（用户指认）
+1. **快速入口卡太高太松**：行垂直内边距 6→4、芯片内边距回到 H8/V4、标题行下间距 8→6，卡高收紧约 20%。
+2. **卡片底色/边框观感不同**：全库卡片填充/描边本就同为 cardBackground/cardBorder 令牌，观感差异来自描边过淡——统一上调对比度（见上），所有卡片边缘清晰度一致。
+3. **网格边缘没对齐/没铺满**：根因是 LazyVGrid 内的卡片根布局缺少 `maxWidth: .infinity`，卡片按内容宽度收缩、在单元格里居中——EditableHostCard、HostManagementCard、PresetManagementCard、ServicesTab 服务项四处补齐，卡片现在铺满网格列宽，左右边缘与工具栏/快速入口卡片对齐。
+4. **卡内元素密度**：随第 1 项与既有间距刻度归一后，各卡内容密度统一为「标题行 headline semibold + 区块间距 12/16」。
+
+### 2026-08-29 追加：卡片对齐与密度四项修复（用户指认）
+1. **快速入口卡太高太松**：行垂直内边距 6→4、芯片内边距回到 H8/V4、标题行下间距 8→6，卡高收紧约 20%。
+2. **卡片底色/边框观感不同**：填充/描边本就同为 cardBackground/cardBorder 令牌，观感差异来自描边过淡——统一上调对比度（见上）。
+3. **网格边缘没对齐/没铺满**：根因是 LazyVGrid 内卡片根布局缺 `maxWidth: .infinity`，卡片按内容宽收缩、在单元格内居中——EditableHostCard、HostManagementCard、PresetManagementCard、ServicesTab 服务项四处补齐，卡片铺满列宽、边缘与工具栏/快速入口对齐。
+4. **卡内元素密度**：随第 1 项与间距刻度归一，各卡统一为「标题 headline semibold + 区块间距 12/16」。

@@ -106,7 +106,7 @@ struct RuleEditorRow: View {
     @ObservedObject private var languageManager = LanguageManager.shared
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             // Row 1: Enable toggle + Delete
             HStack {
                 Toggle(languageManager.t("editor.rule.enable"), isOn: $rule.enabled)
@@ -168,7 +168,7 @@ struct AddRuleSheet: View {
     @ObservedObject private var languageManager = LanguageManager.shared
     
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 16) {
             Text(languageManager.t("editor.add_rule"))
                 .font(Theme.Fonts.ui(Theme.Fonts.Size.headline, weight: .semibold))
             

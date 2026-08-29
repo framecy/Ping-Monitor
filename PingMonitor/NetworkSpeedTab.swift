@@ -67,7 +67,7 @@ struct NetworkSpeedTab: View {
     // MARK: - Speed Overview Card    
     private var speedOverviewCard: some View {
         ModernCard {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 16) {
                 HStack {
                     SectionHeader(title: languageManager.t("netspeed.title"), icon: "chart.line.uptrend.xyaxis")
                     Spacer()
@@ -101,7 +101,7 @@ struct NetworkSpeedTab: View {
                 HStack(spacing: 0) {
                     // Upload speed
                     VStack(alignment: .leading, spacing: 6) {
-                        HStack(spacing: 5) {
+                        HStack(spacing: 6) {
                             Image(systemName: "arrow.up")
                                 .font(Theme.Fonts.icon(Theme.Fonts.Size.caption, weight: .bold))
                                 .foregroundStyle(Theme.Colors.accentPurple)
@@ -129,7 +129,7 @@ struct NetworkSpeedTab: View {
                     
                     // Download speed
                     VStack(alignment: .trailing, spacing: 6) {
-                        HStack(spacing: 5) {
+                        HStack(spacing: 6) {
                             Text(languageManager.t("netspeed.download"))
                                 .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote))
                                 .foregroundStyle(Theme.Colors.textSecondary)
@@ -323,7 +323,7 @@ struct NetworkSpeedTab: View {
                     VStack(spacing: 8) {
                         ForEach(topProcs) { proc in
                             HStack {
-                                VStack(alignment: .leading, spacing: 1) {
+                                VStack(alignment: .leading, spacing: 2) {
                                     Text(proc.processName)
                                         .font(Theme.Fonts.ui(Theme.Fonts.Size.body, weight: .semibold))
                                         .foregroundStyle(Theme.Colors.textPrimary)
@@ -445,7 +445,7 @@ struct NetworkSpeedTab: View {
                     expandedFamilies.insert(group.family)
                 }
             } label: {
-                HStack(spacing: 10) {
+                HStack(spacing: 12) {
                     Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
                         .font(Theme.Fonts.icon(Theme.Fonts.Size.micro, weight: .semibold))
                         .foregroundStyle(Theme.Colors.textTertiary)
@@ -493,8 +493,8 @@ struct NetworkSpeedTab: View {
 
     /// 上/下行速率对，组行与成员行共用。
     private func speedPair(speedIn: Double, speedOut: Double) -> some View {
-        HStack(spacing: 14) {
-            HStack(spacing: 3) {
+        HStack(spacing: 16) {
+            HStack(spacing: 4) {
                 Image(systemName: "arrow.up")
                     .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
                     .foregroundStyle(speedOut > 0 ? Theme.Colors.accentPurple : Theme.Colors.textTertiary)
@@ -502,7 +502,7 @@ struct NetworkSpeedTab: View {
                     .font(Theme.Fonts.number(Theme.Fonts.Size.caption, weight: .medium))
                     .foregroundStyle(speedOut > 0 ? Theme.Colors.accentPurple : Theme.Colors.textTertiary)
             }
-            HStack(spacing: 3) {
+            HStack(spacing: 4) {
                 Image(systemName: "arrow.down")
                     .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
                     .foregroundStyle(speedIn > 0 ? Theme.Colors.accentCyan : Theme.Colors.textTertiary)
@@ -546,8 +546,8 @@ struct NetworkSpeedTab: View {
             // Speed
             HStack(spacing: 16) {
                 // Upload
-                VStack(alignment: .trailing, spacing: 1) {
-                    HStack(spacing: 3) {
+                VStack(alignment: .trailing, spacing: 2) {
+                    HStack(spacing: 4) {
                         Image(systemName: "arrow.up")
                             .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
                             .foregroundStyle(Theme.Colors.accentPurple)
@@ -561,8 +561,8 @@ struct NetworkSpeedTab: View {
                 }
                 
                 // Download
-                VStack(alignment: .trailing, spacing: 1) {
-                    HStack(spacing: 3) {
+                VStack(alignment: .trailing, spacing: 2) {
+                    HStack(spacing: 4) {
                         Image(systemName: "arrow.down")
                             .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
                             .foregroundStyle(Theme.Colors.accentCyan)
@@ -576,7 +576,7 @@ struct NetworkSpeedTab: View {
                 }
                 
                 // Packets
-                VStack(alignment: .trailing, spacing: 1) {
+                VStack(alignment: .trailing, spacing: 2) {
                     Text("PKT ↑\(formatPackets(iface.packetsOut))")
                         .font(Theme.Fonts.number(Theme.Fonts.Size.micro))
                         .foregroundStyle(Theme.Colors.textTertiary)
@@ -587,8 +587,8 @@ struct NetworkSpeedTab: View {
             }
         }
         .padding(.leading, 34)
-        .padding(.trailing, 10)
-        .padding(.vertical, 5)
+        .padding(.trailing, 12)
+        .padding(.vertical, 6)
         .contentShape(Rectangle())
         .onTapGesture {
             speedManager.selectedInterface = (speedManager.selectedInterface == iface.id) ? "all" : iface.id
@@ -663,7 +663,7 @@ struct NetworkSpeedTab: View {
                 .foregroundStyle(Theme.Colors.textPrimary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(10)
+        .padding(12)
         .background(
             RoundedRectangle(cornerRadius: Theme.Radius.md)
                 .fill(color.opacity(0.06))
@@ -875,7 +875,7 @@ struct ProcessListView: View {
         ScrollView {
             VStack(spacing: 16) {
                 // Search & Refresh bar
-                HStack(spacing: 10) {
+                HStack(spacing: 12) {
                     HStack(spacing: 6) {
                         Image(systemName: "magnifyingglass")
                             .font(Theme.Fonts.icon(Theme.Fonts.Size.footnote))
@@ -919,7 +919,7 @@ struct ProcessListView: View {
                 }
                 
                 if filteredProcesses.isEmpty {
-                    VStack(spacing: 10) {
+                    VStack(spacing: 12) {
                         Image(systemName: "network.slash")
                             .font(Theme.Fonts.icon(Theme.Fonts.Size.hero))
                             .foregroundStyle(Theme.Colors.textTertiary)
@@ -985,7 +985,7 @@ struct ProcessListView: View {
         return ModernCard {
             VStack(alignment: .leading, spacing: 0) {
                 // Header row
-                HStack(spacing: 10) {
+                HStack(spacing: 12) {
                     // Expand chevron
                     Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
                         .font(Theme.Fonts.icon(Theme.Fonts.Size.micro, weight: .bold))
@@ -1003,7 +1003,7 @@ struct ProcessListView: View {
                     }
                     
                     // Name + PID
-                    VStack(alignment: .leading, spacing: 1) {
+                    VStack(alignment: .leading, spacing: 2) {
                         Text(proc.processName)
                             .font(Theme.Fonts.ui(Theme.Fonts.Size.body, weight: .semibold))
                             .foregroundStyle(Theme.Colors.textPrimary)
@@ -1171,7 +1171,7 @@ struct ProcessListView: View {
                 .frame(width: 100, alignment: .trailing)
         }
         .padding(.horizontal, 4)
-        .padding(.vertical, 3)
+        .padding(.vertical, 4)
         .background(
             RoundedRectangle(cornerRadius: Theme.Radius.xs)
                 .fill(Theme.Colors.surfaceOverlay)

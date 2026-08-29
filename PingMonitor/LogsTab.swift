@@ -68,7 +68,7 @@ struct LogsTab: View {
                 .font(Theme.Fonts.ui(Theme.Fonts.Size.caption, weight: .semibold))
                 .foregroundStyle(Theme.Colors.textSecondary)
                 .padding(.horizontal, LogColumn.gutter)
-                .padding(.vertical, 7)
+                .padding(.vertical, 8)
                 .background(Theme.Colors.surfaceOverlay)
 
                 ScrollView {

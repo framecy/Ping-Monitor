@@ -65,8 +65,8 @@ struct HostsManagementView: View {
             } else {
                 ScrollView {
                     LazyVGrid(columns: [
-                        GridItem(.adaptive(minimum: Theme.Layout.hostGridMinWidth), spacing: 12)
-                    ], spacing: 12) {
+                        GridItem(.adaptive(minimum: Theme.Layout.hostGridMinWidth), spacing: Theme.Layout.gridSpacing)
+                    ], spacing: Theme.Layout.gridSpacing) {
                         ForEach(viewModel.hosts) { host in
                             HostManagementCard(
                                 host: host,
@@ -185,7 +185,7 @@ struct HostManagementCard: View {
     @ObservedObject private var languageManager = LanguageManager.shared
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             // Header: name + actions
             HStack {
                 Image(systemName: "server.rack")
@@ -266,8 +266,8 @@ struct HostManagementCard: View {
                 }
             }
         }
-        .frame(maxHeight: .infinity, alignment: .top)
-        .padding(14)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .padding(16)
         .background(
             RoundedRectangle(cornerRadius: Theme.Radius.lg)
                 .fill(Theme.Colors.cardBackground)
@@ -320,8 +320,8 @@ struct PresetsManagementView: View {
             } else {
                 ScrollView {
                     LazyVGrid(columns: [
-                        GridItem(.adaptive(minimum: Theme.Layout.hostGridMinWidth), spacing: 12)
-                    ], spacing: 12) {
+                        GridItem(.adaptive(minimum: Theme.Layout.hostGridMinWidth), spacing: Theme.Layout.gridSpacing)
+                    ], spacing: Theme.Layout.gridSpacing) {
                         ForEach(viewModel.presets) { preset in
                             PresetManagementCard(
                                 preset: preset,
@@ -400,7 +400,7 @@ struct PresetManagementCard: View {
     @ObservedObject private var languageManager = LanguageManager.shared
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "bookmark.fill")
                     .font(Theme.Fonts.icon(Theme.Fonts.Size.footnote))
@@ -460,7 +460,8 @@ struct PresetManagementCard: View {
             }
             .opacity(isHovered ? 1 : 0.2)
         }
-        .padding(14)
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .top)
         .frame(height: 110, alignment: .top)
         .background(
             RoundedRectangle(cornerRadius: Theme.Radius.lg)
@@ -491,7 +492,7 @@ struct PresetEditorSheet: View {
     @ObservedObject private var languageManager = LanguageManager.shared
 
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 16) {
             Text(title)
                 .font(Theme.Fonts.ui(Theme.Fonts.Size.headline, weight: .semibold))
 

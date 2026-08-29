@@ -48,7 +48,7 @@ struct Theme {
 
         /// 卡片/悬浮容器的统一描边。
         static var cardBorder: Color {
-            overlayTint(dark: 0.05, light: 0.06)
+            overlayTint(dark: 0.07, light: 0.09)
         }
 
         /// 斑马纹、hover、次级表面的统一浅色叠加。
@@ -73,8 +73,7 @@ struct Theme {
         static let chipOverlay = Color.black.opacity(0.1)
 
         /// 明暗两套外观下的中性叠加色，避免各处硬编码 white/black + opacity。
-        private static func overlayTint(dark: CGFloat, light: CGFloat) -> Color {
-            Color(nsColor: NSColor(name: nil) { appearance in
+        private static func overlayTint(dark: CGFloat, light: CGFloat) -> Color {            Color(nsColor: NSColor(name: nil) { appearance in
                 if appearance.name == .darkAqua || appearance.name == .vibrantDark {
                     return NSColor.white.withAlphaComponent(dark)
                 } else {
@@ -169,6 +168,13 @@ struct Theme {
         static let cardCornerRadius: CGFloat = Radius.lg
         static let cardPadding: CGFloat = 16
         static let gridSpacing: CGFloat = 16
+        // 间距刻度：全部 UI 间距只允许取这些档位（2/4/6/8/12/16）。
+        // 卡片间距、卡片内边距、页面块间距统一用 gridSpacing/cardPadding(16)。
+        static let spacingXXS: CGFloat = 2
+        static let spacingXS: CGFloat = 4
+        static let spacingSM: CGFloat = 6
+        static let spacingMD: CGFloat = 8
+        static let spacingLG: CGFloat = 12
         // 自适应布局断点：detail 区宽度低于阈值时并排两列降为单列堆叠。
         static let twoColumnMinWidth: CGFloat = 280
         static let hostGridMinWidth: CGFloat = 260

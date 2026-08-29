@@ -32,7 +32,7 @@ struct MonitorTab: View {
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
                 }
-                .cardBar()
+                .cardBar(bottomInset: 12)
                 
                 if viewModel.hosts.isEmpty {
                     ContentUnavailableView(languageManager.t("monitor.no_hosts"), systemImage: "network", description: Text(languageManager.t("monitor.add_host_hint")))
@@ -43,8 +43,8 @@ struct MonitorTab: View {
                         QuickAccessServicesRibbon(viewModel: viewModel)
                         
                         LazyVGrid(columns: [
-                            GridItem(.adaptive(minimum: 280, maximum: .infinity), spacing: 12)
-                        ], spacing: 12) {
+                            GridItem(.adaptive(minimum: 280, maximum: .infinity), spacing: Theme.Layout.gridSpacing)
+                        ], spacing: Theme.Layout.gridSpacing) {
                             ForEach(viewModel.hosts) { host in
                                 EditableHostCard(
                                     host: host,
@@ -181,67 +181,55 @@ struct QuickAccessServicesRibbon: View {
 
     var body: some View {
         if !hostGroups.isEmpty {
-            VStack(spacing: 0) {
-                // Header — always visible
-                HStack(spacing: 0) {
-                    HStack(spacing: 5) {
-                        Image(systemName: "bolt.fill")
-                            .font(Theme.Fonts.icon(Theme.Fonts.Size.micro))
-                            .foregroundStyle(Theme.Colors.accentOrange)
-                        Text(LanguageManager.shared.t("monitor.quick_access"))
-                            .font(Theme.Fonts.ui(Theme.Fonts.Size.footnote, weight: .semibold))
-                            .foregroundStyle(Theme.Colors.textSecondary)
-                    }
-                    .padding(.leading, 14)
-
-                    Spacer()
-
+            ModernCard {
+                VStack(spacing: 0) {
+                    // 标题行——整行可点，展开/收起
                     Button {
                         withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
                             isExpanded.toggle()
                         }
                     } label: {
-                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                            .font(Theme.Fonts.icon(Theme.Fonts.Size.caption, weight: .semibold))
-                            .foregroundStyle(Theme.Colors.textTertiary)
-                            .frame(width: 28, height: 28)
-                            .contentShape(Rectangle())
+                        HStack(spacing: 6) {
+                            Image(systemName: "bolt.fill")
+                                .font(Theme.Fonts.icon(Theme.Fonts.Size.body))
+                                .foregroundStyle(Theme.Colors.accentOrange)
+                            Text(LanguageManager.shared.t("monitor.quick_access"))
+                                .font(Theme.Fonts.ui(Theme.Fonts.Size.headline, weight: .semibold))
+                                .foregroundStyle(Theme.Colors.textPrimary)
+                            Badge(text: "\(totalShortcutCount)", color: Theme.Colors.accentOrange)
+                            Spacer()
+                            Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                                .font(Theme.Fonts.icon(Theme.Fonts.Size.footnote, weight: .semibold))
+                                .foregroundStyle(Theme.Colors.textTertiary)
+                        }
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .padding(.trailing, 8)
-                }
-                .frame(height: 36)
 
-                // Expanded content
-                if isExpanded {
-                    Rectangle()
-                        .fill(Theme.Colors.separator)
-                        .frame(height: 1)
-                        .padding(.horizontal, 14)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        ForEach(hostGroups, id: \.host.id) { group in
-                            hostRow(group: group)
+                    if isExpanded {
+                        VStack(spacing: 0) {
+                            ForEach(hostGroups, id: \.host.id) { group in
+                                hostRow(group: group)
+                            }
                         }
+                        .padding(.top, 6)
                     }
-                    .padding(.vertical, 6)
                 }
             }
-            .background(Theme.Colors.cardBackground.opacity(0.42))
-            .overlay(
-                Rectangle()
-                    .fill(Theme.Colors.separator)
-                    .frame(height: 1),
-                alignment: .bottom
-            )
+            .padding(.horizontal, Theme.Layout.cardPadding)
+            .padding(.top, 4)
         }
+    }
+
+    private var totalShortcutCount: Int {
+        hostGroups.reduce(0) { $0 + $1.shortcuts.count }
     }
 
     @ViewBuilder
     private func hostRow(group: (host: HostConfig, shortcuts: [ServiceShortcut])) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 12) {
             // Status dot + host name (fixed-width label column)
-            HStack(spacing: 5) {
+            HStack(spacing: 6) {
                 Circle()
                     .fill(hostStatusColor(group.host))
                     .frame(width: 6, height: 6)
@@ -262,7 +250,6 @@ struct QuickAccessServicesRibbon: View {
                 }
             }
         }
-        .padding(.horizontal, 14)
         .padding(.vertical, 4)
     }
 
@@ -271,7 +258,7 @@ struct QuickAccessServicesRibbon: View {
         Button {
             openService(shortcut, host: host)
         } label: {
-            HStack(spacing: 5) {
+            HStack(spacing: 6) {
                 Image(systemName: shortcut.icon)
                     .font(Theme.Fonts.icon(Theme.Fonts.Size.footnote))
                     .foregroundStyle(serviceColor(for: shortcut.type))
@@ -282,7 +269,7 @@ struct QuickAccessServicesRibbon: View {
                 typePill(shortcut.type)
             }
             .padding(.horizontal, 8)
-            .padding(.vertical, 5)
+            .padding(.vertical, 4)
             .background(serviceColor(for: shortcut.type).opacity(0.10))
             .cornerRadius(Theme.Radius.md)
         }

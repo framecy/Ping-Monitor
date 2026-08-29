@@ -216,7 +216,7 @@ struct EditableHostCard: View {
             Image(systemName: icon)
                 .font(Theme.Fonts.icon(Theme.Fonts.Size.caption))
                 .foregroundStyle(color)
-            VStack(alignment: .leading, spacing: 1) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(Theme.Fonts.ui(Theme.Fonts.Size.micro))
                     .foregroundStyle(Theme.Colors.textSecondary)
@@ -233,7 +233,7 @@ struct EditableHostCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 ZStack {
                     Circle()
@@ -268,7 +268,7 @@ struct EditableHostCard: View {
 
                 VStack(alignment: .trailing, spacing: 4) {
                     if let latency = host.lastLatency, viewModel.isRunning {
-                        Text("\(Int(latency)) ms")
+                        Text("\(Int(latency))ms")
                             .font(Theme.Fonts.number(Theme.Fonts.Size.headline, weight: .bold))
                             .foregroundStyle(statusColor)
                     } else if !host.isReachable && viewModel.isRunning && !host.isChecking {
@@ -422,6 +422,7 @@ struct EditableHostCard: View {
             }
             .frame(height: 24)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(Theme.Layout.cardPadding)
         .background(Theme.Colors.cardBackground)
         .cornerRadius(Theme.Layout.cardCornerRadius)
