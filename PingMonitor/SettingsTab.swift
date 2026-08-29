@@ -268,7 +268,7 @@ struct SettingsTab: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 20) {
+            VStack(spacing: Theme.Layout.gridSpacing) {
                 // MARK: - General
                 ModernCard {
                     VStack(alignment: .leading, spacing: 16) {
@@ -367,7 +367,7 @@ struct SettingsTab: View {
                         }
                         
                         Text(statusBarDescription)
-                            .font(.caption)
+                            .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                             .foregroundStyle(Theme.Colors.textSecondary)
                             .padding(.top, -8)
                         
@@ -750,7 +750,6 @@ struct SettingsTab: View {
             .padding(Theme.Layout.cardPadding)
         }
         .background(Theme.Colors.background)
-        .padding()
         .onAppear {
             // 安装 Tailscale 后无需重启应用：打开设置页即重新检测 CLI。
             if enableTailscale { TailscaleManager.shared.detectCLI() }

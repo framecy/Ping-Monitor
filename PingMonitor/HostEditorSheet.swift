@@ -19,7 +19,7 @@ struct HostEditorSheet: View {
     var body: some View {
         VStack(spacing: 16) {
             Text(title)
-                .font(.headline)
+                .font(Theme.Fonts.ui(Theme.Fonts.Size.headline, weight: .semibold))
 
             ScrollView {
                 Form {
@@ -115,7 +115,7 @@ struct RuleEditorRow: View {
                 Spacer()
                 Button(role: .destructive, action: onDelete) {
                     Image(systemName: "trash")
-                        .font(.caption)
+                        .font(Theme.Fonts.icon(Theme.Fonts.Size.caption))
                 }
                 .buttonStyle(.borderless)
             }
@@ -170,7 +170,7 @@ struct AddRuleSheet: View {
     var body: some View {
         VStack(spacing: 20) {
             Text(languageManager.t("editor.add_rule"))
-                .font(.headline)
+                .font(Theme.Fonts.ui(Theme.Fonts.Size.headline, weight: .semibold))
             
             Form {
                 Picker(languageManager.t("editor.rule.condition"), selection: $condition) {

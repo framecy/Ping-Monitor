@@ -63,13 +63,15 @@ cardCornerRadius 12、cardPadding 16、gridSpacing 16、twoColumnMinWidth 280、
 
 ---
 
-## 3. 通用组件（Components.swift，仅 3 个）
+## 3. 通用组件（Components.swift）
 
 | 组件 | 定义 |
 |---|---|
 | `ModernCard` | padding 16 + cardBackground + 圆角 12 + 1px cardBorder 描边 |
 | `SectionHeader` | accentBlue 图标 + headline semibold 标题 + 可选 `arrow.clockwise` 刷新按钮 |
 | `Badge` | caption bold 文字，color 20% 透明背景，H6/V2，圆角 4 |
+| `CardSegmentedControl` | 统一分段切换控件：surfaceOverlay 滑轨 + accentBlue 滑动高亮（matchedGeometryEffect），等宽分段；网速页与主机管理页共用（此前两页各有一套不一致的私有实现） |
+| `View.cardBar(topInset:bottomInset:)` | 页面顶部工具栏卡片化样式，与 ModernCard 同视觉语言，替代原通栏材质条 |
 
 另有 Theme 内辅助：`ContainerWidthKey` PreferenceKey + `measureContainerWidth`（容器宽度实测）、`gridCell()`、`tableCellPadding()`。
 
@@ -98,6 +100,7 @@ cardCornerRadius 12、cardPadding 16、gridSpacing 16、twoColumnMinWidth 280、
 - 根 `HStack(spacing:0)`；900×650 为初始 contentRect 与**默认**最小尺寸——实际最小宽随侧边栏拖拽动态变化（侧边栏宽 + detailMinWidth 672，默认 220+672=892），`WindowMinSizeSetter` 同步 NSWindow，过窄时自动放大。窗口位置/大小经 `setFrameAutosaveName("PingMonitorMainWindow")` 持久化（首启居中）。
 - 左列 `SidebarView`：宽度可拖拽（SidebarResizer，透明 8pt 热区 + resizeLeftRight 光标，DragGesture 持久化到 `@AppStorage("pm.sidebarWidth")`）。
 - 右列：`VStack { headerView; detailContent }`，左缘自绘 1pt 发丝分隔线。
+- **内容宽度标准（2026-08-29 统一）**：所有页面滚动列内容水平边距 = `Theme.Layout.cardPadding`(16)，卡片间距 = `Theme.Layout.gridSpacing`(16)——修复 SettingsTab 曾有的 ScrollView 双层 padding（内容 32pt，与 16pt 的页面头卡片错位）；各页卡片间距 20 → gridSpacing 统一。
 
 ### 5.2 侧边栏（SidebarView.swift）
 - 品牌区：渐变图标（accentBlue→accentPurple `network.badge.shield.half.filled`）+ "PingMonitor"。
@@ -118,7 +121,9 @@ cardCornerRadius 12、cardPadding 16、gridSpacing 16、twoColumnMinWidth 280、
 
 - 底部：分隔线 + 32pt 圆形头像 + `NSFullUserName()` + `vX.Y` 版本号 + gear 进设置。
 
-### 5.3 Header（顶栏，ultraThinMaterial + 浅色渐变）
+### 5.3 Header（卡片式页面头，2026-08-29 改版）
+- **视觉**：不再是通栏材质条——呼吸灯/标题/副标题/EN 圆钮/TailnetStatusPill/启停胶囊整体置于浮动卡片（cardBackground + 12pt 圆角 + 1pt cardBorder，左右距窗缘 16pt），与页内 ModernCard 同一语言；语言圆钮底色改 surfaceOverlay 保持对比。
+- 内容自左向右：
 1. **呼吸状态灯**：24pt 绿圆 opacity 扩散动画（1.5s easeInOut repeatForever，scale 1.6→0）+ 中心 10pt 实心圆（运行绿带阴影 / 停止灰）；
 2. 页标题 + 副标题（"Monitoring N hosts" / "Stopped"）；
 3. **语言切换圆钮**（"EN"/"中"）；
@@ -130,7 +135,7 @@ cardCornerRadius 12、cardPadding 16、gridSpacing 16、twoColumnMinWidth 280、
 ## 6. 页面明细
 
 ### 6.1 监控页 MonitorTab
-- 工具栏：标题"监控 (N)" + borderedProminent "+" 添加主机；空态 `ContentUnavailableView`。
+- 工具栏（**cardBar 卡片**）：标题"监控 (N)" + borderedProminent "+" 添加主机；空态 `ContentUnavailableView`。
 - **QuickAccessServicesRibbon**（快捷服务带）：
   - 折叠头 36pt：`bolt.fill` 橙图标 + "快捷访问" + chevron（`@AppStorage("pm.quickAccessExpanded")` 持久化，spring 0.28/0.82）。
   - 每行：6pt 状态圆点 + 主机名（110pt 固定列）+ 水平滚动服务 chips（SF 图标 + 名称 + WEB/SSH/CMD pill）。点击打开：web/custom `NSWorkspace.open`；ssh 生成 `/tmp/pm_ssh_<8位>.command` 脚本（自删 + chmod +x，绕过 AppleScript 授权）。`.help` 显示目标预览；右键：打开 / 复制目标。
@@ -159,7 +164,7 @@ cardCornerRadius 12、cardPadding 16、gridSpacing 16、twoColumnMinWidth 280、
 - *旧统计页 StatisticsTab 已在 2026-08-29 重构中删除*（零调用点死代码，含 AggregatedStats/StatsRawMetricsCard 等 13 项原始指标卡实现；其"13 项指标"若需恢复可参见 git 历史）。
 
 ### 6.4 路由跟踪 TracerouteView
-- 顶栏（ultraThinMaterial）：主机输入框（320pt，onSubmit 开始）、**MTR 开关**（Toggle switch，运行时禁用）、Start/Stop 胶囊、NSLookup 按钮、复制按钮（成功 1.5s 变 ✓）、MTR 提示行。
+- 顶栏（**cardBar 卡片**）：主机输入框（320pt，onSubmit 开始）、**MTR 开关**（Toggle switch，运行时禁用）、Start/Stop 胶囊、NSLookup 按钮、复制按钮（成功 1.5s 变 ✓）、MTR 提示行。
 - 空态：渐变大图标 + 3 个 QuickTarget（8.8.8.8 / 1.1.1.1 / baidu.com）+ 已监控主机网格（MonitoredHostCard 点击即追踪）。
 - 结果态 **VSplitView**：
   - 上部 **TracerouteMapView**（MapKit）：逐跳地理坐标 MapPolyline 折线（蓝 2pt）+ 每跳 12pt latencyColor 圆标注 + 跳数标签；相机随 hops 自适应包围盒；仅 MapZoomStepper。
@@ -168,7 +173,7 @@ cardCornerRadius 12、cardPadding 16、gridSpacing 16、twoColumnMinWidth 280、
 - **TracerouteManager**：`/usr/sbin/traceroute -n -I -m 30 -q 3 -w 1`，并按路由上下文追加 `-i <接口>` 与 `-s <源地址>`（ICMP ECHO；`/usr/bin/script -q /dev/null` 包装骗 TTY）；追踪中的错误行（unreachable/no route/unknown host 等）实时显示在进度文本里；MTR = shell 每秒 1 轮循环 + 轮次合并（latencies 保留最近 3 次、滚动平均，逐跳表底部有 "..." 加载行）；`route -n get` 解析路由上下文（接口/网关/源地址，隧道接口智能回避）；GeoIP 走 ip-api.com（actor 缓存 + 私网跳过，Tailscale 100.x 与 IPv6 ULA `fd7a:115c:a1e0:` 前缀 hop 从节点表取 "Relay: x"）；NSLookup 解析 Server/CNAME/A 记录（空态页也可先解析后追踪，失败显示红色错误）；结果复制为对齐文本表。
 
 ### 6.5 测速页 NetworkSpeedTab
-- 顶部分段 Tab（接口 / 进程，200pt，spring 0.3/0.7）。
+- 顶部**分段 Tab**（**cardBar 卡片**内，`CardSegmentedControl` 统一组件，等宽分段 + 滑动高亮）：接口 / 进程。
 - **接口页 6 卡**：
   1. **speedOverviewCard**：上传（紫 hero 字号）/下载（青）大速率 + 累计字节；右侧刷新间隔 Picker（1/2/3/5/10s）+ 接口选择 Picker；"all" 时追加 Tunnel/VPN 行（隧道速率取 utun max 防重复计数，说明文字硬编码英文）。
   2. **speedChartCard**：60 秒折线（Upload 紫 / Download 青，Line+Area 渐变，高 120pt），历史容量 60 条。
@@ -199,12 +204,15 @@ cardCornerRadius 12、cardPadding 16、gridSpacing 16、twoColumnMinWidth 280、
 - SSH 命令构造：`-p` 非默认端口、`-i` key 路径、密码模式内联 `expect -c 'spawn…send…interact'`（密码转义）。
 
 ### 6.8 主机管理页 HostManagementTab
-- 自绘分段控件（"已保存 (N)" / "常用模板 (N)"，matchedGeometryEffect 滑动高亮）。
+- 分段控件已替换为 `CardSegmentedControl` 统一组件（"已保存 (N)" / "常用模板 (N)"，等宽分段 + 滑动高亮，置于 **cardBar 卡片**内）。
 - **已保存**：`HostManagementCard` 网格（server.rack 蓝图标 + 名称 + 地址 + 规则 chips ≤3 条 + 探测模式行 + 命令行；hover 显编辑/删除圆钮 + 放大 1.01；右键：编辑/删除）。添加主机默认规则 `<50ms→Direct`、`>100ms→Relay`。
 - **模板**：`PresetManagementCard`（bookmark 橙图标 + "+" 加入监控绿钮；右键：加入监控/编辑/删除；内置 8.8.8.8 / 1.1.1.1 / 百度 / 淘宝）+ PresetEditorSheet（宽 380：名称/地址/命令）。
 
 ### 6.9 日志页 LogsTab
-- 级别分段 Picker（全部/DEBUG/INFO/WARN/ERROR）+ 清空 + 导出（fileExporter，默认名 `PingMonitor_Logs_<时间戳>.txt`；单主机导出为 `<主机名>_Logs_<时间戳>.txt` 且行内不带主机名前缀）。
+- 工具栏（**cardBar 卡片**）：级别分段 Picker（全部/DEBUG/INFO/WARN/ERROR）+ 清空 + 导出（fileExporter，默认名 `PingMonitor_Logs_<时间戳>.txt`；单主机导出为 `<主机名>_Logs_<时间戳>.txt` 且行内不带主机名前缀）。
+- 日志列表装入卡片容器（cardBackground + 12pt 圆角 + cardBorder 描边，`scrollContentBackground(.hidden)` 去掉 List 默认底色），行内水平 padding 12pt——2026-08-29 修复：此前 List 通栏裸排与卡片语言脱节。
+- 列表卡顶部带**列对齐表头**（固定不滚动，surfaceOverlay 底）：圆点占位 / 时间（155pt）/ 级别（50pt）/ 主机（140pt）/ 内容（弹性），列宽由共享常量 `LogColumn` 定义，表头与行逐列对齐（`logs.header.*` key）——2026-08-29 补齐：原始设计就没有表头，非重构丢失。
+- **表格化行布局**：LogRow 单行五列（圆点/时间/级别/主机/内容），主机与内容不再上下堆叠；斑马纹区分行（偶数行 surfaceOverlay 0.45）；内容超长单行截断 + `.help` 悬停看全文 + 可选中；列表用 ScrollView+LazyVStack 实现（List 的系统 row inset 会破坏表头对齐）。
 - List 倒序行：6pt 级别色圆点 + 时间戳（130pt）+ 级别标签（50pt）+ 主机名 + 消息（可选中）。LogManager 上限 1000 条。
 
 ### 6.10 设置页 SettingsTab（MainView 内）
@@ -217,7 +225,7 @@ cardCornerRadius 12、cardPadding 16、gridSpacing 16、twoColumnMinWidth 280、
 
 ## 7. 主机详情覆盖层 HostDetailView
 
-- Header：返回按钮 + 可达圆点 + 主机名/地址 + 实时延迟徽章（latencyColor 0.1 背景）；检测中显示 ProgressView + "检测中…"。内容区同用 `fitsTwoColumns` 做 2 列/单列响应式（宽度实测驱动）。
+- Header（**卡片式**，与主页面头同语言）：返回按钮 + 可达圆点 + 主机名/地址 + 实时延迟徽章（latencyColor 0.1 背景）；检测中显示 ProgressView + "检测中…"。内容区同用 `fitsTwoColumns` 做 2 列/单列响应式（宽度实测驱动）。
 - 内容行序：〔状态卡 + 延迟统计卡〕→ 延迟图表卡（全宽）→〔包统计卡 + 流量卡〕→ 操作按钮行 →〔显示规则卡 + 服务快捷卡〕→〔记录卡 + 日志卡〕。
 - **状态卡**：Online/Offline + Uptime（≥1h `dh dmm` 否则 `dm dss`）+ 诊断信息行（探测模式 / 质量分+P95+Loss / 最近结果 / 路径快照 / 最近检测时间 / 命令）。
 - **延迟统计卡**：Current（latencyColor）/ Min（绿）/ Max（红）/ Avg（蓝）+ Jitter（橙，= max−min）。
@@ -439,3 +447,21 @@ i18n 双字典（**每语言 63 key**，localStorage `pm-lang`）、GitHub relea
 - `xcodegen generate` + Xcode 27 `xcodebuild build`：**BUILD SUCCEEDED**。
 - 单元测试：**37/37 通过**（NetworkSpeedManagerTests 35 + QualityEngineTests 2）。
 - 备份：`~/PingMonitor/Ping-Monitor-src-backup-20260829.tar.gz`；未提交 git（工作区可用 `git diff` 审阅）。
+
+### 2026-08-29 追加：顶部布局全量卡片化
+- 用户反馈不喜欢通栏式页面顶栏 → **所有页面顶部改用卡片**，新增统一样式 `View.cardBar(topInset:bottomInset:)`（Components.swift，与 ModernCard 同视觉语言：cardBackground + 12pt 圆角 + 1pt cardBorder）。
+- 改造点：①主窗口共享 Header（MainView，去材质层与渐变，语言圆钮改 surfaceOverlay 底）；②监控页工具栏；③路由追踪工具栏；④测速页分段 Tab；⑤主机管理分段控件（滑轨改 surfaceOverlay）与已保存/模板两个子页工具栏；⑥日志页工具栏；⑦主机详情覆盖层 Header。
+- 不再存在页面级 ultraThinMaterial（2026-08-29 二次修复：主机管理/模板两张卡片原用 `.fill(.ultraThinMaterial)` + `textTertiary 0.08` 描边，浅色模式下与背景几乎无对比，已统一为 cardBackground + cardBorder 令牌，hover 描边加强至 0.45）；Dashboard/服务/Tailscale/设置本就是纯卡片流，未动。
+- 验证：BUILD SUCCEEDED，37/37 测试通过。
+
+### 2026-08-29 追加：统一分段切换控件
+- 用户反馈网速页与主机管理页的两个分段 Tab 视觉不一致 → 新增 `CardSegmentedControl`（Components.swift），两页共用。
+- 差异根因：网速页原为固定 200pt 宽、选中项自绘蓝底无滑轨、无滑动动画的自研实现；主机管理页为全宽等分 + surfaceOverlay 滑轨 + matchedGeometryEffect 滑动高亮。统一后均为：等宽分段、surfaceOverlay 滑轨、accentBlue 滑动高亮、body 字号、滑动 spring(0.3/0.7)。
+
+### 2026-08-29 追加：设计令牌全量合规审计
+对 15 个视图文件扫描五类违规（硬编码系统字号 / 绕过 Theme 的语义字体 / 直接色 / 数字圆角 / hex 泄漏），结果与处置：
+- **合规项**：无 `.font(.system(size:))`、无数字圆角、无 hex 泄漏（仅 Theme.swift 持有 hex 定义）。
+- **修正 8 处语义字体**（`.headline`→`Fonts.ui(headline, .semibold)`，`.caption`→`Fonts.ui(caption)`，图标→`Fonts.icon(caption)`）：HostEditorSheet ×3、MonitorTab 工具栏标题、HostManagementTab ×3、SettingsTab 状态栏说明。
+- **修正 3 处直接色**：LogsTab 时间戳 `.foregroundStyle(.tertiary)`→`textTertiary`；ServicesTab 命令预览黑底 → 新令牌 `Theme.Colors.codeBackground`（黑 30%）；TailscaleTab 结果胶囊黑底 → 新令牌 `Theme.Colors.chipOverlay`（黑 10%）。
+- **豁免例外（功能用途，非样式）**：MonitorTab 0.1% 透明点击遮罩；PingMonitorApp 状态栏 NSColor.white/black（用户显式选择"浅色/深色"文字颜色）；Widget 的 `.system(size:)`（Widget target 不含 Theme.swift，像素规格由 §9 单独定义）。
+- **容器间距**：各页滚动列 padding=cardPadding(16)、卡片间距=gridSpacing(16)（本日早前已统一）；组件内 ≤14pt 的微间距属组件规格（design.md 各节已标注），不设全局令牌。

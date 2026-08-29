@@ -23,7 +23,7 @@ struct TailscaleTab: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 20) {
+            VStack(spacing: Theme.Layout.gridSpacing) {
                 // Status Card
                 statusCard
                 
@@ -972,7 +972,7 @@ struct TailscaleTab: View {
                         .foregroundStyle(result.contains("P2P") ? Theme.Colors.accentGreen : (result.contains("Error") ? Theme.Colors.accentRed : Theme.Colors.accentOrange))
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(Color.black.opacity(0.1))
+                        .background(Theme.Colors.chipOverlay)
                         .cornerRadius(Theme.Radius.xs)
                     Spacer()
                 }

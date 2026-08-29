@@ -7,19 +7,18 @@ struct HostManagementTab: View {
     @ObservedObject var viewModel: PingMonitorViewModel
     @State private var selectedSection = 0
     @ObservedObject private var languageManager = LanguageManager.shared
-    @Namespace private var animation
     
     var body: some View {
         VStack(spacing: 0) {
-            // Custom Segmented Control
-            HStack(spacing: 0) {
-                customTabButton(title: "\(languageManager.t("host.manage.section.saved")) (\(viewModel.hosts.count))", section: 0)
-                customTabButton(title: "\(languageManager.t("host.manage.section.presets")) (\(viewModel.presets.count))", section: 1)
-            }
-            .padding(4)
-            .background(Theme.Colors.cardBackground)
-            .cornerRadius(Theme.Radius.md)
-            .padding()
+            // Custom Segmented Control（统一分段控件，卡片式）
+            CardSegmentedControl(
+                segments: [
+                    "\(languageManager.t("host.manage.section.saved")) (\(viewModel.hosts.count))",
+                    "\(languageManager.t("host.manage.section.presets")) (\(viewModel.presets.count))"
+                ],
+                selection: $selectedSection
+            )
+            .cardBar()
             
             if selectedSection == 0 {
                 HostsManagementView(viewModel: viewModel)
@@ -27,34 +26,6 @@ struct HostManagementTab: View {
                 PresetsManagementView(viewModel: viewModel)
             }
         }
-    }
-    
-    @ViewBuilder
-    private func customTabButton(title: String, section: Int) -> some View {
-        Button {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                selectedSection = section
-            }
-        } label: {
-            Text(title)
-                .font(Theme.Fonts.ui(Theme.Fonts.Size.body))
-                .fontWeight(selectedSection == section ? .medium : .regular)
-                .foregroundStyle(selectedSection == section ? Theme.Colors.onAccent : Theme.Colors.textSecondary)
-                .padding(.vertical, 6)
-                .padding(.horizontal, 16)
-                .frame(maxWidth: .infinity)
-                .background(
-                    ZStack {
-                        if selectedSection == section {
-                            RoundedRectangle(cornerRadius: Theme.Radius.sm)
-                                .fill(Theme.Colors.accentBlue)
-                                .matchedGeometryEffect(id: "HostManageTabBackground", in: animation)
-                        }
-                    }
-                )
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
     }
 }
 
@@ -75,7 +46,7 @@ struct HostsManagementView: View {
         VStack(spacing: 0) {
             HStack {
                 Text(languageManager.t("sidebar.hosts"))
-                    .font(.caption)
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                     .foregroundStyle(Theme.Colors.textSecondary)
                 Spacer()
                 Button {
@@ -86,8 +57,7 @@ struct HostsManagementView: View {
                 .buttonStyle(.borderedProminent)
                 .controlSize(.small)
             }
-            .padding(.horizontal)
-            .padding(.bottom, 12)
+            .cardBar(bottomInset: 12)
             
             if viewModel.hosts.isEmpty {
                 ContentUnavailableView(languageManager.t("host.manage.no_hosts"), systemImage: "server.rack", description: Text(languageManager.t("host.manage.add_hint")))
@@ -300,12 +270,12 @@ struct HostManagementCard: View {
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: Theme.Radius.lg)
-                .fill(.ultraThinMaterial)
-                .shadow(color: .black.opacity(isHovered ? 0.08 : 0.03), radius: isHovered ? 8 : 4, y: 2)
+                .fill(Theme.Colors.cardBackground)
+                .shadow(color: .black.opacity(isHovered ? 0.08 : 0.04), radius: isHovered ? 8 : 3, y: 1)
         )
         .overlay(
             RoundedRectangle(cornerRadius: Theme.Radius.lg)
-                .stroke(isHovered ? Theme.Colors.accentBlue.opacity(0.15) : Theme.Colors.textTertiary.opacity(0.08), lineWidth: 1)
+                .stroke(isHovered ? Theme.Colors.accentBlue.opacity(0.45) : Theme.Colors.cardBorder, lineWidth: 1)
         )
         .scaleEffect(isHovered ? 1.01 : 1.0)
         .contextMenu {
@@ -331,7 +301,7 @@ struct PresetsManagementView: View {
         VStack(spacing: 0) {
             HStack {
                 Text(languageManager.t("host.manage.quick_add"))
-                    .font(.caption)
+                    .font(Theme.Fonts.ui(Theme.Fonts.Size.caption))
                     .foregroundStyle(Theme.Colors.textSecondary)
                 Spacer()
                 Button {
@@ -342,8 +312,7 @@ struct PresetsManagementView: View {
                 .buttonStyle(.borderedProminent)
                 .controlSize(.small)
             }
-            .padding(.horizontal)
-            .padding(.bottom, 12)
+            .cardBar(bottomInset: 12)
             
             if viewModel.presets.isEmpty {
                 ContentUnavailableView(languageManager.t("host.manage.no_presets"), systemImage: "bookmark", description: Text(languageManager.t("host.manage.add_preset_hint")))
@@ -495,12 +464,12 @@ struct PresetManagementCard: View {
         .frame(height: 110, alignment: .top)
         .background(
             RoundedRectangle(cornerRadius: Theme.Radius.lg)
-                .fill(.ultraThinMaterial)
-                .shadow(color: .black.opacity(isHovered ? 0.08 : 0.03), radius: isHovered ? 8 : 4, y: 2)
+                .fill(Theme.Colors.cardBackground)
+                .shadow(color: .black.opacity(isHovered ? 0.08 : 0.04), radius: isHovered ? 8 : 3, y: 1)
         )
         .overlay(
             RoundedRectangle(cornerRadius: Theme.Radius.lg)
-                .stroke(isHovered ? Theme.Colors.accentOrange.opacity(0.15) : Theme.Colors.textTertiary.opacity(0.08), lineWidth: 1)
+                .stroke(isHovered ? Theme.Colors.accentOrange.opacity(0.45) : Theme.Colors.cardBorder, lineWidth: 1)
         )
         .scaleEffect(isHovered ? 1.01 : 1.0)
         .contextMenu {
@@ -524,7 +493,7 @@ struct PresetEditorSheet: View {
     var body: some View {
         VStack(spacing: 20) {
             Text(title)
-                .font(.headline)
+                .font(Theme.Fonts.ui(Theme.Fonts.Size.headline, weight: .semibold))
 
             Form {
                 TextField(languageManager.t("editor.name"), text: $name)

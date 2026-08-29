@@ -606,6 +606,10 @@ public final class LanguageManager: ObservableObject {
             // Logs (additions)
             "logs.title": "Logs",
             "logs.empty": "No logs yet",
+            "logs.header.time": "Time",
+            "logs.header.level": "Level",
+            "logs.header.host": "Host",
+            "logs.header.content": "Content",
             // 重构补充：原硬编码英文字符串
             "traceroute.location": "Location",
             "host.records.title": "Records",
@@ -1207,6 +1211,10 @@ public final class LanguageManager: ObservableObject {
             // Logs (additions)
             "logs.title": "日志",
             "logs.empty": "暂无日志",
+            "logs.header.time": "时间",
+            "logs.header.level": "级别",
+            "logs.header.host": "主机",
+            "logs.header.content": "内容",
             // 重构补充：原硬编码英文字符串
             "traceroute.location": "归属地",
             "host.records.title": "记录",

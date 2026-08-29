@@ -21,26 +21,23 @@ struct NetworkSpeedTab: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Tab Switcher
-            HStack {
-                HStack(spacing: 2) {
-                    customTabButton(title: languageManager.t("netspeed.tab.interfaces"), mode: .interfaces)
-                    customTabButton(title: languageManager.t("netspeed.tab.processes"), mode: .processes)
-                }
-                .padding(3)
-                .background(Theme.Colors.cardBackground)
-                .cornerRadius(Theme.Radius.md)
-                .frame(width: 200)
-                Spacer()
-            }
-            .padding(.horizontal, Theme.Layout.cardPadding)
-            .padding(.top, 12)
-            .padding(.bottom, 4)
+            // Tab Switcher（统一分段控件，卡片式）
+            CardSegmentedControl(
+                segments: [
+                    languageManager.t("netspeed.tab.interfaces"),
+                    languageManager.t("netspeed.tab.processes")
+                ],
+                selection: Binding(
+                    get: { tabMode == .interfaces ? 0 : 1 },
+                    set: { tabMode = $0 == 0 ? .interfaces : .processes }
+                )
+            )
+            .cardBar(bottomInset: 4)
             
             // Content
             if tabMode == .interfaces {
                 ScrollView {
-                    VStack(spacing: 20) {
+                    VStack(spacing: Theme.Layout.gridSpacing) {
                         speedOverviewCard
                         speedChartCard
                         topProcessesCard
@@ -67,29 +64,7 @@ struct NetworkSpeedTab: View {
         }
     }
     
-    private func customTabButton(title: String, mode: NetSpeedTabMode) -> some View {
-        Button(action: {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                tabMode = mode
-            }
-        }) {
-            Text(title)
-                .font(Theme.Fonts.ui(Theme.Fonts.Size.callout))
-                .fontWeight(tabMode == mode ? .semibold : .regular)
-                .foregroundStyle(tabMode == mode ? Theme.Colors.onAccent : Theme.Colors.textSecondary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 5)
-                .background(
-                    RoundedRectangle(cornerRadius: Theme.Radius.sm)
-                        .fill(tabMode == mode ? Theme.Colors.accentBlue : Color.clear)
-                )
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-    
-    // MARK: - Speed Overview Card
-    
+    // MARK: - Speed Overview Card    
     private var speedOverviewCard: some View {
         ModernCard {
             VStack(alignment: .leading, spacing: 14) {

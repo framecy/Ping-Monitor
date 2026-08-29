@@ -47,7 +47,7 @@ struct ServicesTab: View {
     
     var body: some View {
         ScrollView {
-            VStack(spacing: 20) {
+            VStack(spacing: Theme.Layout.gridSpacing) {
                 // Stats + Controls header
                 statsCard
                 
@@ -569,7 +569,7 @@ struct ShortcutEditorSheet: View {
                             .foregroundStyle(Theme.Colors.accentGreen)
                             .padding(8)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color.black.opacity(0.3))
+                            .background(Theme.Colors.codeBackground)
                             .cornerRadius(Theme.Radius.sm)
                     }
                 }

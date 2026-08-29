@@ -253,7 +253,15 @@ struct HostDetailView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(.ultraThinMaterial)
+        .background(Theme.Colors.cardBackground)
+        .cornerRadius(Theme.Layout.cardCornerRadius)
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.Layout.cardCornerRadius)
+                .stroke(Theme.Colors.cardBorder, lineWidth: 1)
+        )
+        .padding(.horizontal, Theme.Layout.cardPadding)
+        .padding(.top, Theme.Layout.cardPadding)
+        .padding(.bottom, 4)
     }
     
     // MARK: - Status Card

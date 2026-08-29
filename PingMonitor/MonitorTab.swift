@@ -22,7 +22,7 @@ struct MonitorTab: View {
                 // 工具栏
                 HStack {
                     Text("\(languageManager.t("monitor.title")) (\(viewModel.hosts.count))")
-                        .font(.headline)
+                        .font(Theme.Fonts.ui(Theme.Fonts.Size.headline, weight: .semibold))
                     Spacer()
                     Button {
                         showingAddHost = true
@@ -32,8 +32,7 @@ struct MonitorTab: View {
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
                 }
-                .padding()
-                .background(.ultraThinMaterial)
+                .cardBar()
                 
                 if viewModel.hosts.isEmpty {
                     ContentUnavailableView(languageManager.t("monitor.no_hosts"), systemImage: "network", description: Text(languageManager.t("monitor.add_host_hint")))

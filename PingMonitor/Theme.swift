@@ -66,6 +66,12 @@ struct Theme {
             overlayTint(dark: 0.06, light: 0.08)
         }
 
+        /// 命令/SSH 预览的终端风黑底（恒为黑，明暗模式同值）。
+        static let codeBackground = Color.black.opacity(0.3)
+
+        /// 结果胶囊（如 Tailscale ping 结果）的黑底。
+        static let chipOverlay = Color.black.opacity(0.1)
+
         /// 明暗两套外观下的中性叠加色，避免各处硬编码 white/black + opacity。
         private static func overlayTint(dark: CGFloat, light: CGFloat) -> Color {
             Color(nsColor: NSColor(name: nil) { appearance in

@@ -202,8 +202,7 @@ struct TracerouteView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .padding()
-        .background(.ultraThinMaterial)
+        .cardBar()
     }
     
     // MARK: - Empty State

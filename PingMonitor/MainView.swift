@@ -97,6 +97,7 @@ struct MainView: View {
                 .layoutPriority(1)
 
             VStack(spacing: 0) {
+                // 页面头改为浮动卡片（cardBar），不再通栏铺满材质层
                 headerView
 
                 detailContent
@@ -166,7 +167,7 @@ struct MainView: View {
         }
     }
 
-    // MARK: - Header
+    // MARK: - Header（卡片式：与页内 ModernCard 同一视觉语言）
     private var headerView: some View {
         HStack(spacing: 14) {
             // Animated status indicator
@@ -201,7 +202,7 @@ struct MainView: View {
                     .font(Theme.Fonts.ui(Theme.Fonts.Size.body, weight: .bold))
                     .foregroundStyle(Theme.Colors.textSecondary)
                     .padding(6)
-                    .background(Theme.Colors.cardBackground)
+                    .background(Theme.Colors.surfaceOverlay)
                     .clipShape(Circle())
             }
             .buttonStyle(.plain)
@@ -230,18 +231,16 @@ struct MainView: View {
             .buttonStyle(.plain)
         }
         .padding(.horizontal, 20)
-        .padding(.vertical, 12)
-        .background(
-            LinearGradient(
-                colors: [
-                    viewModel.isRunning ? Theme.Colors.accentGreen.opacity(0.04) : Theme.Colors.textTertiary.opacity(0.03),
-                    .clear
-                ],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
+        .padding(.vertical, 14)
+        .background(Theme.Colors.cardBackground)
+        .cornerRadius(Theme.Layout.cardCornerRadius)
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.Layout.cardCornerRadius)
+                .stroke(Theme.Colors.cardBorder, lineWidth: 1)
         )
-        .background(.ultraThinMaterial)
+        .padding(.horizontal, Theme.Layout.cardPadding)
+        .padding(.top, Theme.Layout.cardPadding)
+        .padding(.bottom, 4)
     }
 }
 
